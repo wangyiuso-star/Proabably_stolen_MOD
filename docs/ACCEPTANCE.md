@@ -70,7 +70,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 
 期望：
 
-- HarmonyProbe：`patched 7 method(s)`（AppraisalAssistant）、`patched 4 method(s)`（AugSpotter）、`RESULT: PASS`。
+- HarmonyProbe：`patched 8 method(s)`（AppraisalAssistant）、`patched 4 method(s)`（AugSpotter）、`RESULT: PASS`。
 - LogicProbe：`aug=true/false/null`、真假／缺陷／複製品／假酒全部 PASS、`appraisal_value hand=100`、兩個 DLL 的 `[Scan]` 都是 `refused=False capabilities=[] findings=0`、`RESULT: PASS`。
 - 這只能證明 patch 與純邏輯，不代表 UI 已在遊戲畫面驗證；UI 仍需第 6 節手動驗收。
 
@@ -90,7 +90,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 [ModLoader]   Initialized: AugSpotter v1.0.0
 ```
 
-- `AppraisalAssistant` 的 `N = 7`（tooltip、force-estimate、OnInspectItem 重置兼 auto-fill、三個 confront 標題、真假 tooltip）。
+- `AppraisalAssistant` 的 `N = 8`（tooltip、force-estimate、OnInspectItem 重置兼 auto-fill、PlayerStore.Reset 清 session、三個 confront 標題、真假 tooltip）。
 - `AugSpotter` 的 `N = 4`（到達、特殊顧客、離開、Reset 四個事件；不再輪詢顧客）。
 - 不得出現 `Init failed`、`LoadError`、`scan refused`、`MissingMethodException`、`NullReferenceException`（與本 MOD 相關者）。
 
@@ -102,7 +102,7 @@ MOD 不再在執行期主動掃描自己的 DLL（已移除 debug self-test／�
 ### B3 無多餘監聽／debug 程式碼
 
 最終版本不安裝任何自測協程、不輪詢日誌、不建立背景監聽：
-- `AppraisalAssistant` 只有 7 個 Harmony patch；沒有 `UpdateAppraisalPanel` 每幀 patch。
+- `AppraisalAssistant` 只有 8 個 Harmony patch；沒有 `UpdateAppraisalPanel` 每幀 patch；`PlayerStore.Reset` 只清 session。
 - `AugSpotter` 只有 4 個事件 patch；首次建立 overlay 後 `Update` 會自動停用，沒有顧客輪詢。
 - `Player.log` 不應出現 `[SelfTest]` 或反覆的 `NullReferenceException`。
 
@@ -257,7 +257,7 @@ PASS appraisal_write_value=100
 
 ### D2 靜態 patch 數量不變
 
-`tools/Probe-Patches.ps1` 應為 `patched 7 method(s)`（AppraisalAssistant）與
+`tools/Probe-Patches.ps1` 應為 `patched 8 method(s)`（AppraisalAssistant）與
 `patched 4 method(s)`（AugSpotter），`RESULT: PASS`；不得為了修效能而移除功能 patch。
 
 ### D3 遊戲內主觀驗收（需玩家操作）

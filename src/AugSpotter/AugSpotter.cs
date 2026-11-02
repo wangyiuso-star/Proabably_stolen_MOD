@@ -76,7 +76,9 @@ namespace DeepSpaceQoL
     {
         private static void Postfix()
         {
-            AugOverlay.Refresh();
+            // The overlay is DontDestroyOnLoad. Destroying it here avoids keeping
+            // old-scene TMP objects/textures alive across a menu -> load transition.
+            AugOverlay.ResetForSceneChange();
         }
     }
 
@@ -172,8 +174,14 @@ namespace DeepSpaceQoL
         {
             if (_instance == null)
             {
-                _refreshPending = true;
-                return;
+                // The previous overlay is destroyed on a scene transition; build
+                // a fresh one from the new scene's Chinese TMP template.
+                RuntimeHost.Create<AugOverlay>("AugSpotterRuntime");
+                if (_instance == null)
+                {
+                    _refreshPending = true;
+                    return;
+                }
             }
             _instance.enabled = true;
             _instance.RefreshNow();
@@ -181,6 +189,11 @@ namespace DeepSpaceQoL
             {
                 _instance.enabled = false;
             }
+        }
+
+        public static void ResetForSceneChange()
+        {
+            RuntimeHost.Destroy();
         }
 
         private void EnsureOverlay()

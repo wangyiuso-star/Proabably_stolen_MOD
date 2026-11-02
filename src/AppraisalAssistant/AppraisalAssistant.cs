@@ -271,6 +271,17 @@ namespace DeepSpaceQoL
         }
     }
 
+    [HarmonyPatch(typeof(PlayerStore), nameof(PlayerStore.Reset))]
+    internal static class AppraisalStoreResetPatch
+    {
+        private static void Postfix()
+        {
+            // Do not keep the previous scene's GameItem graph alive when the
+            // player returns to the main menu and loads another save.
+            AppraisalSession.Clear();
+        }
+    }
+
     [HarmonyPatch(typeof(InspectionUIManager), nameof(InspectionUIManager.OpenCigaretteConfrontPanel))]
     internal static class CigaretteTitlePatch
     {
@@ -381,6 +392,15 @@ namespace DeepSpaceQoL
         public static int Value;
         public static bool HasTruth;
         public static TruthResult Truth;
+
+        public static void Clear()
+        {
+            Item = null;
+            HasValue = false;
+            Value = 0;
+            HasTruth = false;
+            Truth = default(TruthResult);
+        }
 
         public static bool IsCurrent(GameItem item)
         {

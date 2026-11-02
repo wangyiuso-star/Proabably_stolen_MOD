@@ -126,8 +126,9 @@ docs/TEST_EVIDENCE.md       實際測試輸出與還原紀錄
 
 - 不讀寫本機檔案、不連網、不啟動程序、不使用反射／動態碼／P/Invoke；manifest 的 `<Capabilities/>` 為空。
 - 只 patch 遊戲公開方法，不改存檔格式、不新增物品到玩家庫存。
-- **先前遊戲內已確認（上一版）**：真假判定全數通過、Aug overlay 中文顯示正常；遊戲內建 `ModScanner` 對兩個 DLL 給出 `refused=False, capabilities=[], findings=0`。目前鑑定 patch 為 7 個（已移除每幀 auto-fill patch）。
-- **AugSpotter 事件驅動（本版）**：4 個 Harmony patch（到達、特殊顧客、離開、Reset）；不再每 0.5 秒讀顧客，首次更新成功後 `Update()` 會自動停用。事件版尚未在遊戲內實測。
+- **先前遊戲內已確認（上一版）**：真假判定全數通過、Aug overlay 中文顯示正常；遊戲內建 `ModScanner` 對兩個 DLL 給出 `refused=False, capabilities=[], findings=0`。目前鑑定 patch 為 8 個（已移除每幀 auto-fill patch，另有 `PlayerStore.Reset` 清 session）。
+- **AugSpotter 事件驅動（本版）**：4 個 Harmony patch（到達、特殊顧客、離開、Reset）；不再每 0.5 秒讀顧客，首次更新成功後 `Update()` 會自動停用。`PlayerStore.Reset` 時會銷毀 `DontDestroyOnLoad` overlay，避免返回主菜單後把舊場景 TMP／材質帶到新存檔。
+- **返回主菜單清理**：`AppraisalAssistant` 也在 `PlayerStore.Reset` 清空 `AppraisalSession`，不保留舊存檔的 `GameItem` 參照。
 - **效能修正**：估價面板的 `APPRAISAL_DEFAULT_VALUE` 只在值真的不同時才寫入；而且它是純數值 tag，不影響 shape／feature／inventory slot，所以寫入時使用 `skipValidate: true` 並手動同步 `modifiedState`。這避免 `ValidateShapeState()` → `OverlayHandler.UpdateInventoryStateUI()` 的背包 UI 重建。
 - **只在放大鏡檢查時顯示**：`OnInspectItem` 時只掃一次，把正確值與真假結果存進 `AppraisalSession`；tooltip 只有當該物品仍是 `InspectionUIManager.currentInspectingItem` 時才加行，且只格式化 session，不再每幀掃 registry／ItemFeature。普通拖動物品完全不加行、不計算。
 - **仍需你實測**：同一存檔連續切換 10 位以上顧客，確認主觀卡頓是否消失；若 overlay 位置擋住 UI，改 `src/AugSpotter/AugSpotter.cs` 的 `anchoredPosition` 後重編譯。

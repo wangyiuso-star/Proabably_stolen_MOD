@@ -197,7 +197,7 @@ GameItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", ...)
 
 ```text
 Compiling AppraisalAssistant...
-  -> dist\AppraisalAssistant\AppraisalAssistant.dll (15360 bytes)
+  -> dist\AppraisalAssistant\AppraisalAssistant.dll (15872 bytes)
 Compiling AugSpotter...
   -> dist\AugSpotter\AugSpotter.dll (9216 bytes)
 Build OK
@@ -206,7 +206,7 @@ Build OK
 `tools/Verify-Mods.ps1`：
 
 ```text
-PASS AppraisalAssistant.dll: HarmonyPatch attributes checked (7)
+PASS AppraisalAssistant.dll: HarmonyPatch attributes checked (8)
 PASS AugSpotter.dll: HarmonyPatch attributes checked (4)
 RESULT: PASS
 ```
@@ -222,7 +222,7 @@ RESULT: PASS
 `tools/Probe-Patches.ps1`：
 
 ```text
-patched 7 method(s)
+patched 8 method(s)
   AppraisalHelper.CreateAppraisalTooltip
   InspectableHelper.CreateInspectableTooltip
   InspectionUIManager.OnAppraisalServiceEstimated
@@ -230,6 +230,7 @@ patched 7 method(s)
   InspectionUIManager.OpenCigaretteConfrontPanel
   InspectionUIManager.OpenInjectorConfrontPanel
   InspectionUIManager.OpenStampConfrontPanel
+  PlayerStore.Reset
 patched 4 method(s)
   PlayerStore.DismissCurrentClient
   PlayerStore.Reset
@@ -244,8 +245,8 @@ RESULT: PASS
 安裝後雜湊：
 
 ```text
-AppraisalAssistant match=True installed=343450B0E09F57B35E4061B14CD65DCF11F2EFBA89C3E8988922C8FA7F750C1C
-AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A567B49A61638D702AB067B340E
+AppraisalAssistant match=True installed=63A9F4C9F4969C681F5F0C24E2036125F1F8A57616A3427C36FDCA2A673E9844
+AugSpotter         match=True installed=A3207236405D3549B616F713060497AA2113ADE4EF26C02E24BEDD45A6EDECE2
 ```
 
 ### 9.4 AugSpotter 改為事件驅動
@@ -271,7 +272,7 @@ AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A56
 - `AppraisalTag.SetDefaultValue()` 使用 `ModifyTag(..., skipValidate: true)` 並手動同步
   `modifiedState`；`APPRAISAL_DEFAULT_VALUE` 是純數值 tag，不需要重建 shape／背包 UI。
 - `AppraisalForceEstimatePatch` 保留，提交時仍以正確值覆蓋。
-- `AppraisalAssistant` patch 數：8 → 7。
+- `AppraisalAssistant` patch 數：8 → 7（移除 auto-fill）→ 8（新增 PlayerStore.Reset 清 session）。
 - 原始碼不再有 `UpdateAppraisalPanel` 的 Harmony patch。
 
 ### 9.6 Tooltip 只在放大鏡檢查期間顯示
@@ -287,9 +288,35 @@ AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A56
 - 仍保留 `Log`／`Truth` 的 `ConditionalWeakTable` 快取，避免同一 item 重複掃描；
   Ribwich 因開封狀態會影響 reason，不快取。
 
-### 9.7 尚未核實
+### 9.7 返回主菜單後載入的 native crash
 
-- 尚未在真實遊戲內量測 frame time；需要玩家在最新 `343450` 版拖動普通物品與鑑定物品做主觀驗收。
+Windows Event Log 的 `Application Error` 顯示：
+
+```text
+Faulting application name: Probably Stolen.exe
+Faulting module name: ntdll.dll
+Exception code: 0xc0000005
+```
+
+時間為 20:53:13 與 21:19:46，都是返回主菜單／載入切換時。`Player.log` 沒有 managed
+exception，但遊戲日誌有 28 次 `Trying to add a duplicate Directory`。因此不是單純的
+存檔 JSON 錯誤，而是 native access violation。
+
+清理措施：
+
+- `AugOverlay` 是 `DontDestroyOnLoad`；`PlayerStore.Reset` 時呼叫
+  `AugOverlay.ResetForSceneChange()` → `RuntimeHost.Destroy()`，不讓舊場景 TMP／材質
+  跨到新存檔；下一次顧客事件再由 `Refresh()` 重建。
+- `AppraisalAssistant` 也在 `PlayerStore.Reset` 清空 `AppraisalSession.Item`，不保留
+  舊存檔的 `GameItem` 參照。
+- `AugSpotter` patch 數仍為 4；`AppraisalAssistant` 變為 8。
+
+尚未核實：這是否能完全消除 `ntdll.dll 0xc0000005`；需要玩家用最新 `63A9F4C9...` 版
+重複「返回主菜單 → 載入」測試，並看 Windows Event Log 是否還有新 crash。
+
+### 9.8 尚未核實
+
+- 尚未在真實遊戲內量測 frame time；需要玩家在最新 `63A9F4C9...` 版拖動普通物品與鑑定物品做主觀驗收。
 - 事件覆蓋率以遊戲源碼的四個入口為準；若某個 debug／特殊流程直接改
   `PlayerStore.currentClientInstance` 而不經過這四個方法，overlay 可能不會立即更新。
   正常遊玩路徑已覆蓋，但尚未逐一實測所有 debug 指令。
