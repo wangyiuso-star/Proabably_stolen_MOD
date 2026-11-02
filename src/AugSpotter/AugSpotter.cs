@@ -167,6 +167,10 @@ namespace DeepSpaceQoL
             {
                 _label.fontSharedMaterial = storeUi.versionTMP.fontSharedMaterial;
             }
+            else if (_label.font != null && _label.font.material != null)
+            {
+                _label.fontSharedMaterial = _label.font.material;
+            }
             _label.fontSize = 24f;
             _label.alignment = TextAlignmentOptions.TopLeft;
             _label.enableWordWrapping = false;
