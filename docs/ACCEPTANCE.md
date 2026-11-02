@@ -139,6 +139,24 @@ MOD 不應該在這個每幀函式上掛 Postfix。真正的鑑定事件是
 4. `AppraisalAssistant` patch 數從 8 降為 7；`tools/Verify-Mods.ps1` PASS。
 5. 原始碼中不得再出現 `UpdateAppraisalPanel` 的 Harmony patch 類別。
 
+### C1.2 拖動物品的 tooltip 快取
+
+`ItemTooltipHandler.OnEventUpdate()` 在滑鼠指著物品時每幀重建 tooltip；`AppraisalAssistant`
+的兩個 tooltip Postfix 因此每幀被呼叫。第一次算出的鑑定值與真假結果要按 `GameItem` 快取，
+後續同一物品只讀快取，不再重跑：
+
+- `AppraisalItemRegistry.Find()` + `AppraisalHelper.GetCorrectBaseValue()`
+- `ItemFeature` 分類掃描（香菸／郵票／注射器／複製品）
+- `CollectIssues()` 的多個 `IsTag` 查詢
+
+驗收：
+
+1. `Log.TryGetCorrectValue()` 同一 `GameItem` 第二次呼叫不再進入計算路徑。
+2. `Truth.TryGet()` 同一 `GameItem` 第二次呼叫不再掃 `ItemFeature`。
+3. 負面結果（不是鑑定品／沒有真假特徵）也要快取，否則普通物品拖動時每幀仍會重掃。
+4. `OnInspectItem` 時清除該物品的鑑定值快取，避免物品後來才被標成 `APPRAISAL_ITEM`。
+5. 現有 `Probe-Logic.ps1` 全部 PASS；遊戲內拖動普通物品與鑑定物品的掉幀應減少。
+
 ### C2 真假類鑑定（genuine / counterfeit）
 
 遊戲代碼依據：

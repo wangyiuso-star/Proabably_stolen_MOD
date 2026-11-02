@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using HarmonyLib;
 using TMPro;
 using UnityEngine;
@@ -75,6 +76,22 @@ namespace DeepSpaceQoL
             Debug.LogError(Prefix + message);
         }
 
+        private sealed class ValueBox
+        {
+            public int Value;
+        }
+
+        private static readonly ConditionalWeakTable<GameItem, ValueBox> ValueCache =
+            new ConditionalWeakTable<GameItem, ValueBox>();
+
+        public static void Forget(GameItem item)
+        {
+            if (item != null)
+            {
+                ValueCache.Remove(item);
+            }
+        }
+
         public static bool TryGetCorrectValue(GameItem item, out int value)
         {
             value = 0;
@@ -82,18 +99,28 @@ namespace DeepSpaceQoL
             {
                 return false;
             }
+            ValueBox cached;
+            if (ValueCache.TryGetValue(item, out cached))
+            {
+                value = cached.Value;
+                return value > 0;
+            }
             try
             {
                 if (!item.IsTag("APPRAISAL_ITEM"))
                 {
+                    ValueCache.Add(item, new ValueBox());
                     return false;
                 }
                 if (AppraisalItemRegistry.Find(item) == null)
                 {
+                    ValueCache.Add(item, new ValueBox());
                     return false;
                 }
                 value = AppraisalHelper.GetCorrectBaseValue(item);
-                return value > 0;
+                bool ok = value > 0;
+                ValueCache.Add(item, new ValueBox { Value = ok ? value : 0 });
+                return ok;
             }
             catch (Exception e)
             {
@@ -172,7 +199,15 @@ namespace DeepSpaceQoL
     {
         private static void Postfix(InspectionUIManager __instance, GameItem gameItem)
         {
-            if (__instance == null || gameItem == null || !gameItem.IsTag("APPRAISAL_ITEM"))
+            if (__instance == null || gameItem == null)
+            {
+                return;
+            }
+            // Inspecting an item is the point where its features/condition may
+            // become relevant; drop both caches for this item.
+            Truth.Forget(gameItem);
+            Log.Forget(gameItem);
+            if (!gameItem.IsTag("APPRAISAL_ITEM"))
             {
                 return;
             }
@@ -329,6 +364,23 @@ namespace DeepSpaceQoL
 
     internal static class Truth
     {
+        private sealed class TruthBox
+        {
+            public bool HasValue;
+            public TruthResult Value;
+        }
+
+        private static readonly ConditionalWeakTable<GameItem, TruthBox> ResultCache =
+            new ConditionalWeakTable<GameItem, TruthBox>();
+
+        public static void Forget(GameItem item)
+        {
+            if (item != null)
+            {
+                ResultCache.Remove(item);
+            }
+        }
+
         public static bool TryGet(GameItem item, out TruthResult result)
         {
             result = default(TruthResult);
@@ -338,6 +390,8 @@ namespace DeepSpaceQoL
             }
             try
             {
+                // Ribwich can change when opened (reason includes "已开封"), so it
+                // stays uncached. Wine is a single cheap tag check.
                 if (item.IsTag("RIBWICH_TAG"))
                 {
                     bool fake = RibwichHelper.IsCounterfeit(item);
@@ -354,30 +408,51 @@ namespace DeepSpaceQoL
                     return true;
                 }
 
-                ItemFeature feature = item.FindItemFeatureByCategory("CATEGORY_GENUINE_CIGARETTE");
-                if (feature != null && feature.realCondition != null)
+                TruthBox cached;
+                if (ResultCache.TryGetValue(item, out cached))
                 {
-                    return FromCondition(feature, item, out result);
+                    if (cached.HasValue)
+                    {
+                        result = cached.Value;
+                    }
+                    return cached.HasValue;
                 }
-                feature = item.FindItemFeatureByCategory("CATEGORY_GENUINE_STAMP");
-                if (feature != null && feature.realCondition != null)
-                {
-                    return FromCondition(feature, item, out result);
-                }
-                feature = item.FindItemFeatureByCategory("CATEGORY_GENUINE_INJECTOR");
-                if (feature != null && feature.realCondition != null)
-                {
-                    return FromCondition(feature, item, out result);
-                }
-                feature = item.FindItemFeatureByCategory("CATEGORY_REPLICA");
-                if (feature != null && feature.realCondition != null)
-                {
-                    return FromCondition(feature, item, out result);
-                }
+
+                TruthResult computed;
+                bool ok = Compute(item, out computed);
+                ResultCache.Add(item, new TruthBox { HasValue = ok, Value = computed });
+                result = computed;
+                return ok;
             }
             catch (Exception e)
             {
                 Log.Warn("Authenticity check failed: " + e.Message);
+            }
+            return false;
+        }
+
+        private static bool Compute(GameItem item, out TruthResult result)
+        {
+            result = default(TruthResult);
+            ItemFeature feature = item.FindItemFeatureByCategory("CATEGORY_GENUINE_CIGARETTE");
+            if (feature != null && feature.realCondition != null)
+            {
+                return FromCondition(feature, item, out result);
+            }
+            feature = item.FindItemFeatureByCategory("CATEGORY_GENUINE_STAMP");
+            if (feature != null && feature.realCondition != null)
+            {
+                return FromCondition(feature, item, out result);
+            }
+            feature = item.FindItemFeatureByCategory("CATEGORY_GENUINE_INJECTOR");
+            if (feature != null && feature.realCondition != null)
+            {
+                return FromCondition(feature, item, out result);
+            }
+            feature = item.FindItemFeatureByCategory("CATEGORY_REPLICA");
+            if (feature != null && feature.realCondition != null)
+            {
+                return FromCondition(feature, item, out result);
             }
             return false;
         }

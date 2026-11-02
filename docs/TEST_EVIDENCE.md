@@ -197,7 +197,7 @@ GameItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", ...)
 
 ```text
 Compiling AppraisalAssistant...
-  -> dist\AppraisalAssistant\AppraisalAssistant.dll (14336 bytes)
+  -> dist\AppraisalAssistant\AppraisalAssistant.dll (15360 bytes)
 Compiling AugSpotter...
   -> dist\AugSpotter\AugSpotter.dll (9216 bytes)
 Build OK
@@ -244,7 +244,7 @@ RESULT: PASS
 安裝後雜湊：
 
 ```text
-AppraisalAssistant match=True installed=E5CF23A6ABA37CF792DD0ED6B6031E69AEFA05940641BC4DFCD1BA3122042762
+AppraisalAssistant match=True installed=1E5A9F4FB4DC4361B5137F92C4C67B4F87C74C53C71F9F3AD12EECF77B9EAF31
 AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A567B49A61638D702AB067B340E
 ```
 
@@ -274,9 +274,20 @@ AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A56
 - `AppraisalAssistant` patch 數：8 → 7。
 - 原始碼不再有 `UpdateAppraisalPanel` 的 Harmony patch。
 
-### 9.6 尚未核實
+### 9.6 Tooltip 每幀重建的快取
 
-- 尚未在真實遊戲內量測 frame time；需要玩家連續切換 10 位以上顧客做主觀驗收。
+- `ItemTooltipHandler.OnEventUpdate()` 每幀重建 tooltip；拖動任何物品都會走
+  `AppraisalHelper.CreateAppraisalTooltip` 與 `InspectableHelper.CreateInspectableTooltip`。
+- `Log.TryGetCorrectValue()` 用 `ConditionalWeakTable<GameItem, ValueBox>` 快取正確值，
+  包含負面結果（不是 `APPRAISAL_ITEM`、registry 找不到）。
+- `Truth.TryGet()` 用 `ConditionalWeakTable<GameItem, TruthBox>` 快取真假結果，包含
+  「沒有真假特徵」的負面結果；Ribwich 因開封狀態會影響 reason，不快取。
+- `InspectionUIManager.OnInspectItem` 會清除該物品的兩個快取，避免物品後來才被標記。
+- 效果：同一物品第一次 tooltip 之後，後續拖動 frames 不再重跑 registry／ItemFeature 掃描。
+
+### 9.7 尚未核實
+
+- 尚未在真實遊戲內量測 frame time；需要玩家在最新 `1E5A` 版拖動普通物品與鑑定物品做主觀驗收。
 - 事件覆蓋率以遊戲源碼的四個入口為準；若某個 debug／特殊流程直接改
   `PlayerStore.currentClientInstance` 而不經過這四個方法，overlay 可能不會立即更新。
   正常遊玩路徑已覆蓋，但尚未逐一實測所有 debug 指令。
