@@ -43,4 +43,4 @@ if ($Enable) {
     & (Join-Path $PSScriptRoot "Enable-Mods.ps1") -GameDir $GameDir
 }
 
-Write-Host "Done. Launch the game through Steam; the mods should be enabled."
+Write-Host "Done. Open the in-game Mods panel and enable both mods (approve them if prompted)."
