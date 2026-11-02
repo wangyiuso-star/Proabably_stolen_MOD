@@ -105,6 +105,10 @@ namespace DeepSpaceQoL
                 {
                     return false;
                 }
+                if (AppraisalItemRegistry.Find(item) == null)
+                {
+                    return false;
+                }
                 value = AppraisalHelper.GetCorrectBaseValue(item);
                 return value > 0;
             }
