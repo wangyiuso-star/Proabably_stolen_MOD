@@ -61,11 +61,11 @@ git status --short
 
 ### A4 離線 Harmony / 邏輯測試
 
-命令（需要 `.tools/mono` 與 `.tools/harmonyprobe/gamedeps`；設定方式見 `docs/TEST_EVIDENCE.md`）：
+命令（需要 `.tools/mono`；設定方式見 `docs/TEST_EVIDENCE.md`）：
 
 ```powershell
-.tools\mono\Mono\bin\mono.exe .tools\harmonyprobe\HarmonyProbe.exe <Managed 路徑> dist\AppraisalAssistant\AppraisalAssistant.dll dist\AugSpotter\AugSpotter.dll
-.tools\mono\Mono\bin\mono.exe .tools\logicprobe\LogicProbe.exe <Managed 路徑> dist\AppraisalAssistant\AppraisalAssistant.dll dist\AugSpotter\AugSpotter.dll
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Patches.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 ```
 
 期望：

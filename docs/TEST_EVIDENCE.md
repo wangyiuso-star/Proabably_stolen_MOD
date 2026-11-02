@@ -151,6 +151,9 @@ RESULT: PASS
 
 - `tools/Setup-Toolchain.ps1`：下載 Roslyn 4.8、複製 `DseCecil.dll`。
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`。
-- Harmony / 邏輯探針需要 Mono 6.12；本 workspace 放在 `.tools/mono`，不在 git 內。
+- `tools/Probe-Patches.ps1`、`tools/Probe-Logic.ps1`：Harmony / 邏輯探針（需要 `.tools/mono`）。
+- Mono 6.12 放在 `.tools/mono`，不在 git 內。
 - `tools/Install-Mods.ps1` / `tools/Enable-Mods.ps1`：安裝與寫入信任紀錄；`Enable-Mods.ps1`
   會先備份 `SaveFile.es3`。
+- `tools/Restore-SaveFile.ps1`：從 `backup/SaveFile/` 還原最近一次備份，會先備份目前檔案。
+- `tools/Uninstall-Mods.ps1`：移除兩個 MOD 資料夾，會先備份到 `backup/Mods/`。

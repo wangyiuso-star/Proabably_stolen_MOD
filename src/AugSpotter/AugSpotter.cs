@@ -104,6 +104,7 @@ namespace DeepSpaceQoL
     {
         private Canvas _canvas;
         private TextMeshProUGUI _label;
+        private Image _background;
         private string _lastText;
         private bool _selfTestDone;
         private float _started;
@@ -181,10 +182,10 @@ namespace DeepSpaceQoL
 
             GameObject backgroundObject = new GameObject("Background", typeof(RectTransform), typeof(Image));
             backgroundObject.transform.SetParent(root.transform, false);
-            Image background = backgroundObject.GetComponent<Image>();
-            background.color = new Color(0f, 0f, 0f, 0.55f);
-            background.raycastTarget = false;
-            RectTransform backgroundRect = background.rectTransform;
+            _background = backgroundObject.GetComponent<Image>();
+            _background.color = new Color(0f, 0f, 0f, 0.55f);
+            _background.raycastTarget = false;
+            RectTransform backgroundRect = _background.rectTransform;
             backgroundRect.anchorMin = new Vector2(0f, 1f);
             backgroundRect.anchorMax = new Vector2(0f, 1f);
             backgroundRect.pivot = new Vector2(0f, 1f);
@@ -228,6 +229,12 @@ namespace DeepSpaceQoL
             {
                 _lastText = text;
                 _label.text = text;
+                bool visible = text.Length > 0;
+                _label.enabled = visible;
+                if (_background != null)
+                {
+                    _background.enabled = visible;
+                }
             }
         }
 

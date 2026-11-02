@@ -35,6 +35,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Install-Mods.ps1 -Enab
 
 > `-Enable` 會直接改 `%USERPROFILE%\AppData\LocalLow\Questing Goose Studio\Probably Stolen\SaveFile.es3` 的 `modTrust` / `modOrder`，備份在 `backup/SaveFile/`。不想改設定就只用遊戲內 Mods 面板啟用。
 
+### 還原 / 卸載
+
+```powershell
+# 還原最近一次 SaveFile 備份（會先備份目前檔案）
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\Restore-SaveFile.ps1
+
+# 移除兩個 MOD 資料夾（會先備份）
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\Uninstall-Mods.ps1
+```
+
 ## 功能細節
 
 ### 1. 估價型鑑定（`APPRAISAL_ITEM`）
@@ -95,6 +105,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Verify-Mods.ps1
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\Probe-Patches.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\Probe-Logic.ps1
 ```
 
 ## 檔案結構

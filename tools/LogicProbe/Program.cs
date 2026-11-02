@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -92,12 +92,12 @@ internal static class LogicProbe
 
     private static object MakeItem()
     {
-        Console.WriteLine("MakeItem type=" + _itemType.FullName); object item = FormatterServices.GetUninitializedObject(_itemType); Console.WriteLine("item=" + (item==null?"NULL":"OK"));
+        object item = FormatterServices.GetUninitializedObject(_itemType);
         object features = Activator.CreateInstance(typeof(List<>).MakeGenericType(_featureType));
         _itemType.GetField("itemFeatures").SetValue(item, features);
         object state = Activator.CreateInstance(_tagSystemType);
         object modified = Activator.CreateInstance(_tagSystemType);
-        Console.WriteLine("stateProp=" + (_itemType.GetProperty("state")==null?"NULL":"OK")); _itemType.GetProperty("state").SetValue(item, state);
+        _itemType.GetProperty("state").SetValue(item, state);
         _itemType.GetProperty("modifiedState").SetValue(item, modified);
         return item;
     }
@@ -105,19 +105,19 @@ internal static class LogicProbe
     private static void EnableTag(object item, string tag)
     {
         object modified = _itemType.GetProperty("modifiedState").GetValue(item);
-        Console.WriteLine("enabling tag " + tag); _tagSystemType.GetMethod("EnableTag", new Type[] { typeof(string) }).Invoke(modified, new object[] { tag }); Console.WriteLine("tag enabled");
+        _tagSystemType.GetMethod("EnableTag", new Type[] { typeof(string) }).Invoke(modified, new object[] { tag });
     }
 
     private static void AddFeature(object item, string category, string conditionIdentifier)
     {
-        object feature = Activator.CreateInstance(_featureType); Console.WriteLine("feature=" + (feature==null?"NULL":"OK"));
-        Console.WriteLine("catProp=" + (_featureType.GetProperty("category")==null?"NULL":"OK")); _featureType.GetProperty("category").SetValue(feature, category);
+        object feature = Activator.CreateInstance(_featureType);
+        _featureType.GetProperty("category").SetValue(feature, category);
         object condition = Activator.CreateInstance(_conditionType);
-        Console.WriteLine("condCatField=" + (_conditionType.GetField("category")==null?"NULL":"OK")); _conditionType.GetField("category").SetValue(condition, category);
+        _conditionType.GetField("category").SetValue(condition, category);
         _conditionType.GetField("identifier").SetValue(condition, conditionIdentifier);
-        _featureType.GetField("realCondition").SetValue(feature, condition); Console.WriteLine("realCondition=" + (_featureType.GetField("realCondition").GetValue(feature)==null?"NULL":"OK") + " id=" + (_conditionType.GetField("identifier").GetValue(condition) ?? "NULL"));
+        _featureType.GetField("realCondition").SetValue(feature, condition);
         _featureType.GetField("useCondition").SetValue(feature, true);
-        ((IList)_itemType.GetField("itemFeatures").GetValue(item)).Add(feature); Console.WriteLine("added feature");
+        ((IList)_itemType.GetField("itemFeatures").GetValue(item)).Add(feature);
     }
 
     private static void CheckTruth(string name, string category, string condition, string tag, string expectedKind)
@@ -127,10 +127,10 @@ internal static class LogicProbe
             object item = MakeItem();
             if (category != null) AddFeature(item, category, condition);
             if (tag != null) EnableTag(item, tag);
-            Type truth = _appraisal.GetType("DeepSpaceQoL.Truth"); Console.WriteLine("truthType=" + (truth==null?"NULL":truth.FullName));
-            MethodInfo tryGet = truth.GetMethod("TryGet", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static); Console.WriteLine("tryGet=" + (tryGet==null?"NULL":tryGet.Name));
-            Console.WriteLine("before truth invoke"); object[] args = new object[] { item, null };
-            bool ok = (bool)tryGet.Invoke(null, args); Console.WriteLine("after truth invoke ok=" + ok);
+            Type truth = _appraisal.GetType("DeepSpaceQoL.Truth");
+            MethodInfo tryGet = truth.GetMethod("TryGet", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            object[] args = new object[] { item, null };
+            bool ok = (bool)tryGet.Invoke(null, args);
             string kind = ok ? args[1].GetType().GetField("Kind").GetValue(args[1]).ToString() : "None";
             string label = ok ? (string)args[1].GetType().GetField("Label").GetValue(args[1]) : "";
             Check(ok && kind == expectedKind, name + " kind=" + kind + " label=" + label);
@@ -138,7 +138,7 @@ internal static class LogicProbe
         catch (Exception e)
         {
             Exception inner = e.InnerException ?? e;
-            Console.WriteLine("FAIL " + name + " exception: " + inner.GetType().Name + ": " + inner.Message); Console.WriteLine(inner.StackTrace);
+            Console.WriteLine("FAIL " + name + " exception: " + inner.GetType().Name + ": " + inner.Message);
             _fail++;
         }
     }
@@ -148,10 +148,10 @@ internal static class LogicProbe
         try
         {
             object item = MakeItem();
-            Type truth = _appraisal.GetType("DeepSpaceQoL.Truth"); Console.WriteLine("truthType=" + (truth==null?"NULL":truth.FullName));
-            MethodInfo tryGet = truth.GetMethod("TryGet", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static); Console.WriteLine("tryGet=" + (tryGet==null?"NULL":tryGet.Name));
-            Console.WriteLine("before truth invoke"); object[] args = new object[] { item, null };
-            bool ok = (bool)tryGet.Invoke(null, args); Console.WriteLine("after truth invoke ok=" + ok);
+            Type truth = _appraisal.GetType("DeepSpaceQoL.Truth");
+            MethodInfo tryGet = truth.GetMethod("TryGet", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            object[] args = new object[] { item, null };
+            bool ok = (bool)tryGet.Invoke(null, args);
             Check(!ok, "unknown_item returns false");
         }
         catch (Exception e)
@@ -196,6 +196,7 @@ internal static class LogicProbe
         state.GetType().GetMethod("Enable").Invoke(state, null);
         state.GetType().GetMethod("SetString").Invoke(state, new object[] { value });
     }
+
     private static void Scan(Type scanner, MethodInfo scan, string dll, string name)
     {
         try
