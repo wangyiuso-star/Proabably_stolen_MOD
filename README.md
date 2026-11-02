@@ -4,8 +4,8 @@
 
 | MOD | 功能 | 主要檔案 |
 | --- | --- | --- |
-| **AppraisalAssistant** | 估價型鑑定直接顯示真值、自動填入並以正確值提交；真假型鑑定顯示 GENUINE / COUNTERFEIT / DEFECTIVE / REPLICA 與購買建議 | `dist/AppraisalAssistant/` |
-| **AugSpotter** | 顧客在櫃檯時，左上角直接標示 **AUG DETECTED**（改造體）或 **NOT AN AUG**，不需掃描儀、電池或教學 | `dist/AugSpotter/` |
+| **AppraisalAssistant** | 估價型鑑定顯示真值並自動填入／提交；真假型鑑定顯示真品／假貨／有缺陷／複製品與原因（不給收購建議） | `dist/AppraisalAssistant/` |
+| **AugSpotter** | 櫃檯顧客是改造體時，左上角顯示中文「偵測到改造體 等級 n」；普通顧客不顯示 | `dist/AugSpotter/` |
 
 兩個 MOD 都使用遊戲內建 Mod Loader（`Mods/<資料夾>/manifest.xml` + `IMod`），不修改遊戲本體，也不使用檔案／網路／程序／動態碼／原生／反射 capability。
 
@@ -50,8 +50,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Uninstall-Mods.ps1
 ### 1. 估價型鑑定（`APPRAISAL_ITEM`）
 
 - 物品 tooltip 直接顯示：
-  - `TRUE VALUE: <正確基礎價值>`
-  - `PERFECT RANGE: <95%> - <105%>`
+  - `真值：<正確基礎價值>`
+  - `精確區間：<95%> - <105%>`
 - 打開放大鏡／鑑定面板時，輸入框自動填入正確值。
 - 按「估算」時，MOD 會用正確值提交，取得 perfect 評價（可在設定關閉）。
 - 依據遊戲的 `AppraisalHelper.GetCorrectBaseValue`、`AppraisalItemRegistry`、
@@ -60,32 +60,30 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Uninstall-Mods.ps1
 ### 2. 真假型鑑定（香菸／郵票／注射器／Ribwich／葡萄酒／複製品）
 
 - 物品 tooltip 顯示：
-  - `AUTHENTICITY: GENUINE`（綠）＋ `SAFE TO BUY`
-  - `AUTHENTICITY: COUNTERFEIT`（紅）＋ `DO NOT BUY`
-  - `AUTHENTICITY: DEFECTIVE - EXPIRED / UNUSABLE`（橙）＋ `DO NOT BUY`
-  - `AUTHENTICITY: REPLICA (NOT ORIGINAL)`（橙）＋ `DO NOT BUY`
-- 香菸／郵票／注射器的對質面板標題會額外顯示 `[GENUINE]` / `[COUNTERFEIT]` / `[DEFECTIVE]`。
-- 真假來源是遊戲的 `ItemFeature.realCondition.identifier`、`RibwichHelper.IsCounterfeit`、
-  `WINE_COUNTERFEIT_TAG`，不是猜測。
+  - `真品`（綠）
+  - `假货`（紅）＋ `原因：...`
+  - `有缺陷`（橙）＋ `原因：已过期／无法使用...`
+  - `复制品`（橙）＋ `原因：复制品，非原版`
+- 對質面板標題只顯示 `[真品]` / `[假货]` / `[有缺陷]` / `[复制品]`，不改字級、不加原因、不給收購建議。
+- 原因來自遊戲的可見問題標籤（例如 `防伪标问题`、`商标问题`、`指示灯问题`），
+  以及 `ItemFeature.realCondition`、`RibwichHelper.IsCounterfeit`、`WINE_COUNTERFEIT_TAG`。
 
 ### 3. 改造體（Aug）
 
-- 顧客在櫃檯時，畫面左上角顯示：
-  - 改造體：紅色 `AUG DETECTED - Tier <n>`
-  - 普通顧客：綠色 `NOT AN AUG`（可在設定關閉）
-  - 無顧客：隱藏
+- 只有櫃檯前的顧客真的是改造體時，左上角才顯示紅色中文：
+  `侦测到改造体  等级 <n>`（`augTier`）。
+- 普通顧客：完全不顯示。
 - 直接讀 `StoreClient.isAug` / `augTier`，不改顧客狀態、不消耗掃描器電池。
 
 ## 設定
 
 遊戲內 Mod 設定視窗（或 `ModConfigs/<mod id>.json`）：
 
-- `show_true_value`：顯示真值與 perfect 區間（預設 true）
+- `show_true_value`：顯示真值與精確區間（預設 true）
 - `auto_fill`：自動填入估價輸入框（預設 true）
 - `force_correct_estimate`：按估算時強制用正確值（預設 true）
-- `show_buy_advice`：顯示 SAFE TO BUY / DO NOT BUY（預設 true）
-- `run_self_test`：進入店內後記錄自測結果（預設 true）
-- `show_not_an_aug`：普通顧客顯示 NOT AN AUG（預設 true）
+
+（`AugSpotter` 沒有需要調整的設定。）
 
 ## 從原始碼建置
 

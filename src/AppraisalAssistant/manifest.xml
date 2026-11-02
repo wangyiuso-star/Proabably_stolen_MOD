@@ -4,7 +4,7 @@
   <Name>AppraisalAssistant</Name>
   <Author>DeepSeek Harness</Author>
   <ModVersion>1.0.0</ModVersion>
-  <Description>Shows the true value and perfect estimate range for appraisal items, auto-fills and submits the exact value, and labels genuine / counterfeit / defective items before the player decides to buy.</Description>
+  <Description>显示鉴定真值与精确区间、自动填入并提交正确价格；真假鉴定显示真品／假货／有缺陷／复制品与原因。</Description>
   <GameVersions>
     <Version>1.0</Version>
     <Version>VERSION 100-Rev6</Version>

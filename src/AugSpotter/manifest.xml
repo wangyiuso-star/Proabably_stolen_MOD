@@ -4,7 +4,7 @@
   <Name>AugSpotter</Name>
   <Author>DeepSeek Harness</Author>
   <ModVersion>1.0.0</ModVersion>
-  <Description>Shows a clear AUG DETECTED marker for disguised augmented customers (Augs) at the counter, and optionally NOT AN AUG for ordinary customers. No scanner, battery or tutorial required.</Description>
+  <Description>当柜台前的顾客是改造体时，在左上角显示「侦测到改造体」与等级；普通顾客不显示。不需要扫描仪、电池或教学。</Description>
   <GameVersions>
     <Version>1.0</Version>
     <Version>VERSION 100-Rev6</Version>

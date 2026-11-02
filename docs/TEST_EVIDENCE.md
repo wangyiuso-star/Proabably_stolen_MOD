@@ -117,35 +117,42 @@ RESULT: PASS
 - 尚未覆蓋：`InspectionUIManager` 的 TMP 輸入框與 overlay 的實際 Unity 畫面行為；
   這需要真正執行遊戲（見第 7 節）。
 
-## 6. 還原紀錄
+## 6. 還原與最終安裝
 
-測試期間曾把 MOD 複製到正式遊戲的 `Mods/`，並用 `tools/Enable-Mods.ps1` 寫入
-`SaveFile.es3` 的 `modTrust` / `modOrder`。測試後已還原：
+測試期間曾把 MOD 複製到正式遊戲的 `Mods/`，並多次寫入 `SaveFile.es3` 的
+`modTrust` / `modOrder`；中間因 PowerShell 5.1 的 `ConvertFrom-Json` 會吃掉 ES3 的
+`__type`，一度使 MOD 全部無法載入。已修正並用正確格式重新寫入：
 
-- `SaveFile.es3`：
-  - 測試前備份：`backup/SaveFile/SaveFile_20261102-171150.es3`
-  - 還原後 SHA256：`1FA1DCCA3C9A470DD84D7322A2B1238879C8B8197FA298A8A6AE1EBAB929D878`
-  - 與備份 SHA256 完全一致；`modTrust` / `modOrder` 已不存在。
-- 正式遊戲 `Mods/`：已移除 `AppraisalAssistant`、`AugSpotter`，資料夾恢復為空。
+- `tools/Enable-Mods.ps1` 現在改由 Python `tools/update-mod-config.py` 更新，
+  保留 `modOrder.__type` 與 `modTrust.__type`。
+- 測試前乾淨備份仍在 `backup/SaveFile/SaveFile_20261102-171150.es3`
+  （SHA256 `1FA1DCCA...B929D878`）。
+- 目前 `SaveFile.es3` 是**已啟用兩個 MOD** 的狀態，`modOrder` / `modTrust`
+  的 `__type` 正確；可用 `tools/Restore-SaveFile.ps1` 還原最近備份。
+- 正式遊戲 `Mods/` 目前安裝並啟用 `AppraisalAssistant`、`AugSpotter`。
 - 正式遊戲 `Assembly-CSharp.dll`：`RestartAppIfNecessary present: True`，
   `Awake instruction count: 65`；與測試副本的 `False / 6` 不同，證明正式 DLL 未被 patch。
 - 正式遊戲 `Probably Stolen.exe`、`UnityPlayer.dll`、`save_*.es3` 未修改。
-- 完整 AppData 備份：`backup/AppData_20261102/`（注意：此備份是在 Enable-Mods 之後才建立，
-  因此含 `modTrust`/`modOrder`；真正乾淨的 SaveFile 是上面的 `backup/SaveFile/` 版本）。
 
-## 7. 未完成／限制
+## 7. 遊戲內實測與最終清理
 
-- **沒有在真正的遊戲執行期完成 UI 實測。** 原因：
-  - 此環境的 Steam 用戶端處於離線／無法登入狀態；直接啟動 `Probably Stolen.exe` 會以
-    exit code `53` 結束（Steam DRM／`RestartAppIfNecessary`）。
-  - 用 sandbox 啟動 `steam.exe` 時，Steam 跳出「登錄檔路徑無法寫入」對話框；這是
-    Steam 自身權限問題，不是 MOD。已關閉 `steam.exe`，沒有寫入成功。
-- 因此以下項目仍需要使用者或下一個有正常 Steam 環境的回合手動驗收：
-  - `Player.log` 的 `[ModLoader] Loading` / `Initialized` 行。
-  - overlay 在實際畫面中的位置與字型。
-  - 估價輸入框自動填入、按估算後 perfect。
-  - 對質面板標題的 `[GENUINE]` / `[COUNTERFEIT]`。
-- 已用工作區複本 `testgame` 避免動到正式安裝；該資料夾可直接刪除。
+- 遊戲內已成功載入兩個 MOD：
+  - `AppraisalAssistant`：8 個 Harmony patch。
+  - `AugSpotter`：0 個 Harmony patch；overlay 用 `StoreCalendar.dayTMP` 複製中文
+    字體／fallback／材質。
+- 已截圖確認：
+  - 改造體 overlay 顯示中文（早期只有數字 `4` 是字體 fallback 問題，已修正）。
+  - 假貨 tooltip：`真伪判定：假货`、`原因：...`；沒有收購建議。
+  - 對質標題只顯示 `[假货]`，原字級，不加原因。
+  - 同一顧客多件鑑定品：加入 `AppraisalInspectResetPatch` 後每件各自使用自己的價值。
+- 最終清理（使用者要求關掉多餘監聽／debug）：
+  - 移除 `AppraisalRuntime` 自測協程、`RunSelfTest` 設定與 `RuntimeHost`。
+  - 移除 `AugSpotter` 自測與相關設定。
+  - 所有 `Player.log` 背景 watcher job 已結束，沒有執行中的監聽。
+  - 最終 DLL：`AppraisalAssistant.dll` 14,848 bytes、`AugSpotter.dll` 8,192 bytes。
+  - `tools/Verify-Mods.ps1` PASS；`HarmonyProbe` 8 patches；`LogicProbe` 全 PASS。
+- 早期 76MB 的 `NullReferenceException` 日誌已移到 `backup/logs/`，原因是
+  `AugOverlay` 太早讀 `PlayerStore`；已改成延遲 5 秒 + 例外保護 + 低頻探測。
 
 ## 8. 可重跑的工具
 

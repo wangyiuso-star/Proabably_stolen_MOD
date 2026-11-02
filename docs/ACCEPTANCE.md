@@ -1,4 +1,4 @@
-# 驗收標準（v1.0）
+﻿# 驗收標準（v1.0）
 
 本文件在動工前寫好。每一條都要有可重跑的命令或可檢查的日誌；不以「看起來可以」作驗收。
 
@@ -70,7 +70,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 
 期望：
 
-- HarmonyProbe：`patched 7 method(s)`（AppraisalAssistant）、`patched 0 method(s)`（AugSpotter）、`RESULT: PASS`。
+- HarmonyProbe：`patched 8 method(s)`（AppraisalAssistant）、`patched 0 method(s)`（AugSpotter）、`RESULT: PASS`。
 - LogicProbe：`aug=true/false/null`、真假／缺陷／複製品／假酒全部 PASS、`appraisal_value hand=100`、兩個 DLL 的 `[Scan]` 都是 `refused=False capabilities=[] findings=0`、`RESULT: PASS`。
 - 這只能證明 patch 與純邏輯，不代表 UI 已在遊戲畫面驗證；UI 仍需第 4 節手動驗收。
 
@@ -90,34 +90,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 [ModLoader]   Initialized: AugSpotter v1.0.0
 ```
 
-- `AppraisalAssistant` 的 `N = 7`（tooltip、auto-fill、force-estimate、三個 confront 標題、真假 tooltip）。
+- `AppraisalAssistant` 的 `N = 8`（tooltip、auto-fill、force-estimate、OnInspectItem 重置、三個 confront 標題、真假 tooltip）。
 - `AugSpotter` 的 `N = 0`（用自建 MonoBehaviour 更新 overlay，不強制 patch）。
 - 不得出現 `Init failed`、`LoadError`、`scan refused`、`MissingMethodException`、`NullReferenceException`（與本 MOD 相關者）。
 
-### B2 內建掃描器日誌
+### B2 內建掃描器
 
-每個 MOD 啟動時主動呼叫 `ModScanner.Scan` 掃描自己的 DLL，並輸出：
+MOD 不再在執行期主動掃描自己的 DLL（已移除 debug self-test／監聽程式碼）。
+掃描結果由 `tools/Verify-Mods.ps1` 的靜態檢查與遊戲內建 Mods 面板的啟用掃描負責。
 
-```text
-[AppraisalAssistant] [Scan] refused=False capabilities=[] findings=0
-[AugSpotter] [Scan] refused=False capabilities=[] findings=0
-```
+### B3 無多餘監聽／debug 程式碼
 
-期望 `refused=False`、`capabilities=[]`（或只包含 manifest 已宣告者；本 MOD 應為空）、`findings=0`。
-
-### B3 Self-test
-
-在載入存檔並進入店內後（`StoreUIManager.Instance != null`），自動執行：
-
-```text
-[AppraisalAssistant] [SelfTest] PASS ...
-[AppraisalAssistant] [SelfTest] SUMMARY pass=<n> fail=0
-[AugSpotter] [SelfTest] PASS ...
-[AugSpotter] [SelfTest] SUMMARY pass=<n> fail=0
-```
-
-- 任一 `FAIL` 即為未通過，必須修正後重跑。
-- 若因尚未進入遊戲而跳過，日誌必須明寫 `SKIP` 與原因，不能假裝 PASS。
+最終版本不安裝任何自測協程、不輪詢日誌、不建立背景監聽：
+- `AppraisalAssistant` 只有 8 個 Harmony patch。
+- `AugSpotter` 只有 overlay 的 Update（偵測目前顧客是否為 Aug）。
+- `Player.log` 不應出現 `[SelfTest]` 或反覆的 `NullReferenceException`。
 
 ## 3. 功能驗收
 
@@ -131,10 +118,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 
 驗收：
 
-1. 對 `APPRAISAL_ITEM` 顯示 tooltip 時，額外出現 `TRUE VALUE: <正整數>`，數值等於 `GetCorrectBaseValue`。
+1. 對 `APPRAISAL_ITEM` 顯示 tooltip 時，額外出現 `真值：<正整數>` 與 `精確區間：...`，數值等於 `GetCorrectBaseValue`。
 2. 打開放大鏡／鑑定面板時，輸入框自動填入上述正確值（玩家未手動編輯時）。
 3. 玩家按「估算」時，即使輸入框被改成錯誤值，MOD 會以正確值提交，結果為 perfect（`GetEstimatePrecision == 1`）。
-4. Self-test 以 `PreBuiltItemHelper.CreateHandRandom()` 驗證 `GetCorrectBaseValue > 0`，並記錄實際值。
+4. 同一顧客的多件鑑定品，每一件都套用自己的正確值（`OnInspectItem` 會重置共用輸入框）。
+5. 離線邏輯測試以 `PreBuiltItemHelper` 建立 `HAND_TAG` 物品，`appraisal_value hand=100`。
 
 ### C2 真假類鑑定（genuine / counterfeit）
 
@@ -148,18 +136,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 
 驗收：
 
-1. 對上述物品顯示 tooltip 時，額外出現：
-   - `GENUINE`（真品，綠色）；或
-   - `COUNTERFEIT`（假貨，紅色）；或
-   - `DEFECTIVE: EXPIRED` / `DEFECTIVE: UNUSABLE`（有缺陷，橙色）；或
-   - `REPLICA`（複製品，橙色）。
-2. 香菸／郵票／注射器的「對質」面板標題額外顯示 `[GENUINE]` 或 `[COUNTERFEIT]`，讓玩家在決定收購前知道真假。
-3. 對假貨顯示 `DO NOT BUY` 提示；對真品顯示 `SAFE TO BUY`。
-4. Self-test：
-   - `PreBuiltItemHelper.CreateFakeStamp()` → `COUNTERFEIT`
-   - `PreBuiltItemHelper.CreateRealStamp(160)` → `GENUINE`
-   - `PreBuiltItemHelper.CreateRealCounterfeitInjector()` → `COUNTERFEIT`
-   - `PreBuiltItemHelper.CreateRealGenuineInjector()` → `GENUINE`
+1. 對上述物品顯示 tooltip 時，額外出現（簡體中文、對齊遊戲用詞）：
+   - `真伪判定：真品`（綠）；或
+   - `真伪判定：假货`（紅）＋ `原因：...`；或
+   - `真伪判定：有缺陷`（橙）＋ `原因：已过期／无法使用...`；或
+   - `真伪判定：复制品`（橙）＋ `原因：复制品，非原版`。
+2. 原因必須是具體的可見問題，例如 `防伪标问题`、`商标问题`、`字母印刷问题`、`指示灯问题`、`标签问题`；不能只寫「假的」。
+3. 對質面板標題只顯示 `[真品]` / `[假货]` / `[有缺陷]` / `[复制品]`，**不改字級、不加原因**；原因在 hover tooltip。
+4. 不顯示任何收購建議（沒有 `建议：可收购` / `建议：不要收购`）。
+5. 離線邏輯測試（`tools/Probe-Logic.ps1`）覆蓋假郵票、真郵票、假注射器、過期、報廢、複製品、假酒，全部 PASS。
 
 ### C3 改造體（Aug）辨識
 
@@ -170,12 +155,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 
 驗收：
 
-1. 顧客在櫃檯時，畫面左上角 overlay 顯示：
-   - 改造體：紅色 `AUG DETECTED - Tier <n>`。
-   - 普通顧客：綠色 `NOT AN AUG`（可設定關閉）。
-   - 無顧客：overlay 隱藏。
-2. 改造體在 `MakeDisguisedAug` 後、任何互動前就能被標示，不需要掃描儀或消耗電池。
-3. Self-test：`isAug=true` → `AUG`；`isAug=false` → `NOT AUG`。
+1. 只有櫃檯前的顧客是改造體時，左上角 overlay 才顯示紅色中文 `侦测到改造体  等级 <n>`。
+2. 普通顧客：overlay 完全不顯示。
+3. 改造體在 `MakeDisguisedAug` 後、任何互動前就能被標示，不需要掃描儀或消耗電池。
 4. 不修改 `StoreClient` 狀態、不消耗物品、不影響存檔。
 
 ### C4 安全性
@@ -190,6 +172,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 
 1. 進入存檔，接待估價顧客（手上／Ribwich／電漿燃料任一），確認 tooltip 真值與輸入框自動填入，按估算得到 perfect 評價。
 2. 接待帶香菸／郵票／注射器的顧客，滑鼠移到物品上，確認真假標籤；打開對質面板確認標題標籤。
-3. 遇到改造體顧客時，確認左上角紅色 `AUG DETECTED`；普通顧客顯示綠色 `NOT AN AUG`。
+3. 遇到改造體顧客時，確認左上角紅色 `侦测到改造体`；普通顧客顯示綠色 `不顯示`。
 4. 重新啟動遊戲，確認兩個 MOD 仍在 Mods 清單中啟用且日誌無錯誤。
 5. 卸載測試：移除 `Mods/AppraisalAssistant` 與 `Mods/AugSpotter` 後遊戲可正常啟動，日誌無殘留 patch 錯誤。
+
+

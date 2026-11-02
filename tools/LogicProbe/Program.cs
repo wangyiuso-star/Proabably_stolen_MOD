@@ -133,7 +133,9 @@ internal static class LogicProbe
             bool ok = (bool)tryGet.Invoke(null, args);
             string kind = ok ? args[1].GetType().GetField("Kind").GetValue(args[1]).ToString() : "None";
             string label = ok ? (string)args[1].GetType().GetField("Label").GetValue(args[1]) : "";
-            Check(ok && kind == expectedKind, name + " kind=" + kind + " label=" + label);
+            string reason = ok ? (string)args[1].GetType().GetField("Reason").GetValue(args[1]) : "";
+            bool reasonOk = expectedKind == "Genuine" || !string.IsNullOrEmpty(reason);
+            Check(ok && kind == expectedKind && reasonOk, name + " kind=" + kind + " label=" + label + " reason=" + reason);
         }
         catch (Exception e)
         {

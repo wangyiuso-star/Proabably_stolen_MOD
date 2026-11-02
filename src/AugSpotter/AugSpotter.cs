@@ -16,8 +16,6 @@ namespace DeepSpaceQoL
         internal const string ModVersion = "1.0.0";
         internal const string AssemblyName = "AugSpotter";
 
-        internal static ConfigEntry<bool> ShowOrdinary;
-        internal static ConfigEntry<bool> RunSelfTest;
 
         public void Init(ModManifest manifest)
         {
@@ -26,20 +24,6 @@ namespace DeepSpaceQoL
 
         public void OnEnable()
         {
-            ModConfig config = ModHelper.GetConfig(ModId);
-            ShowOrdinary = config.Define(
-                "show_not_an_aug",
-                true,
-                "display",
-                delegate { return "Show NOT AN AUG for ordinary customers"; },
-                delegate { return "When off, the overlay is hidden for ordinary customers and only appears for Augs."; });
-            RunSelfTest = config.Define(
-                "run_self_test",
-                true,
-                "debug",
-                delegate { return "Run self-test after loading a store"; },
-                delegate { return "Logs PASS/FAIL checks for Aug detection and the mod scanner."; });
-
             RuntimeHost.Create<AugOverlay>("AugSpotterRuntime");
             Log.Info("enabled v" + ModVersion);
         }
@@ -106,27 +90,13 @@ namespace DeepSpaceQoL
         private TextMeshProUGUI _label;
         private Image _background;
         private string _lastText;
-        private bool _selfTestDone;
-        private float _started;
-
-        private void Awake()
-        {
-            _started = Time.realtimeSinceStartup;
-        }
+        private float _playerProbeAt;
 
         private void Update()
         {
             EnsureOverlay();
             UpdateLabel();
 
-            if (!_selfTestDone && Time.realtimeSinceStartup - _started > 2f)
-            {
-                _selfTestDone = true;
-                if (AugSpotterMod.RunSelfTest == null || AugSpotterMod.RunSelfTest.Value)
-                {
-                    RunSelfTest();
-                }
-            }
         }
 
         private void EnsureOverlay()
@@ -137,6 +107,11 @@ namespace DeepSpaceQoL
             }
             StoreUIManager storeUi = StoreUIManager.Instance;
             if (storeUi == null || storeUi.versionTMP == null)
+            {
+                return;
+            }
+            InspectionUIManager inspectionUi = InspectionUIManager.Instance;
+            if (inspectionUi == null || inspectionUi.confrontTitleTMP == null)
             {
                 return;
             }
@@ -152,30 +127,41 @@ namespace DeepSpaceQoL
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            GameObject textObject = new GameObject("Label", typeof(RectTransform));
-            textObject.transform.SetParent(root.transform, false);
-            _label = textObject.AddComponent<TextMeshProUGUI>();
-            if (storeUi.versionTMP.font != null)
+            // Clone a TMP text that already renders Chinese in this scene. This
+            // copies the exact font asset, fallback list, material and shader;
+            // building a fresh TMP text with a hand-picked font can lose the
+            // fallback atlas and render only Latin/digits.
+            TextMeshProUGUI template = null;
+            if (storeUi.storeCalendar != null)
             {
-                _label.font = storeUi.versionTMP.font;
+                template = storeUi.storeCalendar.dayTMP;
             }
-            else if (TMP_Settings.defaultFontAsset != null)
+            if (template == null)
             {
-                _label.font = TMP_Settings.defaultFontAsset;
+                template = inspectionUi.confrontTitleTMP;
             }
-            if (storeUi.versionTMP.fontSharedMaterial != null)
+            if (template == null)
             {
-                _label.fontSharedMaterial = storeUi.versionTMP.fontSharedMaterial;
+                return;
             }
-            else if (_label.font != null && _label.font.material != null)
+
+            GameObject textObject = UnityEngine.Object.Instantiate(template.gameObject, root.transform);
+            textObject.name = "Label";
+            textObject.SetActive(true);
+            _label = textObject.GetComponent<TextMeshProUGUI>();
+            if (_label == null)
             {
-                _label.fontSharedMaterial = _label.font.material;
+                UnityEngine.Object.Destroy(textObject);
+                return;
             }
             _label.fontSize = 24f;
+            _label.enableAutoSizing = false;
             _label.alignment = TextAlignmentOptions.TopLeft;
             _label.enableWordWrapping = false;
             _label.raycastTarget = false;
             _label.color = Color.white;
+            _label.margin = Vector4.zero;
+            _label.text = "";
 
             RectTransform rect = _label.rectTransform;
             rect.anchorMin = new Vector2(0f, 1f);
@@ -196,6 +182,11 @@ namespace DeepSpaceQoL
             backgroundRect.anchoredPosition = new Vector2(24f, -104f);
             backgroundRect.sizeDelta = new Vector2(752f, 96f);
             backgroundObject.transform.SetSiblingIndex(0);
+
+            // The store scene can exist before PlayerStore finishes constructing.
+            // Wait a few seconds and then probe at a low rate so a transient
+            // construction failure cannot spam the log or corrupt the singleton.
+            _playerProbeAt = Time.realtimeSinceStartup + 5f;
         }
 
         private void UpdateLabel()
@@ -205,102 +196,53 @@ namespace DeepSpaceQoL
                 return;
             }
 
+            float now = Time.realtimeSinceStartup;
+            if (now < _playerProbeAt)
+            {
+                return;
+            }
+            _playerProbeAt = now + 0.5f;
+
             StoreClient client = null;
-            if (PlayerStore.Instance != null && PlayerStore.Instance.currentClientInstance != null)
-            {
-                client = PlayerStore.Instance.currentClientInstance.GetClientBlueprint();
-            }
-
-            string text;
-            if (client == null)
-            {
-                text = "";
-            }
-            else if (client.isAug)
-            {
-                text = "<color=#FF4B4B>AUG DETECTED</color>  -  Tier " + client.augTier;
-            }
-            else if (AugSpotterMod.ShowOrdinary != null && AugSpotterMod.ShowOrdinary.Value)
-            {
-                text = "<color=#5BE37D>NOT AN AUG</color>";
-            }
-            else
-            {
-                text = "";
-            }
-
-            if (text != _lastText)
-            {
-                _lastText = text;
-                _label.text = text;
-                bool visible = text.Length > 0;
-                _label.enabled = visible;
-                if (_background != null)
-                {
-                    _background.enabled = visible;
-                }
-            }
-        }
-
-        private void RunSelfTest()
-        {
-            int pass = 0;
-            int fail = 0;
             try
             {
-                StoreClient aug = new StoreClient();
-                aug.isAug = true;
-                aug.augTier = 2;
-                Check(AugSpotterMod.IsAug(aug), "aug_detection", "isAug=true", ref pass, ref fail);
-
-                StoreClient normal = new StoreClient();
-                normal.isAug = false;
-                Check(!AugSpotterMod.IsAug(normal), "ordinary_detection", "isAug=false", ref pass, ref fail);
-
-                Check(!AugSpotterMod.IsAug(null), "null_client", "null -> false", ref pass, ref fail);
-
-                string folder = ModHelper.GetModFolder(AugSpotterMod.ModId);
-                if (string.IsNullOrEmpty(folder))
+                PlayerStore store = PlayerStore.Instance;
+                if (store != null && store.currentClientInstance != null)
                 {
-                    Check(false, "mod_scan", "could not resolve mod folder", ref pass, ref fail);
-                }
-                else
-                {
-                    string dll = folder.TrimEnd('/', '\\') + "/" + AugSpotterMod.AssemblyName + ".dll";
-                    ModScanResult scan = ModScanner.Scan(
-                        new string[] { dll },
-                        new string[] { AugSpotterMod.AssemblyName },
-                        folder,
-                        true);
-                    string caps = scan.Capabilities == null ? "" : string.Join(", ", new System.Collections.Generic.List<string>(scan.Capabilities).ToArray());
-                    Log.Info("[Scan] refused=" + scan.Refused + " capabilities=[" + caps + "] findings=" + (scan.Findings == null ? 0 : scan.Findings.Count));
-                    if (scan.Findings != null && scan.Findings.Count > 0)
-                    {
-                        Log.Info("[Scan] " + scan.FormatFindings(4).Replace("\n", " / "));
-                    }
-                    Check(!scan.Refused && (scan.Capabilities == null || scan.Capabilities.Count == 0), "mod_scan", "refused=" + scan.Refused + " caps=[" + caps + "]", ref pass, ref fail);
+                    client = store.currentClientInstance.GetClientBlueprint();
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                fail++;
-                Log.Error("[SelfTest] FAIL exception | " + e.GetType().Name + ": " + e.Message);
+                // PlayerStore is still being constructed or the scene is changing.
+                SetText("");
+                _playerProbeAt = now + 2f;
+                return;
             }
-            Log.Info("[SelfTest] SUMMARY pass=" + pass + " fail=" + fail);
+
+            string text = "";
+            if (client != null && client.isAug)
+            {
+                text = "<color=#FF4B4B>侦测到改造体  等级 " + client.augTier + "</color>";
+            }
+            SetText(text);
         }
 
-        private static void Check(bool ok, string name, string detail, ref int pass, ref int fail)
+        private void SetText(string text)
         {
-            if (ok)
+            if (text == _lastText)
             {
-                pass++;
-                Log.Info("[SelfTest] PASS " + name + " | " + detail);
+                return;
             }
-            else
+            _lastText = text;
+            _label.text = text;
+            bool visible = text.Length > 0;
+            _label.enabled = visible;
+            if (_background != null)
             {
-                fail++;
-                Log.Error("[SelfTest] FAIL " + name + " | " + detail);
+                _background.enabled = visible;
             }
         }
+
     }
 }

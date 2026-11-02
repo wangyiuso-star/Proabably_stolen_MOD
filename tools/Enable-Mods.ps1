@@ -49,47 +49,9 @@ $backupPath = Join-Path $backupDir ("SaveFile_" + (Get-Date -Format "yyyyMMdd-HH
 Copy-Item $SaveFile $backupPath -Force
 Write-Host "Backed up SaveFile.es3 -> $backupPath"
 
-$json = [System.IO.File]::ReadAllText($SaveFile)
-$save = $json | ConvertFrom-Json
-if ($null -eq $save) {
-    throw "Could not parse SaveFile.es3"
-}
-
-$recordStore = [ordered]@{ records = @(); stopped = @() }
-if ($save.PSObject.Properties.Name -contains "modTrust") {
-    $raw = $save.modTrust.value
-    if (-not [string]::IsNullOrWhiteSpace($raw)) {
-        $parsed = $raw | ConvertFrom-Json
-        if ($parsed) {
-            if ($parsed.PSObject.Properties.Name -contains "records" -and $parsed.records) {
-                $recordStore.records = @($parsed.records)
-            }
-            if ($parsed.PSObject.Properties.Name -contains "stopped" -and $parsed.stopped) {
-                $recordStore.stopped = @($parsed.stopped)
-            }
-        }
-    }
-}
-
-$order = @()
-if ($save.PSObject.Properties.Name -contains "modOrder") {
-    $order = @($save.modOrder.value)
-}
-$order = @($order | Where-Object { $_ })
-
 $ids = @("deepspace.appraisal_assistant", "deepspace.aug_spotter")
-foreach ($id in $ids) {
-    if ($order -notcontains $id) {
-        $order += $id
-    }
-}
-
 $records = @()
-foreach ($existing in @($recordStore.records)) {
-    if ($existing -and $existing.id -and $existing.id -ne "deepspace.appraisal_assistant" -and $existing.id -ne "deepspace.aug_spotter") {
-        $records += $existing
-    }
-}
+$now = [DateTime]::UtcNow.ToString("o")
 
 foreach ($name in @("AppraisalAssistant", "AugSpotter")) {
     $modDir = Join-Path $modsDir $name
@@ -103,7 +65,6 @@ foreach ($name in @("AppraisalAssistant", "AugSpotter")) {
     $dllHash = Get-Sha256Hex $dll
     $combinedInput = ($manifestHash + "`n" + $name + ".dll|" + $dllHash)
     $combined = Get-Sha256Text $combinedInput
-    $now = [DateTime]::UtcNow.ToString("o")
     $records += [ordered]@{
         id = $id
         source = "Local"
@@ -122,24 +83,26 @@ foreach ($name in @("AppraisalAssistant", "AugSpotter")) {
     Write-Host "Prepared trust record for $id ($name.dll)"
 }
 
-$recordStore.records = @($records)
-$recordStore.stopped = @($recordStore.stopped)
-
-$trustJson = $recordStore | ConvertTo-Json -Compress -Depth 20
-if ($save.PSObject.Properties.Name -contains "modTrust") {
-    $save.modTrust.value = $trustJson
-} else {
-    $save | Add-Member -NotePropertyName "modTrust" -NotePropertyValue ([ordered]@{ __type = "string"; value = $trustJson }) -Force
-}
+# ES3 stores the list type inside __type. Keep that string exact; do not
+# round-trip the whole file through PowerShell's ConvertFrom-Json, because
+# Windows PowerShell 5.1 drops reserved-looking "__type" properties.
 $listType = "System.Collections.Generic.List``1[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]],mscorlib"
-if ($save.PSObject.Properties.Name -contains "modOrder") {
-    $save.modOrder.value = @($order)
-} else {
-    $save | Add-Member -NotePropertyName "modOrder" -NotePropertyValue ([ordered]@{ __type = $listType; value = @($order) }) -Force
+$payload = [ordered]@{
+    save = $SaveFile
+    ids = @($ids)
+    listType = $listType
+    records = @($records)
 }
+$payloadDir = Join-Path $root ".scratch"
+New-Item -ItemType Directory -Force -Path $payloadDir | Out-Null
+$payloadPath = Join-Path $payloadDir "enable-mods-payload.json"
+$payload | ConvertTo-Json -Compress -Depth 20 | Set-Content -Encoding UTF8 $payloadPath
 
-$outJson = $save | ConvertTo-Json -Compress -Depth 50
-$utf8 = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText($SaveFile, $outJson, $utf8)
+& python (Join-Path $PSScriptRoot "update-mod-config.py") $payloadPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Python updater failed (exit $LASTEXITCODE)"
+}
+Remove-Item $payloadPath -Force -ErrorAction SilentlyContinue
+
 Write-Host "Enabled mods in $SaveFile"
-Write-Host ("modOrder = " + ($order -join ", "))
+Write-Host ("modOrder = " + ($ids -join ", "))

@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using HarmonyLib;
@@ -21,8 +20,6 @@ namespace DeepSpaceQoL
         internal static ConfigEntry<bool> ShowTrueValue;
         internal static ConfigEntry<bool> AutoFill;
         internal static ConfigEntry<bool> ForceEstimate;
-        internal static ConfigEntry<bool> ShowBuyAdvice;
-        internal static ConfigEntry<bool> RunSelfTest;
 
         public void Init(ModManifest manifest)
         {
@@ -36,40 +33,26 @@ namespace DeepSpaceQoL
                 "show_true_value",
                 true,
                 "appraisal",
-                delegate { return "Show true appraisal value"; },
-                delegate { return "Adds TRUE VALUE and the perfect estimate range to appraisal item tooltips."; });
+                delegate { return "显示真实价值"; },
+                delegate { return "在鉴定物品提示中加入真值与精确区间。"; });
             AutoFill = config.Define(
                 "auto_fill",
                 true,
                 "appraisal",
-                delegate { return "Auto-fill the appraisal input"; },
-                delegate { return "Fills the exact value into the appraisal service input field."; });
+                delegate { return "自动填入鉴定价格"; },
+                delegate { return "打开鉴定面板时，自动把正确价值填入输入框。"; });
             ForceEstimate = config.Define(
                 "force_correct_estimate",
                 true,
                 "appraisal",
-                delegate { return "Submit the exact value"; },
-                delegate { return "When you press Estimate, submit the exact value even if the field was edited."; });
-            ShowBuyAdvice = config.Define(
-                "show_buy_advice",
-                true,
-                "inspection",
-                delegate { return "Show buy / do-not-buy advice"; },
-                delegate { return "Adds SAFE TO BUY or DO NOT BUY under the authenticity label."; });
-            RunSelfTest = config.Define(
-                "run_self_test",
-                true,
-                "debug",
-                delegate { return "Run self-test after loading a store"; },
-                delegate { return "Logs PASS/FAIL checks for values, authenticity and item tags."; });
+                delegate { return "提交时使用正确价格"; },
+                delegate { return "按下估算时，即使输入框被改过，也以正确价值提交。"; });
 
-            RuntimeHost.Create<AppraisalRuntime>("AppraisalAssistantRuntime");
             Log.Info("enabled v" + ModVersion);
         }
 
         public void OnDisable()
         {
-            RuntimeHost.Destroy();
         }
     }
 
@@ -120,31 +103,6 @@ namespace DeepSpaceQoL
         }
     }
 
-    internal static class RuntimeHost
-    {
-        private static GameObject _root;
-
-        public static void Create<T>(string name) where T : MonoBehaviour
-        {
-            if (_root != null)
-            {
-                return;
-            }
-            _root = new GameObject(name);
-            UnityEngine.Object.DontDestroyOnLoad(_root);
-            _root.AddComponent<T>();
-        }
-
-        public static void Destroy()
-        {
-            if (_root != null)
-            {
-                UnityEngine.Object.Destroy(_root);
-                _root = null;
-            }
-        }
-    }
-
     [HarmonyPatch(typeof(AppraisalHelper), nameof(AppraisalHelper.CreateAppraisalTooltip))]
     internal static class AppraisalTooltipPatch
     {
@@ -166,11 +124,11 @@ namespace DeepSpaceQoL
             int low = Mathf.CeilToInt(value * 0.95f);
             int high = Mathf.FloorToInt(value * 1.05f);
             builder.AddLine(
-                "TRUE VALUE: " + value.ToString(CultureInfo.InvariantCulture),
+                "真值：" + value.ToString(CultureInfo.InvariantCulture),
                 true,
                 RenderHandler.ColorPalette.LightGreen);
             builder.AddLine(
-                "PERFECT RANGE: " + low.ToString(CultureInfo.InvariantCulture) + " - " + high.ToString(CultureInfo.InvariantCulture),
+                "精确区间：" + low.ToString(CultureInfo.InvariantCulture) + " - " + high.ToString(CultureInfo.InvariantCulture),
                 true,
                 RenderHandler.ColorPalette.LightGreen);
         }
@@ -204,6 +162,34 @@ namespace DeepSpaceQoL
                 __instance.apprisalServiceInputField.text = text;
             }
             __instance.currentInspectingItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", delegate(TagState state)
+            {
+                state.Enable().SetInt(value);
+            });
+        }
+    }
+
+    [HarmonyPatch(typeof(InspectionUIManager), nameof(InspectionUIManager.OnInspectItem))]
+    internal static class AppraisalInspectResetPatch
+    {
+        private static void Postfix(InspectionUIManager __instance, GameItem gameItem)
+        {
+            if (__instance == null || gameItem == null || !gameItem.IsTag("APPRAISAL_ITEM"))
+            {
+                return;
+            }
+            // 同一顾客的第二件鉴定品可能沿用上一个输入框状态；
+            // 每件物品开始检查时都重置，确保各自使用自己的价值。
+            __instance.isEditingAppraisalField = false;
+            int value;
+            if (!Log.TryGetCorrectValue(gameItem, out value))
+            {
+                return;
+            }
+            if (__instance.apprisalServiceInputField != null)
+            {
+                __instance.apprisalServiceInputField.text = value.ToString(CultureInfo.InvariantCulture);
+            }
+            gameItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", delegate(TagState state)
             {
                 state.Enable().SetInt(value);
             });
@@ -284,16 +270,16 @@ namespace DeepSpaceQoL
             switch (truth.Kind)
             {
                 case TruthKind.Genuine:
-                    tag = "  <color=#39A78E>[GENUINE]</color>";
+                    tag = "  <color=#39A78E>[真品]</color>";
                     break;
                 case TruthKind.Counterfeit:
-                    tag = "  <color=#FF5555>[COUNTERFEIT]</color>";
+                    tag = "  <color=#FF5555>[假货]</color>";
                     break;
                 case TruthKind.Defective:
-                    tag = "  <color=#FFAA00>[DEFECTIVE]</color>";
+                    tag = "  <color=#FFAA00>[有缺陷]</color>";
                     break;
                 case TruthKind.Replica:
-                    tag = "  <color=#FFAA00>[REPLICA]</color>";
+                    tag = "  <color=#FFAA00>[复制品]</color>";
                     break;
                 default:
                     return;
@@ -319,21 +305,10 @@ namespace DeepSpaceQoL
             RenderHandler.ColorPalette color = truth.Kind == TruthKind.Genuine
                 ? RenderHandler.ColorPalette.LightGreen
                 : (truth.Kind == TruthKind.Counterfeit ? RenderHandler.ColorPalette.Red : RenderHandler.ColorPalette.Orange);
-            builder.AddLine("AUTHENTICITY: " + truth.Label, true, color);
-            if (truth.Detail != null)
+            builder.AddLine("真伪判定：" + truth.Label, true, color);
+            if (truth.Reason != null)
             {
-                builder.AddLine(truth.Detail, true, color);
-            }
-            if (AppraisalAssistantMod.ShowBuyAdvice != null && AppraisalAssistantMod.ShowBuyAdvice.Value)
-            {
-                if (truth.Kind == TruthKind.Genuine)
-                {
-                    builder.AddLine("SAFE TO BUY", true, RenderHandler.ColorPalette.LightGreen);
-                }
-                else
-                {
-                    builder.AddLine("DO NOT BUY", true, RenderHandler.ColorPalette.Red);
-                }
+                builder.AddLine("原因：" + truth.Reason, true, color);
             }
         }
     }
@@ -351,7 +326,7 @@ namespace DeepSpaceQoL
     {
         public TruthKind Kind;
         public string Label;
-        public string Detail;
+        public string Reason;
     }
 
     internal static class Truth
@@ -369,37 +344,37 @@ namespace DeepSpaceQoL
                 {
                     bool fake = RibwichHelper.IsCounterfeit(item);
                     result.Kind = fake ? TruthKind.Counterfeit : TruthKind.Genuine;
-                    result.Label = fake ? "COUNTERFEIT" : "GENUINE";
-                    result.Detail = "Ribwich";
+                    result.Label = fake ? "假货" : "真品";
+                    result.Reason = fake ? RibwichReason(item) : null;
                     return true;
                 }
                 if (item.IsTag("WINE_COUNTERFEIT_TAG"))
                 {
                     result.Kind = TruthKind.Counterfeit;
-                    result.Label = "COUNTERFEIT";
-                    result.Detail = "Counterfeit wine";
+                    result.Label = "假货";
+                    result.Reason = "带有假酒标记";
                     return true;
                 }
 
                 ItemFeature feature = item.FindItemFeatureByCategory("CATEGORY_GENUINE_CIGARETTE");
                 if (feature != null && feature.realCondition != null)
                 {
-                    return FromCondition(feature, "Cigarette", item, out result);
+                    return FromCondition(feature, item, out result);
                 }
                 feature = item.FindItemFeatureByCategory("CATEGORY_GENUINE_STAMP");
                 if (feature != null && feature.realCondition != null)
                 {
-                    return FromCondition(feature, "Stamp", item, out result);
+                    return FromCondition(feature, item, out result);
                 }
                 feature = item.FindItemFeatureByCategory("CATEGORY_GENUINE_INJECTOR");
                 if (feature != null && feature.realCondition != null)
                 {
-                    return FromCondition(feature, "Injector", item, out result);
+                    return FromCondition(feature, item, out result);
                 }
                 feature = item.FindItemFeatureByCategory("CATEGORY_REPLICA");
                 if (feature != null && feature.realCondition != null)
                 {
-                    return FromCondition(feature, "Replica", item, out result);
+                    return FromCondition(feature, item, out result);
                 }
             }
             catch (Exception e)
@@ -409,11 +384,10 @@ namespace DeepSpaceQoL
             return false;
         }
 
-        private static bool FromCondition(ItemFeature feature, string kind, GameItem item, out TruthResult result)
+        private static bool FromCondition(ItemFeature feature, GameItem item, out TruthResult result)
         {
             string id = feature.realCondition.identifier ?? "";
             result = new TruthResult();
-            result.Detail = kind + " condition: " + id;
             switch (id)
             {
                 case "genuineCigarette":
@@ -421,167 +395,88 @@ namespace DeepSpaceQoL
                 case "genuineInjector":
                 case "non_replica":
                     result.Kind = TruthKind.Genuine;
-                    result.Label = "GENUINE";
-                    break;
+                    result.Label = "真品";
+                    return true;
                 case "counterfeitCigarette":
                 case "counterfeitStamp":
                 case "counterfeitInjector":
                     result.Kind = TruthKind.Counterfeit;
-                    result.Label = "COUNTERFEIT";
-                    break;
+                    result.Label = "假货";
+                    result.Reason = CounterfeitReason(item);
+                    return true;
                 case "expiredInjector":
                     result.Kind = TruthKind.Defective;
-                    result.Label = "DEFECTIVE - EXPIRED";
-                    break;
+                    result.Label = "有缺陷";
+                    result.Reason = "已过期" + ReasonSuffix(item);
+                    return true;
                 case "unusableInjector":
                     result.Kind = TruthKind.Defective;
-                    result.Label = "DEFECTIVE - UNUSABLE";
-                    break;
+                    result.Label = "有缺陷";
+                    result.Reason = "无法使用" + ReasonSuffix(item);
+                    return true;
                 case "replica":
                     result.Kind = TruthKind.Replica;
-                    result.Label = "REPLICA (NOT ORIGINAL)";
-                    break;
+                    result.Label = "复制品";
+                    result.Reason = "复制品，非原版";
+                    return true;
                 default:
                     return false;
             }
+        }
+
+        private static string CounterfeitReason(GameItem item)
+        {
             string issues = CollectIssues(item);
-            if (issues != null)
+            return string.IsNullOrEmpty(issues) ? "与正品特征不符" : issues;
+        }
+
+        private static string ReasonSuffix(GameItem item)
+        {
+            string issues = CollectIssues(item);
+            return string.IsNullOrEmpty(issues) ? "" : "（" + issues + "）";
+        }
+
+        private static string RibwichReason(GameItem item)
+        {
+            List<string> reasons = new List<string>();
+            try
             {
-                result.Detail = result.Detail + " | " + issues;
+                int month = item.GetTagReadonly("RIBWICH_PRODUCTION_MONTH_TAG").GetInt();
+                int year = item.GetTagReadonly("RIBWICH_PRODUCTION_YEAR_TAG").GetInt();
+                int facility = item.GetTagReadonly("RIBWICH_FACILITY_NUMBER_TAG").GetInt();
+                int logo = item.GetTagReadonly("RIBWICH_DAVRE_LOGO_TAG").GetInt();
+                if (!RibwichHelper.IsValidProductionDate(month, year)) reasons.Add("生产日期异常");
+                if (!RibwichHelper.IsValidFacilityNumber(facility)) reasons.Add("设施编号异常");
+                if (logo != RibwichHelper.RIBWICH_DAVRE_LOGO_CORRECT) reasons.Add("商标异常");
+                if (RibwichHelper.IsOpened(item)) reasons.Add("已开封");
             }
-            return true;
+            catch (Exception)
+            {
+            }
+            if (reasons.Count == 0) reasons.Add("包装与正品不符");
+            return string.Join("、", reasons.ToArray());
         }
 
         private static string CollectIssues(GameItem item)
         {
             List<string> issues = new List<string>();
-            if (item.IsTag("CIGARETTE_LETTERING_ISSUE")) issues.Add("lettering");
-            if (item.IsTag("CIGARETTE_COLOR_ISSUE")) issues.Add("color");
-            if (item.IsTag("CIGARETTE_SEAL_ISSUE")) issues.Add("seal");
-            if (item.IsTag("CIGARETTE_LOGO_ISSUE")) issues.Add("logo");
-            if (item.IsTag("CIGARETTE_BOX_ISSUE")) issues.Add("box");
-            if (item.IsTag("STAMP_LETTERING_ISSUE")) issues.Add("lettering");
-            if (item.IsTag("STAMP_LOGO_ISSUE")) issues.Add("logo");
-            if (item.IsTag("STAMP_SEAL_ISSUE")) issues.Add("seal");
-            if (item.IsTag("STAMP_AMOUNT_ISSUE")) issues.Add("amount");
-            if (item.IsTag("STAMP_CHIP_ISSUE")) issues.Add("chip");
-            if (item.IsTag("ISSUE_INDICATOR")) issues.Add("indicator");
-            if (item.IsTag("ISSUE_LABEL")) issues.Add("label");
-            if (item.IsTag("ISSUE_SERIAL")) issues.Add("serial");
-            if (item.IsTag("ISSUE_BODY")) issues.Add("body");
-            if (item.IsTag("ISSUE_COLOR")) issues.Add("color");
-            return issues.Count == 0 ? null : "visible issues: " + string.Join(", ", issues.ToArray());
+            if (item.IsTag("CIGARETTE_LETTERING_ISSUE")) issues.Add("字母印刷问题");
+            if (item.IsTag("CIGARETTE_COLOR_ISSUE")) issues.Add("颜色问题");
+            if (item.IsTag("CIGARETTE_SEAL_ISSUE")) issues.Add("防伪标问题");
+            if (item.IsTag("CIGARETTE_LOGO_ISSUE")) issues.Add("商标问题");
+            if (item.IsTag("CIGARETTE_BOX_ISSUE")) issues.Add("包装盒问题");
+            if (item.IsTag("STAMP_LETTERING_ISSUE")) issues.Add("字母印刷问题");
+            if (item.IsTag("STAMP_LOGO_ISSUE")) issues.Add("商标问题");
+            if (item.IsTag("STAMP_SEAL_ISSUE")) issues.Add("防伪标问题");
+            if (item.IsTag("STAMP_AMOUNT_ISSUE")) issues.Add("面额问题");
+            if (item.IsTag("STAMP_CHIP_ISSUE")) issues.Add("芯片问题");
+            if (item.IsTag("ISSUE_INDICATOR")) issues.Add("指示灯问题");
+            if (item.IsTag("ISSUE_LABEL")) issues.Add("标签问题");
+            if (item.IsTag("ISSUE_SERIAL")) issues.Add("序列号问题");
+            if (item.IsTag("ISSUE_BODY")) issues.Add("瓶体问题");
+            if (item.IsTag("ISSUE_COLOR")) issues.Add("颜色问题");
+            return issues.Count == 0 ? null : string.Join("、", issues.ToArray());
         }
     }
 
-    internal sealed class AppraisalRuntime : MonoBehaviour
-    {
-        private IEnumerator Start()
-        {
-            if (AppraisalAssistantMod.RunSelfTest != null && !AppraisalAssistantMod.RunSelfTest.Value)
-            {
-                yield break;
-            }
-
-            float started = Time.realtimeSinceStartup;
-            while (Time.realtimeSinceStartup - started < 90f)
-            {
-                if (PlayerStore.Instance != null && StoreUIManager.Instance != null)
-                {
-                    break;
-                }
-                yield return new WaitForSeconds(1f);
-            }
-            if (PlayerStore.Instance == null || StoreUIManager.Instance == null)
-            {
-                Log.Info("[SelfTest] SKIP: no store scene loaded within 90 seconds");
-                yield break;
-            }
-
-            yield return new WaitForSeconds(1.5f);
-            int pass = 0;
-            int fail = 0;
-            RunTests(delegate(bool ok, string name, string detail)
-            {
-                if (ok)
-                {
-                    pass++;
-                    Log.Info("[SelfTest] PASS " + name + (string.IsNullOrEmpty(detail) ? "" : " | " + detail));
-                }
-                else
-                {
-                    fail++;
-                    Log.Error("[SelfTest] FAIL " + name + (string.IsNullOrEmpty(detail) ? "" : " | " + detail));
-                }
-            });
-            Log.Info("[SelfTest] SUMMARY pass=" + pass + " fail=" + fail);
-        }
-
-        private static void RunTests(Action<bool, string, string> check)
-        {
-            try
-            {
-                GameItem hand = PreBuiltItemHelper.CreateHandRandom();
-                int handValue;
-                bool valueOk = Log.TryGetCorrectValue(hand, out handValue);
-                check(valueOk && handValue > 0, "appraisal_value", "hand=" + handValue);
-                string autoText = handValue.ToString(CultureInfo.InvariantCulture);
-                check(autoText == handValue.ToString(CultureInfo.InvariantCulture), "auto_fill_value", autoText);
-            }
-            catch (Exception e)
-            {
-                check(false, "appraisal_value", e.GetType().Name + ": " + e.Message);
-            }
-
-            CheckTruth(check, "fake_stamp", delegate { return PreBuiltItemHelper.CreateFakeStamp(); }, TruthKind.Counterfeit);
-            CheckTruth(check, "real_stamp", delegate { return PreBuiltItemHelper.CreateRealStamp(160); }, TruthKind.Genuine);
-            CheckTruth(check, "fake_injector", delegate { return PreBuiltItemHelper.CreateRealCounterfeitInjector(); }, TruthKind.Counterfeit);
-            CheckTruth(check, "real_injector", delegate { return PreBuiltItemHelper.CreateRealGenuineInjector(); }, TruthKind.Genuine);
-
-            try
-            {
-                string folder = ModHelper.GetModFolder(AppraisalAssistantMod.ModId);
-                if (string.IsNullOrEmpty(folder))
-                {
-                    check(false, "mod_scan", "could not resolve mod folder");
-                }
-                else
-                {
-                    string dll = folder.TrimEnd('/', '\\') + "/" + AppraisalAssistantMod.AssemblyName + ".dll";
-                    ModScanResult scan = ModScanner.Scan(
-                        new string[] { dll },
-                        new string[] { AppraisalAssistantMod.AssemblyName },
-                        folder,
-                        true);
-                    string caps = scan.Capabilities == null ? "" : string.Join(", ", new List<string>(scan.Capabilities).ToArray());
-                    string findings = scan.Findings == null ? "" : scan.FormatFindings(4);
-                    Log.Info("[Scan] refused=" + scan.Refused + " capabilities=[" + caps + "] findings=" + (scan.Findings == null ? 0 : scan.Findings.Count));
-                    if (!string.IsNullOrEmpty(findings))
-                    {
-                        Log.Info("[Scan] " + findings.Replace("\n", " / "));
-                    }
-                    check(!scan.Refused && (scan.Capabilities == null || scan.Capabilities.Count == 0), "mod_scan", "refused=" + scan.Refused + " caps=[" + caps + "]");
-                }
-            }
-            catch (Exception e)
-            {
-                check(false, "mod_scan", e.GetType().Name + ": " + e.Message);
-            }
-        }
-
-        private static void CheckTruth(Action<bool, string, string> check, string name, Func<GameItem> factory, TruthKind expected)
-        {
-            try
-            {
-                GameItem item = factory();
-                TruthResult truth;
-                bool ok = Truth.TryGet(item, out truth) && truth.Kind == expected;
-                check(ok, name, ok ? truth.Label : "expected " + expected + ", got " + truth.Kind);
-            }
-            catch (Exception e)
-            {
-                check(false, name, e.GetType().Name + ": " + e.Message);
-            }
-        }
-    }
 }

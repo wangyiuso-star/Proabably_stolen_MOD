@@ -55,6 +55,7 @@ foreach ($project in $projects) {
         "/nologo",
         "/target:library",
         "/langversion:latest",
+        "/codepage:65001",
         $optimize,
         "/deterministic+",
         "/nowarn:1701,1702",
