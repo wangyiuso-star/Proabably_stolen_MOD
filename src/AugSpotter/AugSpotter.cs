@@ -1,5 +1,5 @@
 using System;
-using System.Collections;
+using HarmonyLib;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -36,6 +36,47 @@ namespace DeepSpaceQoL
         internal static bool IsAug(StoreClient client)
         {
             return client != null && client.isAug;
+        }
+    }
+
+    // Normal customers: the game calls this after the walk-in animation ends.
+    [HarmonyPatch(typeof(StoreUIManager), nameof(StoreUIManager.OnNextClientArrived))]
+    internal static class ClientArrivedPatch
+    {
+        private static void Postfix()
+        {
+            AugOverlay.Refresh();
+        }
+    }
+
+    // Morning/special customers are created directly without the normal walk-in
+    // event, so they need their own hook.
+    [HarmonyPatch(typeof(PlayerStore), nameof(PlayerStore.SetupWaitingClient))]
+    internal static class WaitingClientPatch
+    {
+        private static void Postfix()
+        {
+            AugOverlay.Refresh();
+        }
+    }
+
+    [HarmonyPatch(typeof(PlayerStore), nameof(PlayerStore.DismissCurrentClient))]
+    internal static class ClientDismissedPatch
+    {
+        private static void Postfix()
+        {
+            AugOverlay.Refresh();
+        }
+    }
+
+    // Loading a save/new game can clear the customer without going through the
+    // dismiss path; hide a marker that belonged to the previous scene.
+    [HarmonyPatch(typeof(PlayerStore), nameof(PlayerStore.Reset))]
+    internal static class StoreResetPatch
+    {
+        private static void Postfix()
+        {
+            AugOverlay.Refresh();
         }
     }
 
@@ -86,17 +127,60 @@ namespace DeepSpaceQoL
 
     internal sealed class AugOverlay : MonoBehaviour
     {
+        private static AugOverlay _instance;
+        private static bool _refreshPending;
+
         private Canvas _canvas;
         private TextMeshProUGUI _label;
         private Image _background;
         private string _lastText;
-        private float _playerProbeAt;
+
+        private void Awake()
+        {
+            _instance = this;
+        }
+
+        private void OnDestroy()
+        {
+            if (_instance == this)
+            {
+                _instance = null;
+            }
+        }
 
         private void Update()
         {
             EnsureOverlay();
-            UpdateLabel();
+            if (_label == null)
+            {
+                return;
+            }
+            if (_refreshPending)
+            {
+                _refreshPending = false;
+                RefreshNow();
+            }
+            // Once the overlay is built and the first read succeeded there is
+            // nothing to do every frame. Customer changes are event-driven.
+            if (!_refreshPending)
+            {
+                enabled = false;
+            }
+        }
 
+        public static void Refresh()
+        {
+            if (_instance == null)
+            {
+                _refreshPending = true;
+                return;
+            }
+            _instance.enabled = true;
+            _instance.RefreshNow();
+            if (_instance._label != null && !_refreshPending)
+            {
+                _instance.enabled = false;
+            }
         }
 
         private void EnsureOverlay()
@@ -116,17 +200,6 @@ namespace DeepSpaceQoL
                 return;
             }
 
-            GameObject root = new GameObject("AugSpotterOverlay");
-            UnityEngine.Object.DontDestroyOnLoad(root);
-            _canvas = root.AddComponent<Canvas>();
-            _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _canvas.sortingOrder = 32000;
-
-            CanvasScaler scaler = root.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
-
             // Clone a TMP text that already renders Chinese in this scene. This
             // copies the exact font asset, fallback list, material and shader;
             // building a fresh TMP text with a hand-picked font can lose the
@@ -144,6 +217,17 @@ namespace DeepSpaceQoL
             {
                 return;
             }
+
+            GameObject root = new GameObject("AugSpotterOverlay");
+            UnityEngine.Object.DontDestroyOnLoad(root);
+            _canvas = root.AddComponent<Canvas>();
+            _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            _canvas.sortingOrder = 32000;
+
+            CanvasScaler scaler = root.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
 
             GameObject textObject = UnityEngine.Object.Instantiate(template.gameObject, root.transform);
             textObject.name = "Label";
@@ -183,25 +267,16 @@ namespace DeepSpaceQoL
             backgroundRect.sizeDelta = new Vector2(752f, 96f);
             backgroundObject.transform.SetSiblingIndex(0);
 
-            // The store scene can exist before PlayerStore finishes constructing.
-            // Wait a few seconds and then probe at a low rate so a transient
-            // construction failure cannot spam the log or corrupt the singleton.
-            _playerProbeAt = Time.realtimeSinceStartup + 5f;
+            RefreshNow();
         }
 
-        private void UpdateLabel()
+        private void RefreshNow()
         {
             if (_label == null)
             {
+                _refreshPending = true;
                 return;
             }
-
-            float now = Time.realtimeSinceStartup;
-            if (now < _playerProbeAt)
-            {
-                return;
-            }
-            _playerProbeAt = now + 0.5f;
 
             StoreClient client = null;
             try
@@ -214,18 +289,21 @@ namespace DeepSpaceQoL
             }
             catch (Exception)
             {
-                // PlayerStore is still being constructed or the scene is changing.
+                // PlayerStore may still be constructing; retry until it is ready.
                 SetText("");
-                _playerProbeAt = now + 2f;
+                _refreshPending = true;
                 return;
             }
 
-            string text = "";
+            _refreshPending = false;
             if (client != null && client.isAug)
             {
-                text = "<color=#FF4B4B>侦测到改造体  等级 " + client.augTier + "</color>";
+                SetText("<color=#FF4B4B>侦测到改造体  等级 " + client.augTier + "</color>");
             }
-            SetText(text);
+            else
+            {
+                SetText("");
+            }
         }
 
         private void SetText(string text)
@@ -243,6 +321,5 @@ namespace DeepSpaceQoL
                 _background.enabled = visible;
             }
         }
-
     }
 }

@@ -167,6 +167,9 @@ RESULT: PASS
 
 ## 9. 切換顧客卡頓修正（2026-11-02）
 
+> 第 3–7 節保留當時的歷史輸出；AugSpotter 在那些版本仍是 0 patch、每 0.5 秒輪詢。
+> 本節（9.x）才是最終的事件驅動版本。
+
 ### 9.1 根因
 
 `InspectionUIManager.Update()` 在估價面板開啟時每幀呼叫 `UpdateAppraisalPanel()`。
@@ -196,7 +199,7 @@ GameItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", ...)
 Compiling AppraisalAssistant...
   -> dist\AppraisalAssistant\AppraisalAssistant.dll (14848 bytes)
 Compiling AugSpotter...
-  -> dist\AugSpotter\AugSpotter.dll (8192 bytes)
+  -> dist\AugSpotter\AugSpotter.dll (9216 bytes)
 Build OK
 ```
 
@@ -204,7 +207,7 @@ Build OK
 
 ```text
 PASS AppraisalAssistant.dll: HarmonyPatch attributes checked (8)
-PASS AugSpotter.dll: HarmonyPatch attributes checked (0)
+PASS AugSpotter.dll: HarmonyPatch attributes checked (4)
 RESULT: PASS
 ```
 
@@ -227,7 +230,11 @@ patched 8 method(s)
   InspectionUIManager.OpenInjectorConfrontPanel
   InspectionUIManager.OpenStampConfrontPanel
   InspectionUIManager.UpdateAppraisalPanel
-patched 0 method(s)
+patched 4 method(s)
+  PlayerStore.DismissCurrentClient
+  PlayerStore.Reset
+  PlayerStore.SetupWaitingClient
+  StoreUIManager.OnNextClientArrived
 RESULT: PASS
 ```
 
@@ -238,11 +245,25 @@ RESULT: PASS
 
 ```text
 AppraisalAssistant match=True installed=BA51AE2BD01C95C437500D83B55EDCCDE0B4966EA441A692680332FB613AF581
-AugSpotter         match=True installed=E661C82BC21F939AE7556C0CE47B99622FA2ED8B85EC3B6A5563423CD230C4C4
+AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A567B49A61638D702AB067B340E
 ```
 
-### 9.4 尚未核實
+### 9.4 AugSpotter 改為事件驅動
+
+- 移除 `AugOverlay.Update()` 內每 0.5 秒的 `PlayerStore.currentClientInstance` 讀取，
+  以及 `_playerProbeAt`／`Time.realtimeSinceStartup`。
+- 改為 4 個 Harmony Postfix：
+  - `StoreUIManager.OnNextClientArrived`：正常顧客走到櫃檯。
+  - `PlayerStore.SetupWaitingClient`：早晨／特殊顧客直接生成。
+  - `PlayerStore.DismissCurrentClient`：顧客離開。
+  - `PlayerStore.Reset`：讀檔／新遊戲重置。
+- 首次建立 overlay 時仍讀一次目前顧客，覆蓋「載入存檔時顧客已在櫃檯」。
+- 更新成功後 `AugOverlay.enabled = false`；之後只有事件到來才暫時啟用。
+- 原始碼檢查：`0.5f` 只剩 `CanvasScaler.matchWidthOrHeight`，沒有顧客輪詢。
+
+### 9.5 尚未核實
 
 - 尚未在真實遊戲內量測 frame time；需要玩家連續切換 10 位以上顧客做主觀驗收。
-- 若仍有卡頓，下一個可疑點是 `AugOverlay.Update()` 的 0.5 秒顧客探測；目前它只讀
-  `StoreClient.isAug`／`augTier`，理論上不會造成持續掉幀，但尚未用 profiler 證實。
+- 事件覆蓋率以遊戲源碼的四個入口為準；若某個 debug／特殊流程直接改
+  `PlayerStore.currentClientInstance` 而不經過這四個方法，overlay 可能不會立即更新。
+  正常遊玩路徑已覆蓋，但尚未逐一實測所有 debug 指令。

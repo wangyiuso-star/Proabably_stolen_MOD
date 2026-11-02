@@ -1,4 +1,4 @@
-﻿# 驗收標準（v1.0）
+# 驗收標準（v1.0）
 
 本文件在動工前寫好。每一條都要有可重跑的命令或可檢查的日誌；不以「看起來可以」作驗收。
 
@@ -70,9 +70,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 
 期望：
 
-- HarmonyProbe：`patched 8 method(s)`（AppraisalAssistant）、`patched 0 method(s)`（AugSpotter）、`RESULT: PASS`。
+- HarmonyProbe：`patched 8 method(s)`（AppraisalAssistant）、`patched 4 method(s)`（AugSpotter）、`RESULT: PASS`。
 - LogicProbe：`aug=true/false/null`、真假／缺陷／複製品／假酒全部 PASS、`appraisal_value hand=100`、兩個 DLL 的 `[Scan]` 都是 `refused=False capabilities=[] findings=0`、`RESULT: PASS`。
-- 這只能證明 patch 與純邏輯，不代表 UI 已在遊戲畫面驗證；UI 仍需第 4 節手動驗收。
+- 這只能證明 patch 與純邏輯，不代表 UI 已在遊戲畫面驗證；UI 仍需第 6 節手動驗收。
 
 ## 2. 遊戲內載入驗收
 
@@ -91,7 +91,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 ```
 
 - `AppraisalAssistant` 的 `N = 8`（tooltip、auto-fill、force-estimate、OnInspectItem 重置、三個 confront 標題、真假 tooltip）。
-- `AugSpotter` 的 `N = 0`（用自建 MonoBehaviour 更新 overlay，不強制 patch）。
+- `AugSpotter` 的 `N = 4`（到達、特殊顧客、離開、Reset 四個事件；不再輪詢顧客）。
 - 不得出現 `Init failed`、`LoadError`、`scan refused`、`MissingMethodException`、`NullReferenceException`（與本 MOD 相關者）。
 
 ### B2 內建掃描器
@@ -103,7 +103,7 @@ MOD 不再在執行期主動掃描自己的 DLL（已移除 debug self-test／�
 
 最終版本不安裝任何自測協程、不輪詢日誌、不建立背景監聽：
 - `AppraisalAssistant` 只有 8 個 Harmony patch。
-- `AugSpotter` 只有 overlay 的 Update（偵測目前顧客是否為 Aug）。
+- `AugSpotter` 只有 4 個事件 patch；首次建立 overlay 後 `Update` 會自動停用，沒有顧客輪詢。
 - `Player.log` 不應出現 `[SelfTest]` 或反覆的 `NullReferenceException`。
 
 ## 3. 功能驗收
@@ -160,6 +160,26 @@ MOD 不再在執行期主動掃描自己的 DLL（已移除 debug self-test／�
 3. 改造體在 `MakeDisguisedAug` 後、任何互動前就能被標示，不需要掃描儀或消耗電池。
 4. 不修改 `StoreClient` 狀態、不消耗物品、不影響存檔。
 
+### C3.1 改造體更新改為事件驅動
+
+原本 `AugOverlay.Update()` 每 0.5 秒讀一次 `PlayerStore.currentClientInstance`。改成只在
+顧客事件發生時更新，避免無意義輪詢：
+
+- 正常顧客到櫃檯：`StoreUIManager.OnNextClientArrived` Postfix。
+- 早晨／特殊顧客直接生成：`PlayerStore.SetupWaitingClient` Postfix。
+- 顧客離開：`PlayerStore.DismissCurrentClient` Postfix。
+- 讀檔／新遊戲重置：`PlayerStore.Reset` Postfix。
+- 首次建立 overlay 時讀一次目前顧客，覆蓋「載入存檔時顧客已在櫃檯」。
+- 更新成功後 `AugOverlay.enabled = false`，不再有每幀 Update。
+
+驗收：
+
+1. `AugSpotter` 的 Harmony patch 數為 4（上述四個事件），不是 0。
+2. 原始碼中不得再出現 `_playerProbeAt`、`0.5f` 顧客輪詢或 `Time.realtimeSinceStartup`。
+3. `tools/Probe-Patches.ps1` 顯示 `patched 4 method(s)`，且 `Verify-Mods.ps1` PASS。
+4. 遊戲內：普通顧客不顯示；改造體到櫃檯後顯示；顧客離開後立即消失；載入存檔時
+   若顧客已在櫃檯也能顯示。
+
 ### C4 安全性
 
 1. 不讀寫任何本機檔案（除遊戲內建 `ModConfig` 經由遊戲 API 儲存設定）。
@@ -195,8 +215,8 @@ PASS appraisal_write_guard initial=true same=false changed=true
 
 ### D2 靜態 patch 數量不變
 
-`tools/Probe-Patches.ps1` 仍為 `patched 8 method(s)`（AppraisalAssistant）與
-`patched 0 method(s)`（AugSpotter），`RESULT: PASS`；不得為了修效能而移除功能 patch。
+`tools/Probe-Patches.ps1` 應為 `patched 8 method(s)`（AppraisalAssistant）與
+`patched 4 method(s)`（AugSpotter），`RESULT: PASS`；不得為了修效能而移除功能 patch。
 
 ### D3 遊戲內主觀驗收（需玩家操作）
 

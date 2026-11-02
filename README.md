@@ -5,7 +5,7 @@
 | MOD | 功能 | 主要檔案 |
 | --- | --- | --- |
 | **AppraisalAssistant** | 估價型鑑定顯示真值並自動填入／提交；真假型鑑定顯示真品／假貨／有缺陷／複製品與原因（不給收購建議） | `dist/AppraisalAssistant/` |
-| **AugSpotter** | 櫃檯顧客是改造體時，左上角顯示中文「偵測到改造體 等級 n」；普通顧客不顯示 | `dist/AugSpotter/` |
+| **AugSpotter** | 櫃檯顧客是改造體時，左上角顯示中文「偵測到改造體 等級 n」；普通顧客不顯示。事件驅動，不輪詢顧客 | `dist/AugSpotter/` |
 
 兩個 MOD 都使用遊戲內建 Mod Loader（`Mods/<資料夾>/manifest.xml` + `IMod`），不修改遊戲本體，也不使用檔案／網路／程序／動態碼／原生／反射 capability。
 
@@ -74,6 +74,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Uninstall-Mods.ps1
   `侦测到改造体  等级 <n>`（`augTier`）。
 - 普通顧客：完全不顯示。
 - 直接讀 `StoreClient.isAug` / `augTier`，不改顧客狀態、不消耗掃描器電池。
+- 更新時機：正常到櫃檯（`OnNextClientArrived`）、早晨／特殊顧客（`SetupWaitingClient`）、
+  離開（`DismissCurrentClient`）、讀檔／重置（`Reset`）；首次建立 overlay 時讀一次目前顧客。
+  更新成功後關閉 `Update`，沒有 0.5 秒輪詢。
 
 ## 設定
 
@@ -122,6 +125,7 @@ docs/TEST_EVIDENCE.md       實際測試輸出與還原紀錄
 
 - 不讀寫本機檔案、不連網、不啟動程序、不使用反射／動態碼／P/Invoke；manifest 的 `<Capabilities/>` 為空。
 - 只 patch 遊戲公開方法，不改存檔格式、不新增物品到玩家庫存。
-- **已在遊戲內確認**：8 個 Harmony patch 全部套用、真假判定全數通過、Aug overlay 中文顯示正常；遊戲內建 `ModScanner` 對兩個 DLL 給出 `refused=False, capabilities=[], findings=0`。
+- **先前遊戲內已確認（上一版）**：8 個鑑定 patch 全部套用、真假判定全數通過、Aug overlay 中文顯示正常；遊戲內建 `ModScanner` 對兩個 DLL 給出 `refused=False, capabilities=[], findings=0`。
+- **AugSpotter 事件驅動（本版）**：4 個 Harmony patch（到達、特殊顧客、離開、Reset）；不再每 0.5 秒讀顧客，首次更新成功後 `Update()` 會自動停用。事件版尚未在遊戲內實測。
 - **效能修正**：估價面板的 `APPRAISAL_DEFAULT_VALUE` 只在值真的不同時才寫入。`GameItem.ModifyTag()` 會連帶觸發 `ValidateShapeState()` 與 `OverlayHandler.UpdateInventoryStateUI()`；原本每幀無條件寫入會導致切換顧客時反覆重建背包 UI。修正後同一數值不再重寫。
 - **仍需你實測**：同一存檔連續切換 10 位以上顧客，確認主觀卡頓是否消失；若 overlay 位置擋住 UI，改 `src/AugSpotter/AugSpotter.cs` 的 `anchoredPosition` 後重編譯。
