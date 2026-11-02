@@ -136,7 +136,7 @@ MOD 不應該在這個每幀函式上掛 Postfix。真正的鑑定事件是
 2. `OnInspectItem` Postfix 仍會：清除 `isEditingAppraisalField`、填入輸入框、設定
    `APPRAISAL_DEFAULT_VALUE`；`auto_fill=false` 時跳過填入。
 3. `AppraisalForceEstimatePatch` 仍在提交時校正價格。
-4. `AppraisalAssistant` patch 數從 8 降為 7；`tools/Verify-Mods.ps1` PASS。
+4. `AppraisalAssistant` 移除 auto-fill 後為 7，新增 `PlayerStore.Reset` 清 session 後為 8；`tools/Verify-Mods.ps1` PASS。
 5. 原始碼中不得再出現 `UpdateAppraisalPanel` 的 Harmony patch 類別。
 
 ### C1.2 只在放大鏡檢查時掃描一次
@@ -159,6 +159,22 @@ MOD 不應該在這個每幀函式上掛 Postfix。真正的鑑定事件是
 2. 普通物品（未經放大鏡檢查）hover／拖動時，兩個 Postfix 都必須在第一個 reference check 返回。
 3. 同一物品在一次檢查中只掃一次；tooltip 每幀重建只讀 `AppraisalSession`。
 4. `Probe-Logic.ps1` 全部 PASS；遊戲內拖動普通物品不應再因鑑定助手掉幀。
+
+### C1.3 用 SetTextWithoutNotify 避免多一次背包重建
+
+`TMP_InputField.text` 的 setter 會觸發 `InspectionUIManager.OnValueChanged`，後者呼叫
+`GameItem.ModifyTag(..., skipValidate:false)` → `ValidateShapeState()` → 背包 UI 重建。
+MOD 的自動填入與提交前校正必須使用 `SetTextWithoutNotify()`，只更新顯示，不觸發事件。
+
+驗收：
+
+1. `AppraisalInspectResetPatch` 與 `AppraisalForceEstimatePatch` 不得使用
+   `apprisalServiceInputField.text = ...`。
+2. 兩處都使用 `SetTextWithoutNotify(text)`。
+3. `AppraisalTag.SetDefaultValue()` 仍要在後面同步 tag；否則下一幀
+   `UpdateAppraisalPanel()` 會把輸入框改回舊值。
+4. `tools/Verify-Mods.ps1` PASS；每次鑑定只應有 tag 真的變更時的一次
+   `ValidateShapeState`，不再多一次 OnValueChanged。
 
 ### C2 真假類鑑定（genuine / counterfeit）
 
@@ -215,6 +231,22 @@ MOD 不應該在這個每幀函式上掛 Postfix。真正的鑑定事件是
 3. `tools/Probe-Patches.ps1` 顯示 `patched 4 method(s)`，且 `Verify-Mods.ps1` PASS。
 4. 遊戲內：普通顧客不顯示；改造體到櫃檯後顯示；顧客離開後立即消失；載入存檔時
    若顧客已在櫃檯也能顯示。
+
+### C3.2 Overlay 必須被真正拆除
+
+`AugSpotterOverlay` 是另一個 `DontDestroyOnLoad` root，不在 `RuntimeHost._root` 底下。
+只 destroy `RuntimeHost._root` 不會清掉 Canvas；因此 `AugOverlay` 必須自己記住
+`_overlayRoot`，並在 `OnDestroy`／`RuntimeHost.Destroy`／`PlayerStore.Reset`／
+`OnDisable` 時呼叫 `TearDownCanvas()`。
+
+驗收：
+
+1. `RuntimeHost.Destroy()` 先呼叫 `AugOverlay.TearDownCanvas()`，再 destroy holder。
+2. `AugOverlay.OnDestroy()` 只在 `_instance == this` 時清自己的 canvas，避免同一幀
+   重建新 overlay 時把新 canvas 誤刪。
+3. 櫃檯有改造體 → Esc 回主菜單 → 載入同存檔，紅字立即消失，不是留在畫面上。
+4. 重複 5 次「改造體 → Esc → 載入」，場景內 `AugSpotterOverlay` Canvas 數量維持 1。
+5. 停用 MOD 後紅字立即消失。
 
 ### C4 安全性
 

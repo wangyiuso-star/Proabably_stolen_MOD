@@ -136,9 +136,12 @@ RESULT: PASS
 
 ## 7. 遊戲內實測與最終清理
 
+> 此節保留歷史脈絡；最新版數字見第 9 節。舊版曾為 Appraisal 7 patch／Aug 0 patch，
+> 現在的交付版是 Appraisal 8 patch（含 Reset 清 session）／Aug 4 patch。
+
 - 遊戲內已成功載入兩個 MOD：
   - `AppraisalAssistant`：8 個 Harmony patch。
-  - `AugSpotter`：0 個 Harmony patch；overlay 用 `StoreCalendar.dayTMP` 複製中文
+  - `AugSpotter`：4 個事件 patch；overlay 用 `StoreCalendar.dayTMP` 複製中文
     字體／fallback／材質。
 - 已截圖確認：
   - 改造體 overlay 顯示中文（早期只有數字 `4` 是字體 fallback 問題，已修正）。
@@ -149,8 +152,8 @@ RESULT: PASS
   - 移除 `AppraisalRuntime` 自測協程、`RunSelfTest` 設定與 `RuntimeHost`。
   - 移除 `AugSpotter` 自測與相關設定。
   - 所有 `Player.log` 背景 watcher job 已結束，沒有執行中的監聽。
-  - 最終 DLL：`AppraisalAssistant.dll` 14,848 bytes、`AugSpotter.dll` 8,192 bytes。
-  - `tools/Verify-Mods.ps1` PASS；`HarmonyProbe` 8 patches；`LogicProbe` 全 PASS。
+  - 最終 DLL：`AppraisalAssistant.dll` 15,872 bytes、`AugSpotter.dll` 9,216 bytes。
+  - `tools/Verify-Mods.ps1` PASS；`HarmonyProbe` 8＋4 patches；`LogicProbe` 全 PASS。
 - 早期 76MB 的 `NullReferenceException` 日誌已移到 `backup/logs/`，原因是
   `AugOverlay` 太早讀 `PlayerStore`；已改成延遲 5 秒 + 例外保護 + 低頻探測。
 
@@ -245,8 +248,8 @@ RESULT: PASS
 安裝後雜湊：
 
 ```text
-AppraisalAssistant match=True installed=63A9F4C9F4969C681F5F0C24E2036125F1F8A57616A3427C36FDCA2A673E9844
-AugSpotter         match=True installed=A3207236405D3549B616F713060497AA2113ADE4EF26C02E24BEDD45A6EDECE2
+AppraisalAssistant match=True installed=44BAFD769ACDF9B0BE35C56CF636D2E885102F00403281A06D90C8C6B335EA2E
+AugSpotter         match=True installed=CA20B617507A1FC1A9D53F4773F0A7A459BC40D71BCB7C0933E85DAE82332DA7
 ```
 
 ### 9.4 AugSpotter 改為事件驅動
@@ -311,12 +314,25 @@ exception，但遊戲日誌有 28 次 `Trying to add a duplicate Directory`。�
   舊存檔的 `GameItem` 參照。
 - `AugSpotter` patch 數仍為 4；`AppraisalAssistant` 變為 8。
 
-尚未核實：這是否能完全消除 `ntdll.dll 0xc0000005`；需要玩家用最新 `63A9F4C9...` 版
+尚未核實：這是否能完全消除 `ntdll.dll 0xc0000005`；需要玩家用最新 `44BAFD76...` 版
 重複「返回主菜單 → 載入」測試，並看 Windows Event Log 是否還有新 crash。
 
-### 9.8 尚未核實
+### 9.8 P0 overlay 洩漏與 P1 多一次 UI 重建
 
-- 尚未在真實遊戲內量測 frame time；需要玩家在最新 `63A9F4C9...` 版拖動普通物品與鑑定物品做主觀驗收。
+- `AugSpotterOverlay` 是另一個 `DontDestroyOnLoad` root，不在 `RuntimeHost._root`
+  底下；舊版只 destroy holder，canvas 永遠存活。
+- 現在 `AugOverlay` 用 static `_overlayRoot` 記住 canvas；`TearDownCanvas()` 在
+  `OnDestroy`、`RuntimeHost.Destroy()`、`PlayerStore.Reset`、`OnDisable` 都會清掉。
+  `OnDestroy` 只在 `_instance == this` 時清，避免同一幀重建新 overlay 時誤刪新 canvas。
+- `AppraisalInspectResetPatch`／`AppraisalForceEstimatePatch` 改用
+  `TMP_InputField.SetTextWithoutNotify()`；避免 `.text` setter 觸發
+  `OnValueChanged → ModifyTag(skipValidate:false) → ValidateShapeState()`。
+- 最終 build：`AppraisalAssistant.dll` 15,872 bytes、`AugSpotter.dll` 9,216 bytes；
+  hash `44BAFD76...`／`CA20B617...`。
+
+### 9.9 尚未核實
+
+- 尚未在真實遊戲內量測 frame time；需要玩家在最新 `44BAFD76...` 版拖動普通物品與鑑定物品做主觀驗收。
 - 事件覆蓋率以遊戲源碼的四個入口為準；若某個 debug／特殊流程直接改
   `PlayerStore.currentClientInstance` 而不經過這四個方法，overlay 可能不會立即更新。
   正常遊玩路徑已覆蓋，但尚未逐一實測所有 debug 指令。

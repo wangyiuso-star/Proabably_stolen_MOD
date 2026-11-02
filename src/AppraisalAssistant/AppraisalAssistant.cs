@@ -238,7 +238,7 @@ namespace DeepSpaceQoL
             string text = value.ToString(CultureInfo.InvariantCulture);
             if (__instance.apprisalServiceInputField != null && __instance.apprisalServiceInputField.text != text)
             {
-                __instance.apprisalServiceInputField.text = text;
+                __instance.apprisalServiceInputField.SetTextWithoutNotify(text);
             }
             AppraisalTag.SetDefaultValue(gameItem, value);
         }
@@ -265,7 +265,7 @@ namespace DeepSpaceQoL
             string text = value.ToString(CultureInfo.InvariantCulture);
             if (__instance.apprisalServiceInputField != null && __instance.apprisalServiceInputField.text != text)
             {
-                __instance.apprisalServiceInputField.text = text;
+                __instance.apprisalServiceInputField.SetTextWithoutNotify(text);
             }
             AppraisalTag.SetDefaultValue(__instance.currentInspectingItem, value);
         }

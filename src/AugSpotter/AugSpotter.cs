@@ -119,6 +119,9 @@ namespace DeepSpaceQoL
 
         public static void Destroy()
         {
+            // The canvas is a separate DontDestroyOnLoad root; destroy it before
+            // the holder so disabling/resetting the mod leaves no red overlay.
+            AugOverlay.TearDownCanvas();
             if (_root != null)
             {
                 UnityEngine.Object.Destroy(_root);
@@ -131,6 +134,7 @@ namespace DeepSpaceQoL
     {
         private static AugOverlay _instance;
         private static bool _refreshPending;
+        private static GameObject _overlayRoot;
 
         private Canvas _canvas;
         private TextMeshProUGUI _label;
@@ -144,9 +148,21 @@ namespace DeepSpaceQoL
 
         private void OnDestroy()
         {
+            // If a new overlay replaced this one in the same frame, its canvas is
+            // already the static _overlayRoot; do not tear that one down.
             if (_instance == this)
             {
                 _instance = null;
+                TearDownCanvas();
+            }
+        }
+
+        internal static void TearDownCanvas()
+        {
+            if (_overlayRoot != null)
+            {
+                UnityEngine.Object.Destroy(_overlayRoot);
+                _overlayRoot = null;
             }
         }
 
@@ -232,6 +248,7 @@ namespace DeepSpaceQoL
             }
 
             GameObject root = new GameObject("AugSpotterOverlay");
+            _overlayRoot = root;
             UnityEngine.Object.DontDestroyOnLoad(root);
             _canvas = root.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
