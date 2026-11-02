@@ -168,7 +168,7 @@ namespace DeepSpaceQoL
     {
         private static void Postfix(RichTextBuilder builder, GameItem item)
         {
-            if (builder == null || item == null)
+            if (builder == null || item == null || !AppraisalSession.IsCurrent(item))
             {
                 return;
             }
@@ -176,11 +176,11 @@ namespace DeepSpaceQoL
             {
                 return;
             }
-            int value;
-            if (!Log.TryGetCorrectValue(item, out value))
+            if (!AppraisalSession.HasValue)
             {
                 return;
             }
+            int value = AppraisalSession.Value;
             int low = Mathf.CeilToInt(value * 0.95f);
             int high = Mathf.FloorToInt(value * 1.05f);
             builder.AddLine(
@@ -207,6 +207,19 @@ namespace DeepSpaceQoL
             // become relevant; drop both caches for this item.
             Truth.Forget(gameItem);
             Log.Forget(gameItem);
+
+            // One scan per magnifier use. Tooltip rebuilding then only formats
+            // this session, even if the item is dragged or hovered again.
+            TruthResult truth;
+            bool hasTruth = Truth.TryGet(gameItem, out truth);
+            int value;
+            bool hasValue = Log.TryGetCorrectValue(gameItem, out value);
+            AppraisalSession.Item = gameItem;
+            AppraisalSession.HasValue = hasValue;
+            AppraisalSession.Value = value;
+            AppraisalSession.HasTruth = hasTruth;
+            AppraisalSession.Truth = truth;
+
             if (!gameItem.IsTag("APPRAISAL_ITEM"))
             {
                 return;
@@ -218,8 +231,7 @@ namespace DeepSpaceQoL
             {
                 return;
             }
-            int value;
-            if (!Log.TryGetCorrectValue(gameItem, out value))
+            if (!hasValue)
             {
                 return;
             }
@@ -326,15 +338,15 @@ namespace DeepSpaceQoL
     {
         private static void Postfix(RichTextBuilder builder, GameItem item)
         {
-            if (builder == null || item == null)
+            if (builder == null || item == null || !AppraisalSession.IsCurrent(item))
             {
                 return;
             }
-            TruthResult truth;
-            if (!Truth.TryGet(item, out truth))
+            if (!AppraisalSession.HasTruth)
             {
                 return;
             }
+            TruthResult truth = AppraisalSession.Truth;
             RenderHandler.ColorPalette color = truth.Kind == TruthKind.Genuine
                 ? RenderHandler.ColorPalette.LightGreen
                 : (truth.Kind == TruthKind.Counterfeit ? RenderHandler.ColorPalette.Red : RenderHandler.ColorPalette.Orange);
@@ -360,6 +372,25 @@ namespace DeepSpaceQoL
         public TruthKind Kind;
         public string Label;
         public string Reason;
+    }
+
+    internal static class AppraisalSession
+    {
+        public static GameItem Item;
+        public static bool HasValue;
+        public static int Value;
+        public static bool HasTruth;
+        public static TruthResult Truth;
+
+        public static bool IsCurrent(GameItem item)
+        {
+            if (item == null || Item != item)
+            {
+                return false;
+            }
+            InspectionUIManager ui = InspectionUIManager.Instance;
+            return ui != null && ui.currentInspectingItem == item;
+        }
     }
 
     internal static class Truth

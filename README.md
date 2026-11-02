@@ -129,5 +129,5 @@ docs/TEST_EVIDENCE.md       實際測試輸出與還原紀錄
 - **先前遊戲內已確認（上一版）**：真假判定全數通過、Aug overlay 中文顯示正常；遊戲內建 `ModScanner` 對兩個 DLL 給出 `refused=False, capabilities=[], findings=0`。目前鑑定 patch 為 7 個（已移除每幀 auto-fill patch）。
 - **AugSpotter 事件驅動（本版）**：4 個 Harmony patch（到達、特殊顧客、離開、Reset）；不再每 0.5 秒讀顧客，首次更新成功後 `Update()` 會自動停用。事件版尚未在遊戲內實測。
 - **效能修正**：估價面板的 `APPRAISAL_DEFAULT_VALUE` 只在值真的不同時才寫入；而且它是純數值 tag，不影響 shape／feature／inventory slot，所以寫入時使用 `skipValidate: true` 並手動同步 `modifiedState`。這避免 `ValidateShapeState()` → `OverlayHandler.UpdateInventoryStateUI()` 的背包 UI 重建。
-- **Tooltip 快取**：拖動物品時遊戲每幀重建 tooltip；`Log.TryGetCorrectValue()` 與 `Truth.TryGet()` 現在按 `GameItem` 快取（含「不是鑑定品／沒有真假特徵」的負面結果），同一物品後續 frames 不再重掃 registry／ItemFeature。
+- **只在放大鏡檢查時顯示**：`OnInspectItem` 時只掃一次，把正確值與真假結果存進 `AppraisalSession`；tooltip 只有當該物品仍是 `InspectionUIManager.currentInspectingItem` 時才加行，且只格式化 session，不再每幀掃 registry／ItemFeature。普通拖動物品完全不加行、不計算。
 - **仍需你實測**：同一存檔連續切換 10 位以上顧客，確認主觀卡頓是否消失；若 overlay 位置擋住 UI，改 `src/AugSpotter/AugSpotter.cs` 的 `anchoredPosition` 後重編譯。

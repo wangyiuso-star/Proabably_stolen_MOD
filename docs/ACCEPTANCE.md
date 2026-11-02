@@ -139,23 +139,26 @@ MOD 不應該在這個每幀函式上掛 Postfix。真正的鑑定事件是
 4. `AppraisalAssistant` patch 數從 8 降為 7；`tools/Verify-Mods.ps1` PASS。
 5. 原始碼中不得再出現 `UpdateAppraisalPanel` 的 Harmony patch 類別。
 
-### C1.2 拖動物品的 tooltip 快取
+### C1.2 只在放大鏡檢查時掃描一次
 
 `ItemTooltipHandler.OnEventUpdate()` 在滑鼠指著物品時每幀重建 tooltip；`AppraisalAssistant`
-的兩個 tooltip Postfix 因此每幀被呼叫。第一次算出的鑑定值與真假結果要按 `GameItem` 快取，
-後續同一物品只讀快取，不再重跑：
+的兩個 tooltip Postfix 仍會被呼叫，但**普通物品必須立刻 return**，不能做任何鑑定計算。
 
-- `AppraisalItemRegistry.Find()` + `AppraisalHelper.GetCorrectBaseValue()`
-- `ItemFeature` 分類掃描（香菸／郵票／注射器／複製品）
-- `CollectIssues()` 的多個 `IsTag` 查詢
+真正的掃描點是 `InspectionUIManager.OnInspectItem`：
+
+- 每次放大鏡檢查只呼叫一次 `Truth.TryGet()` 與 `Log.TryGetCorrectValue()`。
+- 結果存進 `AppraisalSession`（`Item`、`HasValue`、`Value`、`HasTruth`、`Truth`）。
+- tooltip 只在 `AppraisalSession.IsCurrent(item)` 為真時加行；`IsCurrent` 同時要求
+  `InspectionUIManager.currentInspectingItem == item`，所以關閉檢查後普通 hover／拖動不再顯示。
+- tooltip 加行時只格式化 session，不再掃 `AppraisalItemRegistry` 或 `ItemFeature`。
 
 驗收：
 
-1. `Log.TryGetCorrectValue()` 同一 `GameItem` 第二次呼叫不再進入計算路徑。
-2. `Truth.TryGet()` 同一 `GameItem` 第二次呼叫不再掃 `ItemFeature`。
-3. 負面結果（不是鑑定品／沒有真假特徵）也要快取，否則普通物品拖動時每幀仍會重掃。
-4. `OnInspectItem` 時清除該物品的鑑定值快取，避免物品後來才被標成 `APPRAISAL_ITEM`。
-5. 現有 `Probe-Logic.ps1` 全部 PASS；遊戲內拖動普通物品與鑑定物品的掉幀應減少。
+1. `AppraisalTooltipPatch`／`AuthenticityTooltipPatch` 內不得再呼叫 `Truth.TryGet()` 或
+   `Log.TryGetCorrectValue()`。
+2. 普通物品（未經放大鏡檢查）hover／拖動時，兩個 Postfix 都必須在第一個 reference check 返回。
+3. 同一物品在一次檢查中只掃一次；tooltip 每幀重建只讀 `AppraisalSession`。
+4. `Probe-Logic.ps1` 全部 PASS；遊戲內拖動普通物品不應再因鑑定助手掉幀。
 
 ### C2 真假類鑑定（genuine / counterfeit）
 
