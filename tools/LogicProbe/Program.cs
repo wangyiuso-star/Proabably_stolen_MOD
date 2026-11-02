@@ -80,6 +80,7 @@ internal static class LogicProbe
         CheckTruth("fake_wine", null, null, "WINE_COUNTERFEIT_TAG", "Counterfeit");
         CheckUnknown();
         CheckAppraisalValue();
+        CheckAppraisalWriteGuard();
 
         Type scanner = _game.GetType("ModScanner");
         MethodInfo scan = scanner.GetMethod("Scan", BindingFlags.Public | BindingFlags.Static);
@@ -189,6 +190,38 @@ internal static class LogicProbe
             Console.WriteLine("FAIL appraisal_value exception: " + inner.GetType().Name + ": " + inner.Message);
             _fail++;
         }
+    }
+
+    private static void CheckAppraisalWriteGuard()
+    {
+        try
+        {
+            object item = MakeItem();
+            Type guard = _appraisal.GetType("DeepSpaceQoL.AppraisalTag");
+            MethodInfo needsWrite = guard.GetMethod("NeedsWrite", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            bool initial = (bool)needsWrite.Invoke(null, new object[] { item, 100 });
+            SetIntTag(item, "APPRAISAL_DEFAULT_VALUE", 100);
+            bool same = (bool)needsWrite.Invoke(null, new object[] { item, 100 });
+            bool changed = (bool)needsWrite.Invoke(null, new object[] { item, 50 });
+            Check(initial && !same && changed,
+                "appraisal_write_guard initial=" + initial.ToString().ToLowerInvariant()
+                + " same=" + same.ToString().ToLowerInvariant()
+                + " changed=" + changed.ToString().ToLowerInvariant());
+        }
+        catch (Exception e)
+        {
+            Exception inner = e.InnerException ?? e;
+            Console.WriteLine("FAIL appraisal_write_guard exception: " + inner.GetType().Name + ": " + inner.Message);
+            _fail++;
+        }
+    }
+
+    private static void SetIntTag(object item, string tag, int value)
+    {
+        object modified = _itemType.GetProperty("modifiedState").GetValue(item);
+        object state = _tagSystemType.GetMethod("GetTag", new Type[] { typeof(string) }).Invoke(modified, new object[] { tag });
+        state.GetType().GetMethod("Enable").Invoke(state, null);
+        state.GetType().GetMethod("SetInt").Invoke(state, new object[] { value });
     }
 
     private static void SetStringTag(object item, string tag, string value)

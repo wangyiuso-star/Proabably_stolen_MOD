@@ -168,7 +168,47 @@ MOD 不再在執行期主動掃描自己的 DLL（已移除 debug self-test／�
 4. 不載入額外組件、不使用反射修改遊戲。
 5. 原始碼可由 `git log` 追溯，無混淆或打包惡意 payload。
 
-## 4. 手動遊玩驗收（最終）
+## 4. 效能回歸驗收（切換顧客卡頓）
+
+### D1 每幀寫入防護
+
+`InspectionUIManager.Update()` 在估價面板開啟時每幀呼叫 `UpdateAppraisalPanel()`；MOD 的
+Postfix 不得在 `APPRAISAL_DEFAULT_VALUE` 已等於正確值時再呼叫 `GameItem.ModifyTag()`。
+`ModifyTag()` 會觸發 `ValidateShapeState()`，後者會重建 modified shape 並呼叫
+`OverlayHandler.UpdateInventoryStateUI()`；每幀重複是本次卡頓的主因。
+
+命令：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
+```
+
+期望新增輸出：
+
+```text
+PASS appraisal_write_guard initial=true same=false changed=true
+```
+
+- `initial=true`：tag 未設定時允許寫入。
+- `same=false`：tag 已是同一個值時不得再寫。
+- `changed=true`：值不同時允許寫入。
+
+### D2 靜態 patch 數量不變
+
+`tools/Probe-Patches.ps1` 仍為 `patched 8 method(s)`（AppraisalAssistant）與
+`patched 0 method(s)`（AugSpotter），`RESULT: PASS`；不得為了修效能而移除功能 patch。
+
+### D3 遊戲內主觀驗收（需玩家操作）
+
+同一存檔、同一顧客隊列，連續切換至少 10 位顧客：
+
+1. 切換顧客不應再出現持續掉幀；單次切換允許既有的一次性 UI 重建。
+2. 左上角 Aug overlay 仍只在改造體出現時顯示。
+3. 估價面板仍自動填入正確值；按估算仍以正確值提交。
+4. `Player.log` 不得出現新的 `NullReferenceException`、`MissingMethodException` 或
+   `[AppraisalAssistant]` 警告洗版。
+
+## 5. 手動遊玩驗收（最終）
 
 1. 進入存檔，接待估價顧客（手上／Ribwich／電漿燃料任一），確認 tooltip 真值與輸入框自動填入，按估算得到 perfect 評價。
 2. 接待帶香菸／郵票／注射器的顧客，滑鼠移到物品上，確認真假標籤；打開對質面板確認標題標籤。

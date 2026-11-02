@@ -164,3 +164,85 @@ RESULT: PASS
   會先備份 `SaveFile.es3`。
 - `tools/Restore-SaveFile.ps1`：從 `backup/SaveFile/` 還原最近一次備份，會先備份目前檔案。
 - `tools/Uninstall-Mods.ps1`：移除兩個 MOD 資料夾，會先備份到 `backup/Mods/`。
+
+## 9. 切換顧客卡頓修正（2026-11-02）
+
+### 9.1 根因
+
+`InspectionUIManager.Update()` 在估價面板開啟時每幀呼叫 `UpdateAppraisalPanel()`。
+`AppraisalAutoFillPatch` 的 Postfix 原本每幀無條件呼叫：
+
+```text
+GameItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", ...)
+  -> GameItem.ValidateShapeState()
+  -> OverlayHandler.UpdateInventoryStateUI()
+```
+
+`UpdateInventoryStateUI()` 會讓 visible windows 的 `stateChangeActionFunc` 重建 UI，
+所以不是死循環，而是每幀重複做一次本可只做一次的背包 UI 重建。切換顧客／估價面板
+仍 active 時最容易累積成掉幀。
+
+### 9.2 修正
+
+- 新增 `AppraisalTag.NeedsWrite()`：讀 `APPRAISAL_DEFAULT_VALUE` 的 enabled/int；
+  只有未啟用或數值不同才允許寫入。
+- `AppraisalAutoFillPatch`、`AppraisalInspectResetPatch`、
+  `AppraisalForceEstimatePatch` 全部改走 `AppraisalTag.SetDefaultValue()`。
+- 估價輸入框也只在文字不同時才赋值。
+
+### 9.3 實際輸出
+
+```text
+Compiling AppraisalAssistant...
+  -> dist\AppraisalAssistant\AppraisalAssistant.dll (14848 bytes)
+Compiling AugSpotter...
+  -> dist\AugSpotter\AugSpotter.dll (8192 bytes)
+Build OK
+```
+
+`tools/Verify-Mods.ps1`：
+
+```text
+PASS AppraisalAssistant.dll: HarmonyPatch attributes checked (8)
+PASS AugSpotter.dll: HarmonyPatch attributes checked (0)
+RESULT: PASS
+```
+
+`tools/Probe-Logic.ps1` 新增：
+
+```text
+PASS appraisal_write_guard initial=true same=false changed=true
+RESULT: PASS
+```
+
+`tools/Probe-Patches.ps1`：
+
+```text
+patched 8 method(s)
+  AppraisalHelper.CreateAppraisalTooltip
+  InspectableHelper.CreateInspectableTooltip
+  InspectionUIManager.OnAppraisalServiceEstimated
+  InspectionUIManager.OnInspectItem
+  InspectionUIManager.OpenCigaretteConfrontPanel
+  InspectionUIManager.OpenInjectorConfrontPanel
+  InspectionUIManager.OpenStampConfrontPanel
+  InspectionUIManager.UpdateAppraisalPanel
+patched 0 method(s)
+RESULT: PASS
+```
+
+（Mono 6.12 沒有 Unity native ECall，載入時仍會印 `cant resolve internal call` 警告；
+這是離線 probe 的已知限制，不影響 patch 套用。）
+
+安裝後雜湊：
+
+```text
+AppraisalAssistant match=True installed=BA51AE2BD01C95C437500D83B55EDCCDE0B4966EA441A692680332FB613AF581
+AugSpotter         match=True installed=E661C82BC21F939AE7556C0CE47B99622FA2ED8B85EC3B6A5563423CD230C4C4
+```
+
+### 9.4 尚未核實
+
+- 尚未在真實遊戲內量測 frame time；需要玩家連續切換 10 位以上顧客做主觀驗收。
+- 若仍有卡頓，下一個可疑點是 `AugOverlay.Update()` 的 0.5 秒顧客探測；目前它只讀
+  `StoreClient.isAug`／`augTier`，理論上不會造成持續掉幀，但尚未用 profiler 證實。

@@ -122,5 +122,6 @@ docs/TEST_EVIDENCE.md       實際測試輸出與還原紀錄
 
 - 不讀寫本機檔案、不連網、不啟動程序、不使用反射／動態碼／P/Invoke；manifest 的 `<Capabilities/>` 為空。
 - 只 patch 遊戲公開方法，不改存檔格式、不新增物品到玩家庫存。
-- **已在離線 Mono 環境驗證**：7 個 Harmony patch 全部套用、真假判定全數通過、Aug 判定通過、遊戲內建 `ModScanner` 對兩個 DLL 給出 `refused=False, capabilities=[], findings=0`。
-- **尚未在真正的遊戲執行期內完成 UI 實測**：此環境的 Steam 用戶端無法正常啟動遊戲（Steam 登錄檔權限／DRM 重啟），因此沒有截圖證明 overlay 與輸入框在實際畫面中的位置。請按 `docs/ACCEPTANCE.md` 第 4 節手動驗收；若 overlay 位置擋住 UI，只需改 `src/AugSpotter/AugSpotter.cs` 的 `anchoredPosition` 後重編譯。
+- **已在遊戲內確認**：8 個 Harmony patch 全部套用、真假判定全數通過、Aug overlay 中文顯示正常；遊戲內建 `ModScanner` 對兩個 DLL 給出 `refused=False, capabilities=[], findings=0`。
+- **效能修正**：估價面板的 `APPRAISAL_DEFAULT_VALUE` 只在值真的不同時才寫入。`GameItem.ModifyTag()` 會連帶觸發 `ValidateShapeState()` 與 `OverlayHandler.UpdateInventoryStateUI()`；原本每幀無條件寫入會導致切換顧客時反覆重建背包 UI。修正後同一數值不再重寫。
+- **仍需你實測**：同一存檔連續切換 10 位以上顧客，確認主觀卡頓是否消失；若 overlay 位置擋住 UI，改 `src/AugSpotter/AugSpotter.cs` 的 `anchoredPosition` 後重編譯。

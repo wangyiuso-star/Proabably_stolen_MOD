@@ -103,6 +103,34 @@ namespace DeepSpaceQoL
         }
     }
 
+    internal static class AppraisalTag
+    {
+        // GameItem.ModifyTag -> ValidateShapeState -> OverlayHandler.UpdateInventoryStateUI.
+        // UpdateAppraisalPanel runs every frame while the panel is open, so writing an
+        // unchanged value here would rebuild the inventory UI every frame.
+        public static bool NeedsWrite(GameItem item, int value)
+        {
+            if (item == null)
+            {
+                return false;
+            }
+            TagState state = item.GetTagReadonly("APPRAISAL_DEFAULT_VALUE");
+            return !state.IsEnabled() || state.GetInt() != value;
+        }
+
+        public static void SetDefaultValue(GameItem item, int value)
+        {
+            if (!NeedsWrite(item, value))
+            {
+                return;
+            }
+            item.ModifyTag("APPRAISAL_DEFAULT_VALUE", delegate(TagState state)
+            {
+                state.Enable().SetInt(value);
+            });
+        }
+    }
+
     [HarmonyPatch(typeof(AppraisalHelper), nameof(AppraisalHelper.CreateAppraisalTooltip))]
     internal static class AppraisalTooltipPatch
     {
@@ -161,10 +189,7 @@ namespace DeepSpaceQoL
             {
                 __instance.apprisalServiceInputField.text = text;
             }
-            __instance.currentInspectingItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", delegate(TagState state)
-            {
-                state.Enable().SetInt(value);
-            });
+            AppraisalTag.SetDefaultValue(__instance.currentInspectingItem, value);
         }
     }
 
@@ -185,14 +210,12 @@ namespace DeepSpaceQoL
             {
                 return;
             }
-            if (__instance.apprisalServiceInputField != null)
+            string text = value.ToString(CultureInfo.InvariantCulture);
+            if (__instance.apprisalServiceInputField != null && __instance.apprisalServiceInputField.text != text)
             {
-                __instance.apprisalServiceInputField.text = value.ToString(CultureInfo.InvariantCulture);
+                __instance.apprisalServiceInputField.text = text;
             }
-            gameItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", delegate(TagState state)
-            {
-                state.Enable().SetInt(value);
-            });
+            AppraisalTag.SetDefaultValue(gameItem, value);
         }
     }
 
@@ -215,14 +238,11 @@ namespace DeepSpaceQoL
                 return;
             }
             string text = value.ToString(CultureInfo.InvariantCulture);
-            if (__instance.apprisalServiceInputField != null)
+            if (__instance.apprisalServiceInputField != null && __instance.apprisalServiceInputField.text != text)
             {
                 __instance.apprisalServiceInputField.text = text;
             }
-            __instance.currentInspectingItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", delegate(TagState state)
-            {
-                state.Enable().SetInt(value);
-            });
+            AppraisalTag.SetDefaultValue(__instance.currentInspectingItem, value);
         }
     }
 
