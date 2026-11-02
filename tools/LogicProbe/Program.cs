@@ -200,13 +200,16 @@ internal static class LogicProbe
             Type guard = _appraisal.GetType("DeepSpaceQoL.AppraisalTag");
             MethodInfo needsWrite = guard.GetMethod("NeedsWrite", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
             bool initial = (bool)needsWrite.Invoke(null, new object[] { item, 100 });
-            SetIntTag(item, "APPRAISAL_DEFAULT_VALUE", 100);
+            MethodInfo setDefault = guard.GetMethod("SetDefaultValue", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            setDefault.Invoke(null, new object[] { item, 100 });
+            int written = GetIntTag(item, "APPRAISAL_DEFAULT_VALUE");
             bool same = (bool)needsWrite.Invoke(null, new object[] { item, 100 });
             bool changed = (bool)needsWrite.Invoke(null, new object[] { item, 50 });
             Check(initial && !same && changed,
                 "appraisal_write_guard initial=" + initial.ToString().ToLowerInvariant()
                 + " same=" + same.ToString().ToLowerInvariant()
                 + " changed=" + changed.ToString().ToLowerInvariant());
+            Check(written == 100, "appraisal_write_value=" + written);
         }
         catch (Exception e)
         {
@@ -222,6 +225,13 @@ internal static class LogicProbe
         object state = _tagSystemType.GetMethod("GetTag", new Type[] { typeof(string) }).Invoke(modified, new object[] { tag });
         state.GetType().GetMethod("Enable").Invoke(state, null);
         state.GetType().GetMethod("SetInt").Invoke(state, new object[] { value });
+    }
+
+    private static int GetIntTag(object item, string tag)
+    {
+        object modified = _itemType.GetProperty("modifiedState").GetValue(item);
+        object state = _tagSystemType.GetMethod("GetTag", new Type[] { typeof(string) }).Invoke(modified, new object[] { tag });
+        return (int)state.GetType().GetMethod("GetInt").Invoke(state, null);
     }
 
     private static void SetStringTag(object item, string tag, string value)

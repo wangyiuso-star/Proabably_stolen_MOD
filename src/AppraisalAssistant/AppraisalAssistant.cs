@@ -124,10 +124,15 @@ namespace DeepSpaceQoL
             {
                 return;
             }
+            // APPRAISAL_DEFAULT_VALUE is a pure number tag: it does not change
+            // shape, features or inventory slots. Skip ValidateShapeState (which
+            // rebuilds the inventory UI) and sync the cached modified tag by hand.
             item.ModifyTag("APPRAISAL_DEFAULT_VALUE", delegate(TagState state)
             {
                 state.Enable().SetInt(value);
-            });
+            }, true);
+            TagState modified = item.modifiedState.GetTag("APPRAISAL_DEFAULT_VALUE");
+            modified.Enable().SetInt(value);
         }
     }
 

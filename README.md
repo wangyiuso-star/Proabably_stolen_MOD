@@ -128,5 +128,5 @@ docs/TEST_EVIDENCE.md       實際測試輸出與還原紀錄
 - 只 patch 遊戲公開方法，不改存檔格式、不新增物品到玩家庫存。
 - **先前遊戲內已確認（上一版）**：真假判定全數通過、Aug overlay 中文顯示正常；遊戲內建 `ModScanner` 對兩個 DLL 給出 `refused=False, capabilities=[], findings=0`。目前鑑定 patch 為 7 個（已移除每幀 auto-fill patch）。
 - **AugSpotter 事件驅動（本版）**：4 個 Harmony patch（到達、特殊顧客、離開、Reset）；不再每 0.5 秒讀顧客，首次更新成功後 `Update()` 會自動停用。事件版尚未在遊戲內實測。
-- **效能修正**：估價面板的 `APPRAISAL_DEFAULT_VALUE` 只在值真的不同時才寫入。`GameItem.ModifyTag()` 會連帶觸發 `ValidateShapeState()` 與 `OverlayHandler.UpdateInventoryStateUI()`；原本每幀無條件寫入會導致切換顧客時反覆重建背包 UI。修正後同一數值不再重寫。
+- **效能修正**：估價面板的 `APPRAISAL_DEFAULT_VALUE` 只在值真的不同時才寫入；而且它是純數值 tag，不影響 shape／feature／inventory slot，所以寫入時使用 `skipValidate: true` 並手動同步 `modifiedState`。這避免 `ValidateShapeState()` → `OverlayHandler.UpdateInventoryStateUI()` 的背包 UI 重建。原本每幀無條件寫入是切換顧客時反覆重建的主因。
 - **仍需你實測**：同一存檔連續切換 10 位以上顧客，確認主觀卡頓是否消失；若 overlay 位置擋住 UI，改 `src/AugSpotter/AugSpotter.cs` 的 `anchoredPosition` 後重編譯。

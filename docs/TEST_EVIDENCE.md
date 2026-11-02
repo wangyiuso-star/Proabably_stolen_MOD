@@ -215,6 +215,7 @@ RESULT: PASS
 
 ```text
 PASS appraisal_write_guard initial=true same=false changed=true
+PASS appraisal_write_value=100
 RESULT: PASS
 ```
 
@@ -243,7 +244,7 @@ RESULT: PASS
 安裝後雜湊：
 
 ```text
-AppraisalAssistant match=True installed=14E7DF775749F6715A7A39519BE301D06B0232BD90F2A2D318397AFB1E46A9AC
+AppraisalAssistant match=True installed=E5CF23A6ABA37CF792DD0ED6B6031E69AEFA05940641BC4DFCD1BA3122042762
 AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A567B49A61638D702AB067B340E
 ```
 
@@ -267,6 +268,8 @@ AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A56
 - 自動填入改由真正的鑑定事件 `InspectionUIManager.OnInspectItem` 的 Postfix 負責：
   清除 `isEditingAppraisalField`、填入輸入框、設定 `APPRAISAL_DEFAULT_VALUE`。
 - `auto_fill=false` 時，`AppraisalInspectResetPatch` 仍會清除編輯狀態，但跳過填值。
+- `AppraisalTag.SetDefaultValue()` 使用 `ModifyTag(..., skipValidate: true)` 並手動同步
+  `modifiedState`；`APPRAISAL_DEFAULT_VALUE` 是純數值 tag，不需要重建 shape／背包 UI。
 - `AppraisalForceEstimatePatch` 保留，提交時仍以正確值覆蓋。
 - `AppraisalAssistant` patch 數：8 → 7。
 - 原始碼不再有 `UpdateAppraisalPanel` 的 Harmony patch。

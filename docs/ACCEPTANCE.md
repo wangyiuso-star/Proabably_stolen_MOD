@@ -212,6 +212,10 @@ Postfix 不得在 `APPRAISAL_DEFAULT_VALUE` 已等於正確值時再呼叫 `Game
 `ModifyTag()` 會觸發 `ValidateShapeState()`，後者會重建 modified shape 並呼叫
 `OverlayHandler.UpdateInventoryStateUI()`；每幀重複是本次卡頓的主因。
 
+`APPRAISAL_DEFAULT_VALUE` 是純數值 tag，不影響 shape／feature／inventory slot；因此
+`AppraisalTag.SetDefaultValue()` 使用 `ModifyTag(..., skipValidate: true)`，再手動同步
+`modifiedState` 的同一個 tag，避免鑑定事件本身也觸發一次背包 UI 重建。
+
 命令：
 
 ```powershell
@@ -222,11 +226,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Probe-Logic.ps1
 
 ```text
 PASS appraisal_write_guard initial=true same=false changed=true
+PASS appraisal_write_value=100
 ```
 
 - `initial=true`：tag 未設定時允許寫入。
 - `same=false`：tag 已是同一個值時不得再寫。
 - `changed=true`：值不同時允許寫入。
+- `appraisal_write_value=100`：跳過 shape validation 後，`modifiedState` 仍同步為 100。
 
 ### D2 靜態 patch 數量不變
 
