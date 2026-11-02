@@ -1,0 +1,10 @@
+# Local reverse-engineering / build tooling (not part of the deliverable)
+.tools/
+.scratch/
+backup/
+*.user
+*.suo
+.vs/
+
+# Build output is reproducible with tools/Build-Mods.ps1
+dist/
