@@ -106,8 +106,8 @@ namespace DeepSpaceQoL
     internal static class AppraisalTag
     {
         // GameItem.ModifyTag -> ValidateShapeState -> OverlayHandler.UpdateInventoryStateUI.
-        // UpdateAppraisalPanel runs every frame while the panel is open, so writing an
-        // unchanged value here would rebuild the inventory UI every frame.
+        // These call sites are event-driven, but avoid a needless rebuild when the
+        // value is already correct.
         public static bool NeedsWrite(GameItem item, int value)
         {
             if (item == null)
@@ -162,37 +162,6 @@ namespace DeepSpaceQoL
         }
     }
 
-    [HarmonyPatch(typeof(InspectionUIManager), nameof(InspectionUIManager.UpdateAppraisalPanel))]
-    internal static class AppraisalAutoFillPatch
-    {
-        private static void Postfix(InspectionUIManager __instance)
-        {
-            if (__instance == null || __instance.currentInspectingItem == null)
-            {
-                return;
-            }
-            if (AppraisalAssistantMod.AutoFill != null && !AppraisalAssistantMod.AutoFill.Value)
-            {
-                return;
-            }
-            if (__instance.isEditingAppraisalField)
-            {
-                return;
-            }
-            int value;
-            if (!Log.TryGetCorrectValue(__instance.currentInspectingItem, out value))
-            {
-                return;
-            }
-            string text = value.ToString(CultureInfo.InvariantCulture);
-            if (__instance.apprisalServiceInputField != null && __instance.apprisalServiceInputField.text != text)
-            {
-                __instance.apprisalServiceInputField.text = text;
-            }
-            AppraisalTag.SetDefaultValue(__instance.currentInspectingItem, value);
-        }
-    }
-
     [HarmonyPatch(typeof(InspectionUIManager), nameof(InspectionUIManager.OnInspectItem))]
     internal static class AppraisalInspectResetPatch
     {
@@ -205,6 +174,10 @@ namespace DeepSpaceQoL
             // 同一顾客的第二件鉴定品可能沿用上一个输入框状态；
             // 每件物品开始检查时都重置，确保各自使用自己的价值。
             __instance.isEditingAppraisalField = false;
+            if (AppraisalAssistantMod.AutoFill != null && !AppraisalAssistantMod.AutoFill.Value)
+            {
+                return;
+            }
             int value;
             if (!Log.TryGetCorrectValue(gameItem, out value))
             {

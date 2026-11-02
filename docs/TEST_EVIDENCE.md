@@ -197,7 +197,7 @@ GameItem.ModifyTag("APPRAISAL_DEFAULT_VALUE", ...)
 
 ```text
 Compiling AppraisalAssistant...
-  -> dist\AppraisalAssistant\AppraisalAssistant.dll (14848 bytes)
+  -> dist\AppraisalAssistant\AppraisalAssistant.dll (14336 bytes)
 Compiling AugSpotter...
   -> dist\AugSpotter\AugSpotter.dll (9216 bytes)
 Build OK
@@ -206,7 +206,7 @@ Build OK
 `tools/Verify-Mods.ps1`：
 
 ```text
-PASS AppraisalAssistant.dll: HarmonyPatch attributes checked (8)
+PASS AppraisalAssistant.dll: HarmonyPatch attributes checked (7)
 PASS AugSpotter.dll: HarmonyPatch attributes checked (4)
 RESULT: PASS
 ```
@@ -221,7 +221,7 @@ RESULT: PASS
 `tools/Probe-Patches.ps1`：
 
 ```text
-patched 8 method(s)
+patched 7 method(s)
   AppraisalHelper.CreateAppraisalTooltip
   InspectableHelper.CreateInspectableTooltip
   InspectionUIManager.OnAppraisalServiceEstimated
@@ -229,7 +229,6 @@ patched 8 method(s)
   InspectionUIManager.OpenCigaretteConfrontPanel
   InspectionUIManager.OpenInjectorConfrontPanel
   InspectionUIManager.OpenStampConfrontPanel
-  InspectionUIManager.UpdateAppraisalPanel
 patched 4 method(s)
   PlayerStore.DismissCurrentClient
   PlayerStore.Reset
@@ -244,7 +243,7 @@ RESULT: PASS
 安裝後雜湊：
 
 ```text
-AppraisalAssistant match=True installed=BA51AE2BD01C95C437500D83B55EDCCDE0B4966EA441A692680332FB613AF581
+AppraisalAssistant match=True installed=14E7DF775749F6715A7A39519BE301D06B0232BD90F2A2D318397AFB1E46A9AC
 AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A567B49A61638D702AB067B340E
 ```
 
@@ -261,7 +260,18 @@ AugSpotter         match=True installed=1D655E0DC9B605A7A1DAFEFCCFFFA9D711CA1A56
 - 更新成功後 `AugOverlay.enabled = false`；之後只有事件到來才暫時啟用。
 - 原始碼檢查：`0.5f` 只剩 `CanvasScaler.matchWidthOrHeight`，沒有顧客輪詢。
 
-### 9.5 尚未核實
+### 9.5 鑑定 auto-fill 也改為事件驅動
+
+- 移除 `AppraisalAutoFillPatch`（原本 patch `InspectionUIManager.UpdateAppraisalPanel`，
+  而該方法由遊戲的 `Update()` 每幀呼叫）。
+- 自動填入改由真正的鑑定事件 `InspectionUIManager.OnInspectItem` 的 Postfix 負責：
+  清除 `isEditingAppraisalField`、填入輸入框、設定 `APPRAISAL_DEFAULT_VALUE`。
+- `auto_fill=false` 時，`AppraisalInspectResetPatch` 仍會清除編輯狀態，但跳過填值。
+- `AppraisalForceEstimatePatch` 保留，提交時仍以正確值覆蓋。
+- `AppraisalAssistant` patch 數：8 → 7。
+- 原始碼不再有 `UpdateAppraisalPanel` 的 Harmony patch。
+
+### 9.6 尚未核實
 
 - 尚未在真實遊戲內量測 frame time；需要玩家連續切換 10 位以上顧客做主觀驗收。
 - 事件覆蓋率以遊戲源碼的四個入口為準；若某個 debug／特殊流程直接改
