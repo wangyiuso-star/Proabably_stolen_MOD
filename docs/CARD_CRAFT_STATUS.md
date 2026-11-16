@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-16（P4 完成：退休製卡匠、小偷分級箱、Wild Network「CardFence」分頁；程式＋離線驗證，**實機未跑**）
+更新時間：2026-11-16（P4 修訂：4 個升級、博士販售、小偷只賣 T2/T3、新增 T3 箱；程式＋離線驗證，**實機未跑**）
 
 ## 階段
 
@@ -13,22 +13,23 @@
   `cf_printer_chip_blank_keycard`、專業密碼解序器 `cf_pro_desequencer`、
   批量模組 `cf_batch_card_module`，外加 1 個新 patch
   （`MachinePrinter.FinishPrinting` prefix）。實機 log 見「P3 實機驗證」一節。
-- **P4：完成（離線）。** 退休製卡匠客戶、小偷分級箱、Wild Network 8 個
-  `CF_FENCE_*` 升級（`tab="CardFence"`）、`CF_SAWYER_*` 的 `IsHiddenForRun`
-  隱藏規則；新增 5 家族 T3 卡／核。實機驗證（到訪、買賣、分頁）尚未跑。
-  **P5（索耶）依指示未開。**
+- **P4：完成（離線），已修訂。** 退休製卡匠客戶、博士（`CreateInventor`）販售、
+  小偷只賣 T2／T3 分級箱、Wild Network **4 個** `CF_FENCE_*` 升級
+  （`tab="CardFence"`）、`CF_SAWYER_*` 只在交換所未解鎖時隱藏。新增 5 家族
+  T3 卡／核與 **5 個 T3 箱**（9×8／CMD 10×8、300／500、rolls 11/11/6/7/11）。
+  實機驗證（到訪、買賣、分頁、T3 fit）尚未跑。**P5（索耶）依指示未開。**
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.4.0 |
+| ModVersion | 0.5.0 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 51,200 bytes |
-| SHA256 | `87CBDE783A3B23C3435FD788702C85F427DA91D6846A4795EDA908CFE168098B` |
+| 大小 | 54,784 bytes |
+| SHA256 | `72FE61D565B515156A1DC1107C461DE30CB0D465128108C87EDAC86F5D1B8AE2` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
-| git | P1–P3 已提交（本機 commit，**未 push**）；P4 未提交；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| git | P1–P3＋P4 第一版已提交（本機 commit，**未 push**）；本輪 P4 修訂尚未提交；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 ## P3 實機驗證（2026-11-16，Player.log 逐行）
 
@@ -66,73 +67,76 @@
 `ModuleHelper` 疊加的結果（本機 base 是 speed 50／power 20，批量模組本身 -50/-50）；
 mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 
-## P4 已驗收（本輪實際輸出，2026-11-16）
+## P4 修訂已驗收（本輪實際輸出，2026-11-16）
 
-- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／51,200 bytes）。
-- `tools/Verify-Mods.ps1`：`RESULT: PASS`；CardCraft 6 個 patch：
+- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／54,784 bytes）。
+- `tools/Verify-Mods.ps1`：`RESULT: PASS`；CardCraft **7 個 patch**：
   `CfTryOpenLockPatch -> LockHelper.TryOpenLock`、
   `CfCrateTooltipPatch -> LockHelper.CreateLockerContainerTooltip`、
   `CfCrateFillPatch -> DirectoryMaster.Item`、
   `CfPrinterBatchPatch -> MachinePrinter.FinishPrinting`、
   `CfSawyerHidePatch -> NetworkUpgrade.IsHiddenForRun`、
-  `CfThiefPatch -> StoreClientList.CreateThief`；無 banned API。
-- `tools/Probe-Patches.ps1`：`patched 8 / 4 / 6`，`RESULT: PASS`。
+  `CfThiefPatch -> StoreClientList.CreateThief`、
+  `CfInventorPatch -> StoreClientList.CreateInventor`；無 banned API。
+- `tools/Probe-Patches.ps1`：`patched 8 / 4 / 7`，`RESULT: PASS`。
 - `tools/Probe-Logic.ps1`：CardCraft scan `refused=False capabilities=[] findings=0`，PASS。
 - 動作指令註記：本機沒有 PowerShell 7，`pwsh` 不在 PATH，四條指令實際以
   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\…` 執行（同一腳本、
   同一輸出）。Mono 的 `internal call` 警告是既有環境問題，四條指令仍全部 exit 0。
-- `.scratch/p4check`（scratch-only，不進 MOD，`P4 CHECK: PASS` 59 項）：
-  - T3 純函式：`KeycardId`／`CryptoModuleId` 的 `_t3` id；卡價 300／225／165／165／90、
-    核價 900／750／600／600／450、核工作量 350／300／250／250／250；T2 價格未動；
-    `ContainerId(…,3)` 會丟 `ArgumentOutOfRangeException`（確認沒有 T3 箱）。
-  - 升級：`tab="CardFence"`、8 個價格 300／800／500／1200／3000／9000／1500／4500。
-  - 小偷權重 `30,25,20,15,10`（合計 100）。
-  - 分頁算術直接讀遊戲常數：`TABS_W=1060`、`TAB_W=256`、`TAB_GAP=12`；
-    3 個分頁 792 ≤ 1060、4 個分頁剛好 1060。
-  - 工匠 literal 檢查：有 `printer`／`printer_module_cnc`／`cf_pro_desequencer`／
-    `cf_batch_card_module`／`cf_printer_chip_blank_keycard`／`common_electronic`／
-    `printer_plastic`／`premiumBuy15`／`maker_last_day`；整個類別沒有任何 `_box`
-    字面值（不賣箱子）。
-  - IL：`CF_SAWYER_`、`CardFence`、`制卡`、`CF_FENCE_CONTACT/THIEF/THIEF_T2` 都在。
+- `.scratch/p4bcheck`（scratch-only，`P4B CHECK: PASS`）：
+  - 升級：4 個 id 與價格 1500／1200／3000／2200；舊 5 個 id 已不在 DLL。
+  - T3 箱：五家族 `cf_*_box_t3`、價 300／300／300／300／500、 rolls 11/11/6/7/11、
+    容量 9×8（CMD 10×8）；T2／T1 舊值未動。
+  - 小偷：families `SEC,MED,ENG,SER`、weights `32,27,21,20`；IL 沒有
+    `_box_t1`／`sec_box`／`med_box`／`LootCrate*`／`acceptRetailMarkup`。
+  - IL：`CF_FENCE_*` 4 個 id、PRO kit 的 5 個物品、`backInvinvElement`、
+    `EmporiumTryAdd`、Sawyer 的 `isExchangeUnlocked`、博士的
+    `cf_pro_desequencer`／`cf_batch_card_module` 都在。
+- `.scratch/p4t3loot/verify_t3.py`（scratch-only，`T3 LOOT CHECK: PASS`）：
+  直接從 `CardCraftAndFence.cs` 解析 T3 表，驗證 common 池 = T2 common 池、
+  rare 池保留 T2 rare、權重合計 100；model EV 與 spec 逐箱相符（誤差 <0.02），
+  200 樣本離線模擬見 spec §3.3。
 
-## P4 實作要點（詳見 spec §3.8／§3.10／§3.11）
+## P4 修訂實作要點（詳見 spec §3.8／§3.10／§3.11）
 
-- **退休製卡匠**：掛 `ModHook.OnGenerateCustomerVeryLate`；`dayCounter % 7 == 6`
-  每週一次，`CF_FENCE_CONTACT` 首次解鎖當天補訪一次；`maker_last_day` 存在
-  `ModHelper` 的存檔 modData，重載不會重複到訪。客戶 `SELL`、`nonShootable`、
-  `premiumBuy15`、`acceptRetailMarkup=false`。
-- **工匠庫存**：工具（印表機／CNC／專業解序器）在 `CONTACT`；批量模組在
-  `CF_FENCE_BATCH`；空白卡晶片＋電子×5＋耗材×5 在 `CF_FENCE_SUPPLY`；
-  T1 全卡／核在 `CF_FENCE_T1`；隨機 3 T2 卡＋3 T2 核在 `CF_FENCE_T2`；
-  1 T3 卡＋同家族 1 T3 核在 `CF_FENCE_T3`。全部 `isOwend:false`，售價 = `unitValue`。
-- **T3 卡／核**：5 家族各新增一張卡一個核（§3.4b），沿用 T2 sprite，
-  `CF_CARD_TIER=3`；T3 箱仍未做，所以 T3 卡目前沒有對應的鎖。
-- **小偷分級箱**：postfix 包住 `StoreClientList.CreateThief` 最後一句對話的
-  `endAction`；原版 thief 庫存照舊，之後最多加 1 個 CF 箱。箱等級：黑市聲望
-  ≥60 → T2；解鎖 `CF_FENCE_THIEF_T2` 後 ≥30 → T2；否則 T1。家族權重
-  30／25／20／15／10（SEC／MED／ENG／SER／CMD）。非 CMD 標 stolen；
-  CMD 固定價不標 stolen；箱子售價 = 箱子的 `unitValue`。
-  T1 SEC／MED／ENG／SER 必須走 `PreBuiltItemHelper.LootCrate*`（原版箱是空箱，
-  只有這條路會填內容），T1 CMD 與 T2 才走 `DirectoryMaster.Item` + CF postfix。
-- **Wild Network**：8 個 `CF_FENCE_*` 全部放 `tab="CardFence"`，
-  `SetNetworkTabLabel("CardFence", () => "制卡")`。分頁寬度用遊戲常數量的：
-  3 個分頁 792 ≤ 1060，所以**不塞 Advanced**；第 4 個分頁會剛好 1060、沒有餘量，
-  本輪不新增第 4 個分頁。
-- **CF_SAWYER_**：`NetworkUpgrade.IsHiddenForRun` postfix，前綴 `CF_SAWYER_` 一律
-  回 `true`；本輪沒有註冊任何索耶升級（P5 才做）。
+- **升級只剩 4 個**：`CF_FENCE_PRO` 1500（無前置）、`CF_FENCE_T2` 1200
+  （前置 PRO）、`CF_FENCE_T3` 3000（前置 T2）、`CF_FENCE_THIEF_T2` 2200
+  （無前置）。`CONTACT`／`SUPPLY`／`BATCH`／`T1`／`THIEF` 已刪。
+- **PRO**：`onUnlock` 一次性發 printer、空白卡晶片、CNC、電子×2、耗材×2，
+  用 `GraphUtils.EmporiumTryAdd` 進 `backInvinvElement`；同時解鎖製卡匠到訪。
+- **製卡匠**：掛 `OnGenerateCustomerVeryLate`；`dayCounter % 7 == 6` 每週一次，
+  PRO 首次解鎖後補訪一次；`maker_last_day` 存在存檔 modData。常備 T1 全卡／核；
+  T2／T3 由升級加賣。不再賣機器、不賣箱子。
+- **博士**：`CfInventorPatch` postfix 包 `StoreClientList.CreateInventor` 最後一句
+  對話的 `endAction`（先跑原版）；PRO 後加賣 `cf_pro_desequencer` 與
+  `cf_batch_card_module`，T2／T3 加賣與製卡匠相同的卡／核。
+- **小偷**：postfix 包 `CreateThief` 的 `endAction`；**不加 T1、永不 CMD**。
+  T3＝解鎖 `CF_FENCE_T3` 且聲望 ≥85；T2＝聲望 ≥60 或（≥30 且解鎖
+  `CF_FENCE_THIEF_T2`）；兩者都不成立就不給 CF 箱。權重 SEC 32／MED 27／
+  ENG 21／SER 20。全部 `isStolen: true`；不再改 `acceptRetailMarkup`。
+- **T3 箱**：`cf_*_box_t3`、9×8（CMD 10×8）、300／500、rolls 11/11/6/7/11；
+  `CF_CRATE_TIER=3`、同一組 `LOCK_ID_*`、T3 卡可開。Loot 以 T2 池為底，
+  加 T3 卡／核與最高價稀有物；model EV 3.9–4.5。
+- **Wild Network**：4 個升級全部 `tab="CardFence"`，
+  `SetNetworkTabLabel("CardFence", () => "制卡")`。分頁寬度 792 ≤ 1060，
+  不塞 Advanced、不加第 4 個分頁。
+- **CF_SAWYER_**：`IsHiddenForRun` postfix 只在
+  `exchangeManager.isExchangeUnlocked == false` 時把 `CF_SAWYER_*` 設為隱藏；
+  本輪沒有註冊任何索耶升級（P5 才做）。
 
-## P4 驗收卡（人類實機用，尚未跑）
+## P4 修訂驗收卡（人類實機用，尚未跑）
 
 | # | 項目 | 預期 |
 |---|---|---|
-| 1 | 買 `CF_FENCE_CONTACT` 後的下一位顧客 | 退休制卡匠到訪（`[CF-MAKER] visit … gate=catchup`），前台有印表機／CNC／解序器 |
+| 1 | 買 `CF_FENCE_PRO` | 後台多印表機／晶片／CNC／電子×2／耗材×2（`[CF-NET] PRO kit granted`）；製卡匠下次 `GenerateClient` 到訪（`gate=catchup`） |
 | 2 | 每週第 6 天 | 製卡匠再訪（`gate=weekly`）；同一天不重複 |
-| 3 | 工匠買賣 | 滑鼠點前台物品可看到價格 = `unitValue`；買下後進背包 |
-| 4 | 買 T2／T3 門路後 | 工匠前台出現 3 張不同家族 T2 卡＋3 個 T2 核；T3 門路再加 1 卡 1 核 |
-| 5 | 買 `CF_FENCE_THIEF` 後遇小偷 | `[CF-THIEF] box … added=True`；前台多 1 個上鎖的 CF 箱 |
-| 6 | 黑市聲望 ≥60（或 ≥30＋`CF_FENCE_THIEF_T2`） | 小偷給 T2 箱；否則 T1 箱 |
-| 7 | 打開 Wild Network | 出現第 3 個分頁「制卡」，8 個升級可買、無第 4 個分頁 |
-| 8 | 小偷箱內容 | 卡／核等級 ≤ 箱等級；CMD T1 箱只出 T1 卡／核 |
+| 3 | 製卡匠買賣 | T1 全卡／核常備；T2 後加 3 卡＋3 核；T3 後加 1 卡＋1 核；價格 = `unitValue` |
+| 4 | 遇博士 | `[CF-INVENTOR] stock …`；前台有專業解序器與批量模組；T2／T3 後加卡核 |
+| 5 | 黑市聲望 <30 遇小偷 | 沒有 CF 箱（只有原版 thief 貨） |
+| 6 | 聲望 ≥60 或（≥30＋`CF_FENCE_THIEF_T2`） | 小偷給 1 個 T2 箱（SEC/MED/ENG/SER） |
+| 7 | 解鎖 `CF_FENCE_T3` + 聲望 ≥85 | 小偷給 1 個 T3 箱；用 T3 卡可開 |
+| 8 | 打開 Wild Network | 第 3 個分頁「制卡」只有 4 個升級、無第 4 個分頁 |
+| 9 | T3 箱 12 件 | 9×8／CMD 10×8 放得下（未實機量） |
 
 ## P3 實作要點（詳見 spec §3.5）
 
@@ -164,21 +168,28 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 
 ## 未決 / 未核實
 
-- **P4 全部未實機**：製卡匠到訪／對話／買賣、小偷分級箱、Wild Network 分頁
-  都只有離線驗證；`Player.log` 沒有任何 `[CF-MAKER]`／`[CF-THIEF]`／`[CF-NET]`。
+- **P4 修訂全部未實機**：PRO 工具包、製卡匠／博士到訪與買賣、小偷 T2/T3 箱、
+  Wild Network 4 個升級、T3 箱開鎖，都只有離線驗證；`Player.log` 沒有任何
+  `[CF-NET]`／`[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`。
 - **tabBar 實際寬度**：spec §3.11.1 的 1060 來自 `WildNetworkStyle.TABS_W` 常數，
   不是 prefab 或 runtime `RectTransform` 量測；如果 prefab 的 tabBar 不是 1060，
   第 3 個分頁的結論要重算。
-- **T3 卡／核沒有對應的 T3 鎖**：T3 箱（9×7、300／500）仍未做，所以 T3 卡目前
-  只能交易／收藏，不能開任何箱子。
-- **工匠庫存份量**：全部門路買齊後一次到訪約 40+ 件（含機器與 10 張 T1 卡／核），
-  前台 18×4 理論上放得下，但沒有實機確認會不會中途滿台。
+- **T3 箱 12 件 fit**：9×8（CMD 10×8）只在紙上算過，沒有 runtime 量過；
+  若放不下，`/CF-LOOT/` 的 `remaining` 會大於 0，箱子會少東西。
+- **T3「200 樣本」是離線模擬**：同權重、同 `Pick` 演算法，但不是 in-game
+  `CfLootProbe`；實機 `[CF-EV]` 數字仍待人類補。
+- **工匠庫存份量**：T1 10 件 + T2 6 件 + T3 2 件 = 18 件（博士另有 2 件機器
+  + 同樣的卡核）；前台 18×4 理論上放得下，但沒有實機確認會不會中途滿台。
 - **`premiumBuy15` 對 SELL 客戶的實際效果**：照原版退休匠加，但這個 flag 主要
   影響客戶「買」東西的價格；SELL 客戶是否真的用到，未在 runtime 核。
-- **黑市聲望門檻 60／30**：是我方定案（spec §3.10.2），不是原版常數；實機要到
-  聲望 30／60 才能驗。
+- **黑市聲望門檻 85／60／30**：是我方定案（spec §3.10.2），不是原版常數；
+  實機要到對應聲望才能驗。
 - **`CF_SAWYER_*` 隱藏**：本輪沒有索耶升級，postfix 只用離線 IL 證明存在；
-  P5 註冊後才能真正看到隱藏效果。
+  P5 註冊後才能真正看到「交換所未解鎖就隱藏」的效果。
+- **PRO 工具包進 backInvinvElement**：`EmporiumTryAdd` 在後台滿時會依序落到其他
+  店內庫存；這個 fallback 沒有實機驗。
+- **舊升級孤兒**：買過舊 `CF_FENCE_CONTACT/...` 的存檔，`networkUpgrade` 字典會
+  留下未註冊的 id；不顯示、不影響新升級，但沒有存檔清理。
 - P3 的 #5／#6／#7 仍未補 log 證據（沿用上一輪結論）。
 - `unitValue`（晶片 250／解序器 800／T3 卡核新價）是定案值但未經遊戲平衡驗證。
 - `long_module2` 是否真的是 1×4：由 sprite 切片決定，未在 runtime 量過。
@@ -186,14 +197,16 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
   §3.4 errata、§3.4b T3 定價、§3.5 P3、§3.8／§3.10(2)／§3.11 P4。
 - **`Resources.LoadAll<Sprite>` runtime 清單**：目前只有 asset 字串掃描。
 - **CMD T2 -7.37%**：已接受的例外，未改。
+- **CMD 箱來源**：T1／T2／T3 在江洋大盜（P6）之前沒有正常來源，先留著。
 
-## 下一步（P5，新對話）
+## 下一步
 
-1. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
-2. 把 P4 四條驗收卡交給人類實機跑，收集 `[CF-MAKER]`／`[CF-THIEF]`／`[CF-NET]`。
-3. T3 箱體、loot、開鎖（`CF_CRATE_TIER=3`，容量 9×7，價 300／500）。
-4. 紙本與其餘黑市內容。
-5. 補 §3.1–3.11 全文與 `Resources.LoadAll` 實機清單。
+1. **本輪 P4 修訂 commit**（程式、manifest、spec、STATUS）。
+2. 人類實機跑 P4 修訂驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／`[CF-INVENTOR]`／
+   `[CF-THIEF]`，並補 T3 in-game `[CF-EV]` 200 樣本。
+3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
+4. **江洋大盜（P6）**：補 CMD 箱的正常來源。
+5. 紙本與其餘黑市內容；補 §3.1–3.11 全文與 `Resources.LoadAll` 實機清單。
 
 ## 禁區
 
@@ -205,13 +218,13 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 
 ## 主要檔案
 
-- `src/CardCraftAndFence/CardCraftAndFence.cs`（P4 新增 `CfNetwork`、
-  `CfSawyerHidePatch`、`CfRetiredCardmaker`、`CfThiefBoxes`、`CfThiefPatch`，
-  並把 `ItemFactory` 擴到 T3）
-- `src/CardCraftAndFence/manifest.xml`（0.4.0）
-- `docs/CARD_CRAFT_SPEC.md`（新增 §3.4b、§3.8、§3.10、§3.11）
+- `src/CardCraftAndFence/CardCraftAndFence.cs`（P4 修訂新增 `CfCardStock`、
+  `CfInventorStock`、`CfInventorPatch`；`CfNetwork` 縮成 4 個升級；
+  `CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables` 擴到 T3 箱）
+- `src/CardCraftAndFence/manifest.xml`（0.5.0）
+- `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、§3.10、§3.11）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、
   `tools/Probe-Logic.ps1`（本輪未改）
-- `.scratch/p3check/Program.cs`、`.scratch/p4check/Program.cs`（scratch-only
-  離線核對，不進 MOD）
+- `.scratch/p3check/`、`.scratch/p4check/`、`.scratch/p4bcheck/`、
+  `.scratch/p4t3loot/`（scratch-only 離線核對，不進 MOD）
