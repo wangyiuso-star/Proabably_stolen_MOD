@@ -680,29 +680,29 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 ### §3.8.4 製卡匠庫存（售價 = 物品 `unitValue`，不標 stolen、不賣箱子）
 
-每次到訪重新生成，不保存庫存。**T1 全卡／核是常備**；T2／T3 由升級加賣。
+**每次到訪重新抽一批，總數上限 10 件**；不保存庫存，也不做翻頁。理由：交易
+面板是整批購買（「购买 N 物品」），18 件會強迫玩家一次付 5000+；原版退休商人
+一次只帶 5–8 件。**同一天不重複**：一天最多一位製卡匠，`maker_last_day` 已擋。
 
-| 解鎖升級 | 物品 id | 數量 | 單價 |
-|---|---|---|---:|
-| 無（PRO 起，每次補給） | `printer` | 1 | 350 |
-| 無（PRO 起，每次補給） | `printer_module_cnc` | 1 | 400 |
-| 無（PRO 起，每次補給） | `printer_module_metal` | 1 | 300 |
-| 無（PRO 起，每次補給） | `cf_printer_chip_blank_keycard` | 1 | 250 |
-| 無（PRO 起，每次補給） | `common_electronic` | 5 | 33 |
-| 無（PRO 起，每次補給） | `printer_plastic` | 5 | 12 |
-| 無（PRO 起） | 5 家族 T1 卡（`cmd/sec/med/eng/ser_keycard`） | 各 1 | 125／100／75／75／40 |
-| 無（PRO 起） | 5 家族 T1 核（`crypto_module_cmd/sec/med/eng/ser`） | 各 1 | 350／300／250／250／200 |
-| `CF_FENCE_T2` | 隨機 3 個**不同家族**的 T2 卡 | 3 | 200／150／110／110／60 |
-| `CF_FENCE_T2` | 隨機 3 個**不同家族**的 T2 核 | 3 | 600／500／400／400／300 |
-| `CF_FENCE_T3` | 1 個隨機家族的 T3 卡 | 1 | 300／225／165／165／90 |
-| `CF_FENCE_T3` | 同家族的 T3 核 | 1 | 900／750／600／600／450 |
+| 類別 | 物品 | 數量 | 單價 |
+|---|---|---:|---:|
+| 固定 | `printer`（PRO 後） | 1 | 350 |
+| 固定 | `cf_printer_chip_blank_keycard` | 1 | 250 |
+| 固定 | `printer_module_cnc` **或** `printer_module_metal` | 1（50/50） | 400／300 |
+| 材料 | `common_electronic` | 2 | 33 |
+| 材料 | `printer_plastic` | 2 | 12 |
+| 卡／核 | 已解鎖等級隨機 3 件：卡 2＋核 1 或 卡 1＋核 2 | 3 | 依 id |
 
+- **卡／核池**：T1 永遠在池；解鎖 `CF_FENCE_T2` 加 T2；解鎖 `CF_FENCE_T3`
+  加 T3。池 = 5 家族 × 已解鎖等級（卡池與核池分開），抽 3 件不重複。
+- 3 件的分配是 `cards = RNG(1..2)`、`cores = 3 - cards`，所以每次一定
+  卡核都有、但不會每個家族都給。
+- 固定＋材料＝7 件，加 3 件卡核＝**10 件**；程式仍保留 `>10` 的 trim。
 - **不賣箱子**（任何 T1／T2／T3 箱都不在工匠庫存）。
 - **製卡週邊是補給，不是解鎖**：`CF_FENCE_PRO` 仍一次性發第一套工具包，但卡匠
-  每次到訪都重新上架印表機／CNC／金屬列印模組／空白卡晶片／電子×5／耗材×5，
-  不消耗、不限量。理由：空白卡晶片是自訂物品，只有工具包那一顆時遺失就再也
-  做不出空白卡；CNC 與耗材也需要穩定來源。專業解序器與批量模組仍由博士賣（見下）。
-- T2／T3 的隨機抽選用遊戲 `RNG`；T3 卡與核同家族，方便直接拿去解序。
+  每次到訪都重新上架印表機、晶片、CNC／金屬模組、電子×2、耗材×2。
+  理由：空白卡晶片是自訂物品，只有工具包那一顆時遺失就再也做不出空白卡；
+  CNC 與耗材也需要穩定來源。專業解序器與批量模組仍由博士賣（見下）。
 - 全部 `isOwend: false`：玩家要付 `unitValue` 買；沒有額外 markup。
 - **櫃台放不下不銷毀**：前台是原版 18×4；櫃台滿（或形狀放不下）時，
   貨物改丟 `GraphUtils.EmporiumTryAdd(backInvinvElement, item)`，
@@ -715,14 +715,15 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - Postfix 包住 `CreateInventor` 最後一句對話的 `endAction`，先跑原版 `endAction`
   （若有），再上架：
   - `CF_FENCE_PRO`：`cf_pro_desequencer`（800）、`cf_batch_card_module`（250）。
-  - `CF_FENCE_T2`：與製卡匠相同的 3 張 T2 卡 + 3 個 T2 核（各自獨立抽家族）。
-  - `CF_FENCE_T3`：與製卡匠相同的 1 張 T3 卡 + 同家族 1 個 T3 核。
+  - `CF_FENCE_T2`：3 張 T2 卡 + 3 個 T2 核（各自獨立抽 3 個不同家族）。
+  - `CF_FENCE_T3`：1 張 T3 卡 + 同家族 1 個 T3 核。
 - 博士的 T2／T3 是**加賣**，不是取代製卡匠；兩邊同一天都可能有貨。
+  博士全開時 2＋6＋2 = 10 件，和卡匠同一上限。
 - 全部 `isOwend: false`，售價 = `unitValue`。
 
 ### §3.8.6 診斷 log
 
-- `[CF-MAKER] visit day=… gate=weekly|catchup stock=supplies,t1,t2,t3`
+- `[CF-MAKER] visit day=… gate=weekly|catchup stock=fixed,materials,cards,t2,t3`
 - `[CF-MAKER] skip: already visited today day=…`
 - `[CF-MAKER] skip: CF_FENCE_PRO not unlocked`
 - `[CF-INVENTOR] stock desequencer+batch tier2=… tier3=…`

@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.4";
+        internal const string ModVersion = "0.5.5";
 
         public void Init(ModManifest manifest)
         {
@@ -2039,28 +2039,78 @@ namespace DeepSpaceQoL
             CardFamily.CMD
         };
 
-        // Restock, not unlock: CF_FENCE_PRO gates the visit, but the printer,
-        // CNC, blank-card chip and materials must stay buyable forever. The
-        // starter kit is one-time; losing the custom chip must not brick crafting.
-        internal static void AddPrinterSupplies()
+        // The cardmaker's whole visit is 10 items: 3 fixed supplies, 4 materials
+        // and 3 randomly drawn cards/cores from the unlocked tiers. The trade
+        // panel buys the whole batch, so 18 items would force a 5000+ purchase;
+        // vanilla retired merchants carry 5-8.
+        internal static void AddMakerStock()
         {
-            AddStock("printer");
-            AddStock("printer_module_cnc");
-            AddStock("printer_module_metal");
-            AddStock(ItemFactory.BlankKeycardChipId);
-            for (int i = 0; i < 5; i++)
+            List<string> ids = new List<string>();
+            if (CfNetwork.Unlocked(CfNetwork.Pro))
             {
-                AddStock("common_electronic");
-                AddStock("printer_plastic");
+                ids.Add("printer");
+            }
+            ids.Add(ItemFactory.BlankKeycardChipId);
+            ids.Add(RNG.GetRandomInt(0, 1) == 0 ? "printer_module_cnc" : "printer_module_metal");
+            ids.Add("common_electronic");
+            ids.Add("common_electronic");
+            ids.Add("printer_plastic");
+            ids.Add("printer_plastic");
+
+            List<int> tiers = UnlockedTiers();
+            List<string> cards = new List<string>();
+            List<string> cores = new List<string>();
+            foreach (int tier in tiers)
+            {
+                foreach (CardFamily family in AllFamilies)
+                {
+                    cards.Add(ItemFactory.KeycardId(family, tier));
+                    cores.Add(ItemFactory.CryptoModuleId(family, tier));
+                }
+            }
+            // 3 draws, split 2+1 or 1+2 so cards and cores are both represented.
+            int cardCount = RNG.GetRandomInt(1, 2);
+            AppendRandomDistinct(ids, cards, cardCount);
+            AppendRandomDistinct(ids, cores, 3 - cardCount);
+
+            while (ids.Count > 10)
+            {
+                ids.RemoveAt(ids.Count - 1);
+            }
+            foreach (string id in ids)
+            {
+                AddStock(id);
             }
         }
 
-        internal static void AddTier1()
+        private static List<int> UnlockedTiers()
         {
-            foreach (CardFamily family in AllFamilies)
+            List<int> tiers = new List<int> { 1 };
+            if (CfNetwork.Unlocked(CfNetwork.Tier2))
             {
-                AddStock(ItemFactory.KeycardId(family, 1));
-                AddStock(ItemFactory.CryptoModuleId(family, 1));
+                tiers.Add(2);
+            }
+            if (CfNetwork.Unlocked(CfNetwork.Tier3))
+            {
+                tiers.Add(3);
+            }
+            return tiers;
+        }
+
+        private static void AppendRandomDistinct(List<string> target, List<string> pool, int count)
+        {
+            List<string> copy = new List<string>(pool);
+            for (int i = copy.Count - 1; i > 0; i--)
+            {
+                int j = RNG.GetRandomInt(0, i);
+                string swap = copy[i];
+                copy[i] = copy[j];
+                copy[j] = swap;
+            }
+            int take = Math.Min(count, copy.Count);
+            for (int i = 0; i < take; i++)
+            {
+                target.Add(copy[i]);
             }
         }
 
@@ -2247,23 +2297,17 @@ namespace DeepSpaceQoL
         // card/core list; T2/T3 upgrades widen it.
         private static void StockUp()
         {
-            CfCardStock.AddPrinterSupplies();
-            CfCardStock.AddTier1();
-            if (CfNetwork.Unlocked(CfNetwork.Tier2))
-            {
-                CfCardStock.AddTier2();
-            }
-            if (CfNetwork.Unlocked(CfNetwork.Tier3))
-            {
-                CfCardStock.AddTier3();
-            }
+            // One fixed 10-item batch, re-rolled every visit. No paging, no
+            // per-family dump: the trade panel buys the whole table at once.
+            CfCardStock.AddMakerStock();
         }
 
         private static string StockSummary()
         {
             List<string> parts = new List<string>();
-            parts.Add("supplies");
-            parts.Add("t1");
+            parts.Add("fixed");
+            parts.Add("materials");
+            parts.Add("cards");
             if (CfNetwork.Unlocked(CfNetwork.Tier2))
             {
                 parts.Add("t2");
