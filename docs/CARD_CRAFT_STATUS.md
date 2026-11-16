@@ -46,7 +46,7 @@
 | SHA256 | `670F112D0033022950F766F835C6AFB50085A024D1EB9A42E68707D99314D69F` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
-| git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 ## P3 實機驗證（2026-11-16，Player.log 逐行）
 
@@ -412,8 +412,8 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
 
 ## 下一步
 
-1. 本輪 0.6.0（多台 printer／chip／CNC 數量差）待提交；
-   0.5.9 的 3 核心輪換在 `315df85`。
+1. 本輪 0.6.0（多台 printer／chip／CNC 數量差）已提交
+   （`8094136`，本機 commit、未 push）。
 2. 人類實機跑 P4 修訂與 CMD 貼圖驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／
    `[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`，並補 T3 in-game `[CF-EV]`。
 3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
