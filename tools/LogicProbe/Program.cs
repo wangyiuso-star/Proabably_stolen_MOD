@@ -32,6 +32,7 @@ internal static class LogicProbe
         string deps = args[0];
         string appraisalDll = args[1];
         string augDll = args[2];
+        string cardDll = args.Length > 3 ? args[3] : null;
 
         AppDomain.CurrentDomain.AssemblyResolve += delegate(object sender, ResolveEventArgs e)
         {
@@ -86,6 +87,10 @@ internal static class LogicProbe
         MethodInfo scan = scanner.GetMethod("Scan", BindingFlags.Public | BindingFlags.Static);
         Scan(scanner, scan, appraisalDll, "AppraisalAssistant");
         Scan(scanner, scan, augDll, "AugSpotter");
+        if (cardDll != null)
+        {
+            Scan(scanner, scan, cardDll, "CardCraftAndFence");
+        }
 
         Console.WriteLine(_fail == 0 ? "RESULT: PASS" : "RESULT: FAIL (" + _fail + ")");
         return _fail == 0 ? 0 : 1;

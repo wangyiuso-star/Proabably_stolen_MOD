@@ -41,7 +41,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $modArgs = @(
     (Join-Path $root "dist\AppraisalAssistant\AppraisalAssistant.dll"),
-    (Join-Path $root "dist\AugSpotter\AugSpotter.dll")
+    (Join-Path $root "dist\AugSpotter\AugSpotter.dll"),
+    (Join-Path $root "dist\CardCraftAndFence\CardCraftAndFence.dll")
 )
 $mono = Join-Path $tools "mono\Mono\bin\mono.exe"
 if (Test-Path $mono) {

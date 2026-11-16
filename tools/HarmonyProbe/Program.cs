@@ -42,14 +42,27 @@ internal static class HarmonyProbe
             {
                 Console.WriteLine("  " + p);
             }
-            if (patched.Length == 0 && !Path.GetFileNameWithoutExtension(mod).Equals("AugSpotter", StringComparison.OrdinalIgnoreCase))
+            if (patched.Length == 0 && DeclaresPatches(assembly))
             {
-                Console.WriteLine("FAIL: expected at least one patch");
+                Console.WriteLine("FAIL: mod declares HarmonyPatch attributes but none applied");
                 return 1;
             }
             harmony.UnpatchAll(harmony.Id);
         }
         Console.WriteLine("RESULT: PASS");
         return 0;
+    }
+
+    private static bool DeclaresPatches(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes().Any(t => t.GetCustomAttributes(typeof(HarmonyPatch), false).Length > 0);
+        }
+        catch (ReflectionTypeLoadException)
+        {
+            // If the types cannot be inspected, keep the strict rule.
+            return true;
+        }
     }
 }

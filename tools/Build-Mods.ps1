@@ -26,6 +26,7 @@ $references = @(
     (Join-Path $managed "Assembly-CSharp.dll"),
     (Join-Path $managed "0Harmony.dll"),
     (Join-Path $managed "UnityEngine.CoreModule.dll"),
+    (Join-Path $managed "UnityEngine.AudioModule.dll"),
     (Join-Path $managed "UnityEngine.UIModule.dll"),
     (Join-Path $managed "UnityEngine.UI.dll"),
     (Join-Path $managed "UnityEngine.TextCoreTextEngineModule.dll"),
@@ -43,7 +44,8 @@ foreach ($reference in $references) {
 $optimize = if ($Configuration -eq "Release") { "/optimize+" } else { "/optimize-" }
 $projects = @(
     @{ Name = "AppraisalAssistant"; Source = "src\AppraisalAssistant\AppraisalAssistant.cs" },
-    @{ Name = "AugSpotter"; Source = "src\AugSpotter\AugSpotter.cs" }
+    @{ Name = "AugSpotter"; Source = "src\AugSpotter\AugSpotter.cs" },
+    @{ Name = "CardCraftAndFence"; Source = "src\CardCraftAndFence\CardCraftAndFence.cs" }
 )
 
 foreach ($project in $projects) {

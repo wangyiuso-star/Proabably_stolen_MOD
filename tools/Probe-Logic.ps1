@@ -30,6 +30,7 @@ if ($LASTEXITCODE -ne 0) {
 Remove-Item Env:\MONO_PATH -ErrorAction SilentlyContinue
 & $mono $exe $managed `
     (Join-Path $root "dist\AppraisalAssistant\AppraisalAssistant.dll") `
-    (Join-Path $root "dist\AugSpotter\AugSpotter.dll")
+    (Join-Path $root "dist\AugSpotter\AugSpotter.dll") `
+    (Join-Path $root "dist\CardCraftAndFence\CardCraftAndFence.dll")
 exit $LASTEXITCODE
 
