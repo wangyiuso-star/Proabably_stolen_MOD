@@ -22,14 +22,15 @@
   容量維持不動；容量只影響「放不放得下」，不改 EV／價與件數。
 - **0.7.2 容量重算（fit）**：實機 SEC T3 掉件；用 66 個存檔的實際 `itemShape`
   面積＋10 萬次 rolls 模擬重算。重點：
-  - `LootTables.Fill` 改成**先 roll 全部、再按 shape 面積大→小放入**（遊戲的
-    grid 放置本身會試 4 種旋轉＋2 種翻轉）；`smg`／`shotgun`（7×3）從
-    SEC T3／CMD T2／CMD T3 的 **common** 池移除，只留在 rare。
-  - 原始 worst-case（7×3 還在 common）是 SEC T3 85、CMD T3 136、CMD T2 112；
-    移到 rare-only 後的最大面積降到 57／87／77，容量才有多排餘量。
+  - `LootTables.Fill` 改成**先 roll 全部、rare 先放、common 再按 shape 面積
+    大→小放入**（遊戲的 grid 放置本身會試 4 種旋轉＋2 種翻轉）；`smg`／
+    `shotgun`（7×3）從 SEC T3／CMD T2／CMD T3 的 **common** 池移除，只留 rare。
+  - 原始 worst-case（7×3 還在 common、用 bounding box）是 SEC T3 105、
+    CMD T3 168、CMD T2 147；移到 rare-only 後降到 69／105／93。
   - 容量：SEC T2 10×8、CMD T1 10×8、CMD T2 12×9、SEC T3 13×8、CMD T3 15×9；
     MED／ENG／SER 不變。9 高是因為 6–7 個 4×3 common ＋ 1 個 7×3 rare 需要
-    3～4 排。
+    3～4 排。**SEC T2 10×8=80 仍小於 worst 93**；0.7.8 起 rare 先放，容量
+    不足時只會掉 common。
   - 三張表權重重配後 **common EV 與整箱 EV 完全不變**（SEC T3 238.50、
     CMD T2 172.75、CMD T3 252.75；model EV/價仍是 4.068／3.701／4.117）。
   - overflow 改成**每箱一行**：`[CF-LOOT] overflow box=… expected=… actual=…
@@ -302,12 +303,14 @@ T2 ≥ 同家族 T1 + 0.2：
 > 直接解析本檔的權重、seed 20261116、抽取演算法同 `LootRegistry.Pick`；
 > 不是 in-game `CfLootProbe`。in-game `[CF-EV]` 仍待人類補跑。
 
-### T3／T2 容量（0.7.2 重算）
+### T3／T2 容量（0.7.2 重算，0.7.8 對帳）
 
-T3 不是「5 件就一定放得下」：SEC T3 的 5 件最大面積 85、CMD T3 的 8 件最大
-136，舊 9×8／10×8 會掉件。0.7.2 依實際 `itemShape` 重算成 SEC T3 13×8、
-CMD T3 15×9；MED／ENG／SER T3 仍 9×8（最大 40／30／30）。T2 同步調整：
-SEC T2 10×8、CMD T1 10×8、CMD T2 12×9，其餘不變。詳見 §3.3 容量段。
+T3 不是「5 件就一定放得下」：用 bounding box 算，7×3 還在 common 時 SEC T3
+最大 105、CMD T3 168、CMD T2 147，舊 9×8／10×8 會掉件。0.7.2 依實際
+`itemShape` 重算成 SEC T3 13×8、CMD T3 15×9；0.7.8 把 7×3 移到 rare-only 後
+降到 69／105／93，並改成 rare 先放。MED／ENG／SER T3 仍 9×8（最大 40／30／30）；
+T2 同步調整：SEC T2 10×8、CMD T1 10×8、CMD T2 12×9，其餘不變。SEC T2
+10×8=80 < 93 是已知例外，rare 先放保證只掉 common。詳見 §3.3 容量段。
 
 ## 箱子貼圖決策（asset 字串掃描，2026-11-16）
 
@@ -872,25 +875,31 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
   `No sprite found`、右上角不是藍方塊。
 - 分組：降冪排序＋組內取最低；3 T3 + 1 T1 → T3、2 T1 + 3 T2 → T2、
   1 T1 + 2 T2 → T1、3 T1 + 3 T2 → T1 + T2。
-- SEC T2 rare：8×8＋rare 先放後，開箱 7 件齊全（0.7.1 的 rare-first 在 0.7.2
-  被「全部 roll 完、按面積大→小放」取代，行為等價且更穩）。
+- SEC T2 rare：8×8＋rare 先放後，開箱 7 件齊全。0.7.2 曾改成純面積排序，
+  0.7.8 改回 **rare 先放、common 再按面積大→小**，避免容量不足時先掉 rare。
 
-**0.7.2 容量修正（待實機重測）**：
+**0.7.2／0.7.8 容量與 rare 修正（待實機重測）**：
 
 - 0.7.1 實機仍抓到 SEC T3 掉件；CMD T3／T2 高度可疑。用 66 個存檔的實際
-  `itemShape` 面積＋10 萬次 rolls 重算：7×3 還在 common 時 SEC T3 最大 85、
-  CMD T3 136、CMD T2 112（0.7.1 的 9×8／10×8／9×8 明顯不夠）；把 7×3 移到
-  rare-only 後降到 57／87／77。
-- 修法：`LootTables.Fill` 先 roll 全部、再按 shape 面積**大→小**放入
-  （grid 放置本身會試 4 旋轉＋2 翻轉）；`smg`／`shotgun`（7×3）從 SEC T3／
-  CMD T2／CMD T3 的 **common** 池移除（rare 保留），三張表權重重配、
-  common EV 與整箱 EV 完全不變；容量見 §3.3（SEC T2 10×8、CMD T1 10×8、
-  CMD T2 12×9、SEC T3 13×8、CMD T3 15×9）。
-- overflow 改成**每箱一行**，測試可以看到第二箱以後的掉件。
+  `itemShape` bounding box＋10 萬次 rolls 重算：7×3 還在 common 時 SEC T3
+  最大 105、CMD T3 168、CMD T2 147（0.7.1 的 9×8／10×8／9×8 明顯不夠）；
+  把 7×3 移到 rare-only 後降到 69／105／93。
+- 修法：`LootTables.Fill` 先 roll 全部、**rare 先放**、common 再按 shape 面積
+  **大→小**放入（grid 放置本身會試 4 旋轉＋2 翻轉）；`smg`／`shotgun`（7×3）
+  從 SEC T3／CMD T2／CMD T3 的 **common** 池移除（rare 保留），三張表權重
+  重配、common EV 與整箱 EV 完全不變；容量見 §3.3（SEC T2 10×8、CMD T1 10×8、
+  CMD T2 12×9、SEC T3 13×8、CMD T3 15×9）。SEC T2 80 小於 worst 93，
+  但 rare 已先放，overflow 只會掉 common。
+- MED／ENG／SER T3 用同一套 shape 清單複算：benchmark 最大面積 40／30／30，
+  9×8=72 足夠（`module_extractor_advanced` 2×3、`turbo_booster_adv` 3×2、
+  `advanced_flux_agent` 2×2、`system_capped_neural_core` 2×2、
+  `module_bay_expansion_kit` 2×2）。實機各 3 箱仍待測。
+- overflow 改成**每箱一行**，並分開記 `rolled／spawned／expected／actual／
+  dropped`；null roll 另印 `[CF-LOOT] spawn short …`。
 - 待實機：T3 SEC ×5、T3 CMD ×5、T2 CMD ×3，每箱件數 = rolls + 1，
   log 沒有 `[CF-LOOT] overflow`；SEC T2 也順便看。
 
-**仍未實機（0.7.2）**：
+**仍未實機（0.7.8）**：
 
 - 紙本 item 註冊在 `ModItemDirectory` 尚未 live 時的第一輪會靜默失敗，
   依賴 `OnGameLoadedLate`／`OnNewGameStarted`（與 `Grant` 前）補註冊；

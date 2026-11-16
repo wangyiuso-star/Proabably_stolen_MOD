@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-17（0.7.7：CMD 箱藍色壓深、對齊指揮卡 H 0.62／V 不增益）
+更新時間：2026-11-17（0.7.8：P5 收尾——rare 先放、容量數字對帳、null 診斷）
 
 ## 階段
 
@@ -38,33 +38,34 @@
   `[CF-INVENTOR] client=… pro=…`；小偷改成先放 CF 箱、再跑原版庫存。
   實機驗證（到訪、買賣、分頁、T3 fit、染色外觀、啟動、滿台 skip、
   住所庫存）尚未跑。
-- **P5：0.7.0 完成並已實機跑起來；0.7.1 修三個實機 bug；0.7.2 修容量／填充。**
-  索耶（`OnHandlingNightlyServicesEarly` hook，在 `EndNight` 的
-  `HandleJanitorial` 之前）：垃圾桶同家族鑰匙卡按 SEC 3／MED 4／ENG 4／
-  SER 4／CMD 3 換已填 loot＋已上鎖的物資箱；0.7.1 起同家族卡**高→低**排序、
-  箱子取組內最低等級（3 T3 + 1 T1 → T3、2 T1 + 3 T2 → T2）；未解鎖批量
-  每晚最多 1 箱、**優先最高等級**。`CF_SAWYER_CHIP` 開芯片（3 同家族同級→
-  下一級，T3 不升，每晚每家族 1 次）；`CF_SAWYER_PERMANENT` 解鎖後接管原版
-  三個 crate barter（同時清 `promotionalBarter` 與
+- **P5：0.7.0 完成並已實機跑起來；0.7.1 修三個實機 bug；0.7.2 修容量／填充；
+  0.7.8 收尾 rare 優先與文件對帳。** 索耶（`OnHandlingNightlyServicesEarly`
+  hook，在 `EndNight` 的 `HandleJanitorial` 之前）：垃圾桶同家族鑰匙卡按
+  SEC 3／MED 4／ENG 4／SER 4／CMD 3 換已填 loot＋已上鎖的物資箱；0.7.1 起
+  同家族卡**高→低**排序、箱子取組內最低等級（3 T3 + 1 T1 → T3、2 T1 + 3 T2
+  → T2）；未解鎖批量每晚最多 1 箱、**優先最高等級**。`CF_SAWYER_CHIP` 開芯片
+  （3 同家族同級→下一級，T3 不升，每晚每家族 1 次）；`CF_SAWYER_PERMANENT`
+  解鎖後接管原版三個 crate barter（同時清 `promotionalBarter` 與
   `activePromotionalBarterIds`），並發一本 `cf_sawyer_card_catalog` 換卡目錄
   紙本。0.7.1 紙本改用 `CfPaperSprites` 執行期產圖（紙底＋X／放大鏡／左右
   箭頭）註冊進 `LoadedMod.PaperSprites`，修掉藍方塊。0.7.2 用實際
   `itemShape` 面積重算容量（SEC T2 10×8、CMD T1 10×8、CMD T2 12×9、
-  SEC T3 13×8、CMD T3 15×9），`LootTables.Fill` 改成全部 roll 完後按面積
-  大→小放；`smg`／`shotgun`（7×3）只留在 rare，三張表權重重配後 EV 不變；
-  overflow 每箱一行。Wild Network 由 4 個升級變 **7 個**。
+  SEC T3 13×8、CMD T3 15×9）；0.7.8 改成 **rare 先放、common 再按面積
+  大→小放**，`smg`／`shotgun`（7×3）只留 rare，三張表權重重配後 EV 不變；
+  overflow 每箱一行並記 `rolled/spawned/expected/actual/dropped`。Wild Network
+  由 4 個升級變 **7 個**。
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.7.7 |
+| ModVersion | 0.7.8 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 75,776 bytes |
-| SHA256 | `592F866FCAF801392858F12E6890EBA24CA0451FA48151813676C7E26E48B993` |
+| 大小 | 76,288 bytes |
+| SHA256 | `EEBF0941E34F265C93E3505249986AF88900DD56FDE2955692CD079DCBB74358` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
-| dist / Mods hash | 尚未同步（Mods 仍是 0.7.6 的 75,776 bytes／`CAB94C59…`；0.7.7 請重新複製） |
-| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）、`4fe6b3f`（0.7.3）、`d13d49d`（0.7.4）、`c59107c`（0.7.5）、`225f17b`（0.7.6）、`3e1c4fa`（0.7.7）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| dist / Mods hash | Mods 仍是 0.7.7 的 75,776 bytes／`592F866F…`；0.7.8 待覆蓋 |
+| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）、`4fe6b3f`（0.7.3）、`d13d49d`（0.7.4）、`c59107c`（0.7.5）、`225f17b`（0.7.6）、`3e1c4fa`（0.7.7）；**0.7.8 未提交**；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 > **0.7.7**：HSV 換色參數定案——`BlueHue=0.62`（指揮卡深藍取樣 `39,52,86`
 > 的 H 0.62）、`BlueValueGain=1.00`，保留來源 S 與陰影；白標籤（`s<0.15`）
@@ -422,15 +423,18 @@ CMD T3／T2 高度可疑。這輪只動容量／填充，索耶邏輯不變。
 
 | 箱 | rolls | 舊容量 | 移除前最大 | 移除後最大 | 新容量 |
 |---|---:|---|---:|---:|---|
-| SEC T2 | 6 | 8×8=64 | 77 | 77 | **10×8=80** |
-| CMD T1 | 8 | 7×7=49 | 65 | 65 | **10×8=80** |
-| CMD T2 | 6 | 9×8=72 | 112 | 77 | **12×9=108** |
-| SEC T3 | 4 | 9×8=72 | 85 | 57 | **13×8=104** |
-| CMD T3 | 7 | 10×8=80 | 136 | 87 | **15×9=135** |
+| SEC T2 | 6 | 8×8=64 | 93 | 93 | **10×8=80** |
+| CMD T1 | 8 | 7×7=49 | 69 | 69 | **10×8=80** |
+| CMD T2 | 6 | 9×8=72 | 147 | 93 | **12×9=108** |
+| SEC T3 | 4 | 9×8=72 | 105 | 69 | **13×8=104** |
+| CMD T3 | 7 | 10×8=80 | 168 | 105 | **15×9=135** |
 
-「移除前最大」是 smg／shotgun 還在 common 池時的面積；把它們移到 rare-only
-後，common 最大只剩 4×3（10 格），SEC T3／CMD T2／CMD T3 的最大面積降到
-57／77／87 格，新容量才有幾排餘量。
+「最大」用 itemShape 的 bounding box（width×height），不是 data 的實心格數
+（4×3 glock 是 12 格，不是 10）。「移除前最大」是 smg／shotgun 還在 common
+池時的面積；移到 rare-only 後，common 最大只剩 4×3（12 格），SEC T3／CMD T2／
+CMD T3 的最大面積降到 69／93／105 格，新容量才有幾排餘量。
+**SEC T2 例外**：10×8=80 仍小於 worst 93（6 glock＋shotgun rare）；0.7.8 起
+rare 先放，容量不足時只會掉 common，不會掉 rare。
 
 - MED／ENG／SER 的 T2/T3 最大面積都 ≤40（現有 8×8／7×7／9×8 足夠），不動。
 
@@ -540,6 +544,119 @@ EXIT=0
 - 新容量在 UI 的格子大小／可讀性（CMD T3 15×9、CMD T2 12×9）未進遊戲看過。
 - SEC T2 也順便開箱確認 7 件；若真的遇到 adversarial 6 glock＋shotgun，
   會出現 per-box overflow 行，屆時再放大或調 glock 權重。
+
+## P5 0.7.8 收尾（P5-02／03／04／05／13／14）
+
+0.7.7 定版不動功能；這輪只把交辦單上可離線關的項修完。
+
+### 1) 修正內容
+
+- **P5-02 rare 優先**：`LootTables.Fill` 改成 rare 先放、common 再按 shape
+  面積大→小放。SEC T2 10×8=80 < worst 93 時，掉件只會是 common。
+  離線 adversarial：6 glock＋shotgun → placed 5、dropped 2 個
+  `glock_receiver`，`shotgun` 不在 dropped。
+- **P5-05 診斷／NRE**：排序 tie-break 對 `shape == null` 有防護；overflow
+  log 記 `rolled=… spawned=… expected=… actual=… dropped=…`；null roll 另印
+  `[CF-LOOT] spawn short box=… rolled=… spawned=…`。
+- **P5-03 容量數字**：改用 itemShape bounding box（4×3=12，不是 data 10）：
+  改池前 SEC T3 105／CMD T3 168／CMD T2 147；rare-only 後 69／105／93。
+  SEC T2 仍 10×8=80 < 93，已由 rare 先放保證只掉 common。
+- **P5-04 MED/ENG/SER T3 複算**：最大 40／30／30（9×8=72 足夠）；
+  `module_extractor_advanced` 2×3、`turbo_booster_adv` 3×2、
+  `advanced_flux_agent`/`system_capped_neural_core`/`module_bay_expansion_kit`
+  2×2。實機各 3 箱仍待測。
+- **P5-13 P5 部分**：`CfSawyerExchange` 類別註解改成 high→low＋cap 先最高級；
+  STATUS 的 Mods 行更新成 0.7.7／592F866F；兩個 11-02 舊 docs 仍不動（非 P5）。
+- **P5-14**：CMD T2 200 樣本重跑為 1285.55／model 1295.50／**-0.77%**；
+  舊 -7.37%／-1.64% 作廢。
+
+### 2) 0.7.8 驗收（實際輸出）
+
+**Build**
+```text
+Compiling AppraisalAssistant...
+  -> ...\AppraisalAssistant.dll (15872 bytes)
+Compiling AugSpotter...
+  -> ...\AugSpotter.dll (9216 bytes)
+Compiling CardCraftAndFence...
+  -> ...\CardCraftAndFence.dll (76288 bytes)
+Build OK: C:\Users\wangy\Desktop\Probably_Stolen_MOD\dist
+EXIT=0
+```
+
+**Verify-Mods（CardCraft 段）**
+```text
+PASS CardCraftAndFence: ID deepspace.card_craft_and_fence
+PASS CardCraftAndFence: capabilities empty
+PASS CardCraftAndFence.dll: IMod implemented by DeepSpaceQoL.CardCraftAndFenceMod
+PASS CardCraftAndFence.dll: no banned IL APIs
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfTryOpenLockPatch -> LockHelper.TryOpenLock
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfCrateTooltipPatch -> LockHelper.CreateLockerContainerTooltip
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfCrateFillPatch -> DirectoryMaster.Item
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfPrinterBatchPatch -> MachinePrinter.FinishPrinting
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfSawyerHidePatch -> NetworkUpgrade.IsHiddenForRun
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfThiefPatch -> StoreClientList.CreateThief
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfInventorPatch -> StoreClientList.CreateInventor
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfInventorStoragePatch -> StoreClientList.CreateInventorStorage
+PASS CardCraftAndFence.dll: HarmonyPatch attributes checked (8)
+RESULT: PASS
+EXIT=0
+```
+
+**Probe-Patches**
+```text
+patched 8 method(s)   ← Appraisal
+patched 4 method(s)   ← Aug
+patched 8 method(s)   ← CardCraft
+  DirectoryMaster.Item
+  LockHelper.CreateLockerContainerTooltip
+  LockHelper.TryOpenLock
+  MachinePrinter.FinishPrinting
+  NetworkUpgrade.IsHiddenForRun
+  StoreClientList.CreateInventor
+  StoreClientList.CreateInventorStorage
+  StoreClientList.CreateThief
+RESULT: PASS
+EXIT=0
+```
+
+**Probe-Logic**
+```text
+[Scan] CardCraftAndFence.dll refused=False capabilities=[] findings=0 error=null
+PASS scan CardCraftAndFence.dll
+RESULT: PASS
+EXIT=0
+```
+
+**Scratch**
+```text
+P5 SAWYER CHECK (0.7.8)
+  dll : ...\CardCraftAndFence.dll (76288 bytes)
+  passed: 108  failed: 0
+P5 SAWYER CHECK: PASS
+EXIT=0
+
+python .scratch\p5sawyer\capacity_shapes.py
+SEC T3  cap=13x8=104 worst=69  ok=True
+CMD T2  cap=12x9=108 worst=93  ok=True
+CMD T3  cap=15x9=135 worst=105 ok=True
+SEC T2  cap=10x8=80  worst=93  ok=False  ← rare-first exception
+MED T3 40 / ENG T3 30 / SER T3 30（9×8=72）
+EXIT=0
+
+python .scratch\p5loot\parse_code.py
+... CMD T2 measured200=1285.55 err=-0.77% ...
+VALUE-FLOOR CHECK: PASS
+EXIT=0
+```
+
+### 3) 仍待實機（不擋交辦單其他項）
+
+- **P5-01**：T3 SEC ×5、T3 CMD ×5、T2 CMD ×3，件數 = rolls+1、無
+  `[CF-LOOT] overflow box=…`。
+- **P5-06**：芯片 3 同級→下一級、每家族每晚 1 次、T3 不升、不佔 cap。
+- **P5-07**：促銷 UI 立即消失／重開／重載不復活。
+- P5-08／09／10 與 P5-11／12 依交辦單，可留到 1.0 前。
 
 ## 0.5.2 啟動 NRE 修正（實機回報）
 
@@ -856,12 +973,13 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 - **P5 0.7.1 已實機通過**（紙本、分組、SEC T2 rare、上鎖、T3 鑰匙）：
   開書不再有 `No sprite found`／藍方塊；3 T3 + 1 T1 → T3、2 T1 + 3 T2 → T2；
   SEC T2 7 件齊全。
-- **P5 0.7.2 待實機重測**（容量／填充）：
+- **P5 0.7.8 待實機重測**（容量／填充）：
   - T3 SEC ×5、T3 CMD ×5、T2 CMD ×3：每箱件數 = rolls + 1
     （SEC T3 5、CMD T3 8、CMD T2 7），log 沒有 `[CF-LOOT] overflow`。
   - 新容量（CMD T3 15×9、CMD T2 12×9）在 UI 的格子大小／可讀性。
-  - SEC T2 也順便開箱 7 件；adversarial 6 glock＋shotgun 仍可能排不下，
-    會由 per-box overflow 行指出。
+  - SEC T2 也順便開箱 7 件；adversarial 6 glock＋shotgun 仍排不下，
+    但 0.7.8 已 rare 先放，overflow 只會掉 common。
+  - MED／ENG／SER T3 各 3 箱（離線複算 40／30／30、9×8 足夠）。
 - **P5 其餘仍未實機**：
   - 芯片：3 個同家族同級→下一級、T3 不升、每晚每家族 1 次（3 T1＋3 T2 只做
     T1→T2），以及 0.5.4 舊 alias `cf_<slug>_crypto_module_t3` 的讀取。
@@ -878,20 +996,23 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
   §3.4 errata、§3.4b T3 定價、§3.5 P3、§3.8／§3.10(2)／§3.11 P4、§3.12 貼圖，
   以及 P5 的 §3.9。
 - **`Resources.LoadAll<Sprite>` runtime 清單**：目前只有 asset 字串掃描。
-- **CMD T2 -7.37%**：已接受的例外，未改。
+- **CMD T2 EV 對帳**：0.7.2 重配權重後，200 樣本 `measured200=1285.55`、
+  model 1295.50、誤差 **-0.77%**（spec 表同一個數字）。舊的 -7.37%／-1.64%
+  是舊池／舊樣本，已作廢。
 - **CMD 箱來源**：T1／T2／T3 在江洋大盜（P6）之前沒有正常來源，先留著。
 
 ## 下一步
 
 1. 0.6.2（博士住所 hook／小偷順序）已提交（`75d227f`，本機 commit、未 push）。
-2. **P5 0.7.0 已提交 `66266cf`；0.7.1 已提交 `81c2d08`；0.7.2（容量／
-   填充）已提交 `801a5b0`、未 push**；工作區只剩本輪開始前就存在的
+2. **P5 0.7.0 已提交 `66266cf`；0.7.1 已提交 `81c2d08`；0.7.2 已提交
+   `801a5b0`；0.7.7 已提交 `3e1c4fa`；0.7.8（P5-02／03／04／05／13／14）
+   本輪未提交、未 push**；工作區只剩本輪開始前就存在的
    `ACCEPTANCE_REVIEW.md`／`DEVELOPER_DIAGNOSTIC.md` 修改（非本輪）。
-3. 人類實機重測 **0.7.2 容量三箱**（T3 SEC ×5、T3 CMD ×5、T2 CMD ×3，
-   件數 = rolls+1、無 overflow、SEC T2 7 件），再跑 P4 修訂、CMD 貼圖與
-   P5 其餘驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／`[CF-INVENTOR]`／
-   `[CF-THIEF]`／`[CF-SPRITE]`／`[CF-SAWYER]`／`[CF-PAPER]`，並補 T3
-   in-game `[CF-EV]`。
+3. 人類實機重測 **0.7.8**：P5-01 容量三箱（T3 SEC ×5、T3 CMD ×5、
+   T2 CMD ×3，件數 = rolls+1、無 overflow、SEC T2 7 件）、P5-06 芯片、
+   P5-07 促銷 UI；再跑 P4 修訂、CMD 貼圖與其餘驗收卡，收集 `[CF-NET]`／
+   `[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`／
+   `[CF-SAWYER]`／`[CF-PAPER]`，並補 T3 in-game `[CF-EV]`。
 4. **江洋大盜（P6）**：補 CMD 箱的正常來源（P5 的換卡已先給 CMD T1 一個來源）。
 5. 其餘黑市內容；補 §3.1–3.11 全文與 `Resources.LoadAll` 實機清單。
 
@@ -911,10 +1032,11 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
   `CfSawyerPaper`（換卡目錄紙本）；0.7.1 新增 `CfPaperSprites`（紙本 runtime
   貼圖）並改降冪分組；0.7.2 重算 T2/T3 容量（SEC T2 10×8、CMD T1 10×8、
   CMD T2 12×9、SEC T3 13×8、CMD T3 15×9）、`Fill` 改大件先放、smg/shotgun
-  移出三張 common 池並重配權重、overflow 每箱一行**；`CfNetwork` 由 4 個
-  升級變 7 個；`CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables` 擴到
-  T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.7.2）
+  移出三張 common 池並重配權重、overflow 每箱一行；0.7.8 改 rare 先放＋
+  null-safe 排序／`rolled/spawned/expected/actual/dropped` 診斷**；`CfNetwork`
+  由 4 個升級變 7 個；`CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables`
+  擴到 T3 箱）
+- `src/CardCraftAndFence/manifest.xml`（0.7.8）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、**§3.9 P5**、
   §3.10、§3.11、§3.12）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
