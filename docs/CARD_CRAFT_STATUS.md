@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-16（0.5.2 啟動失敗修正：升級註冊移到讀檔／新遊戲；PRO 工具包加電池）
+更新時間：2026-11-16（0.5.3：製卡匠每次到訪補給製卡週邊；0.5.2 啟動 NRE 修正延續）
 
 ## 階段
 
@@ -22,17 +22,20 @@
   **0.5.2 修啟動 NRE**：`ModHelper.AddNetworkUpgrade` 會碰
   `PlayerStore.Instance`，主選單階段這個 getter 會 new PlayerStore 並在 ctor NRE；
   4 個升級改在 `OnGameLoadedLate`／`OnNewGameStarted` 註冊，OnEnable 只設分頁標籤。
-  PRO 工具包另加 `energy_credit`（100 電）。實機驗證（到訪、買賣、分頁、T3 fit、
-  染色外觀、啟動）尚未跑。**P5（索耶）依指示未開。**
+  PRO 工具包另加 `energy_credit`（100 電）。
+  **0.5.3 製卡匠補給**：PRO 後每次到訪都上架 printer／CNC／`printer_module_metal`／
+  空白卡晶片／電子×5／耗材×5，不消耗；避免自訂晶片遺失後無法再生產。
+  實機驗證（到訪、買賣、分頁、T3 fit、染色外觀、啟動）尚未跑。
+  **P5（索耶）依指示未開。**
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.5.2 |
+| ModVersion | 0.5.3 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
 | 大小 | 59,904 bytes |
-| SHA256 | `7BD2FDE8277337603603606015CC2199B1EC1F452B2DDAB5233C1A5A015FB557` |
+| SHA256 | `CD8C9E99022BC9A66681C47E6A5B81586E3BE6B75113140F95BE7224CA7A1FC7` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
 | git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1 貼圖）、`50204fb`（0.5.2 啟動修正）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
@@ -117,7 +120,10 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
   - OnEnable 訂閱 `OnGameLoadedLate`／`OnNewGameStarted`／`OnModAssetsLoaded`；
   - `EnsureRegistered` 有 4 次 `Add`、`Add` 有 exception handler，
     `[CF-NET] registered`／`register failed id=` 字串都在；
-  - PRO kit 的 `energy_credit` 在 IL。
+  - PRO kit 的 `energy_credit` 在 IL；
+  - `CfCardStock.AddPrinterSupplies` 有 6 個 `AddStock`（printer／CNC／metal／
+    晶片＋電子／耗材），`StockUp` 順序 supplies→t1→t2→t3，`StockSummary` 有
+    `supplies`。
 - `.scratch/upgradecheck`（scratch-only）：離線重現 0.5.1 的 NRE stack
   （`PlayerStore..ctor` → `PlayerStore.get_Instance` →
   `NetworkUpgrade.RegisterModUpgrade`），有無 prerequisites 都一樣，
@@ -164,11 +170,14 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
 - **升級只剩 4 個**：`CF_FENCE_PRO` 1500（無前置）、`CF_FENCE_T2` 1200
   （前置 PRO）、`CF_FENCE_T3` 3000（前置 T2）、`CF_FENCE_THIEF_T2` 2200
   （無前置）。`CONTACT`／`SUPPLY`／`BATCH`／`T1`／`THIEF` 已刪。
-- **PRO**：`onUnlock` 一次性發 printer、空白卡晶片、CNC、電子×2、耗材×2，
-  用 `GraphUtils.EmporiumTryAdd` 進 `backInvinvElement`；同時解鎖製卡匠到訪。
+- **PRO**：`onUnlock` 一次性發 printer、空白卡晶片、CNC、電子×2、耗材×2、
+  `energy_credit` 電池×1，用 `GraphUtils.EmporiumTryAdd` 進 `backInvinvElement`；
+  同時解鎖製卡匠到訪。
 - **製卡匠**：掛 `OnGenerateCustomerVeryLate`；`dayCounter % 7 == 6` 每週一次，
-  PRO 首次解鎖後補訪一次；`maker_last_day` 存在存檔 modData。常備 T1 全卡／核；
-  T2／T3 由升級加賣。不再賣機器、不賣箱子。
+  PRO 首次解鎖後補訪一次；`maker_last_day` 存在存檔 modData。
+  **每次到訪補給**：printer、CNC、`printer_module_metal`、空白卡晶片、
+  電子×5、耗材×5（不消耗、非解鎖）；另常備 T1 全卡／核；T2／T3 由升級加賣。
+  不賣箱子；解序器與批量模組仍由博士賣。
 - **博士**：`CfInventorPatch` postfix 包 `StoreClientList.CreateInventor` 最後一句
   對話的 `endAction`（先跑原版）；PRO 後加賣 `cf_pro_desequencer` 與
   `cf_batch_card_module`，T2／T3 加賣與製卡匠相同的卡／核。
@@ -192,7 +201,7 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
 |---|---|---|
 | 1 | 買 `CF_FENCE_PRO` | 後台多印表機／晶片／CNC／電子×2／耗材×2／`energy_credit` 電池×1（`[CF-NET] PRO kit granted …+battery`）；製卡匠下次 `GenerateClient` 到訪（`gate=catchup`） |
 | 2 | 每週第 6 天 | 製卡匠再訪（`gate=weekly`）；同一天不重複 |
-| 3 | 製卡匠買賣 | T1 全卡／核常備；T2 後加 3 卡＋3 核；T3 後加 1 卡＋1 核；價格 = `unitValue` |
+| 3 | 製卡匠買賣 | 每次到訪有 printer／CNC／metal module／晶片／電子×5／耗材×5（不消耗）；T1 全卡／核常備；T2 後加 3 卡＋3 核；T3 後加 1 卡＋1 核；價格 = `unitValue` |
 | 4 | 遇博士 | `[CF-INVENTOR] stock …`；前台有專業解序器與批量模組；T2／T3 後加卡核 |
 | 5 | 黑市聲望 <30 遇小偷 | 沒有 CF 箱（只有原版 thief 貨） |
 | 6 | 聲望 ≥60 或（≥30＋`CF_FENCE_THIEF_T2`） | 小偷給 1 個 T2 箱（SEC/MED/ENG/SER） |
@@ -276,8 +285,9 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
   若放不下，`/CF-LOOT/` 的 `remaining` 會大於 0，箱子會少東西。
 - **T3「200 樣本」是離線模擬**：同權重、同 `Pick` 演算法，但不是 in-game
   `CfLootProbe`；實機 `[CF-EV]` 數字仍待人類補。
-- **工匠庫存份量**：T1 10 件 + T2 6 件 + T3 2 件 = 18 件（博士另有 2 件機器
-  + 同樣的卡核）；前台 18×4 理論上放得下，但沒有實機確認會不會中途滿台。
+- **工匠庫存份量**：週邊 6 種（printer／CNC／metal module／晶片各 1、電子×5、
+  耗材×5，共 14 件）+ T1 10 件 + T2 6 件 + T3 2 件 = 32 件；前台 18×4 理論上
+  放得下，但沒有實機確認會不會中途滿台。
 - **`premiumBuy15` 對 SELL 客戶的實際效果**：照原版退休匠加，但這個 flag 主要
   影響客戶「買」東西的價格；SELL 客戶是否真的用到，未在 runtime 核。
 - **黑市聲望門檻 85／60／30**：是我方定案（spec §3.10.2），不是原版常數；
@@ -299,7 +309,7 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
 
 ## 下一步
 
-1. 本輪 0.5.2（啟動 NRE 修正＋PRO 電池）已提交（`50204fb`，本機 commit、未 push）。
+1. 本輪 0.5.3（卡匠製卡週邊補給）待提交；0.5.2 啟動修正已在 `50204fb`。
 2. 人類實機跑 P4 修訂與 CMD 貼圖驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／
    `[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`，並補 T3 in-game `[CF-EV]`。
 3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
@@ -320,7 +330,7 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
   `CfInventorStock`、`CfInventorPatch`；0.5.1 新增 `CfCmdBoxSprite`；
   `CfNetwork` 縮成 4 個升級；`CfThiefBoxes` 只賣 T2/T3；
   `ItemFactory`／`LootTables` 擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.5.2）
+- `src/CardCraftAndFence/manifest.xml`（0.5.3）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、§3.10、§3.11、§3.12）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、

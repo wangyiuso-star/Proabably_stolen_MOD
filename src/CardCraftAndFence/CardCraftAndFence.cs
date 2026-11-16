@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.2";
+        internal const string ModVersion = "0.5.3";
 
         public void Init(ModManifest manifest)
         {
@@ -2039,6 +2039,22 @@ namespace DeepSpaceQoL
             CardFamily.CMD
         };
 
+        // Restock, not unlock: CF_FENCE_PRO gates the visit, but the printer,
+        // CNC, blank-card chip and materials must stay buyable forever. The
+        // starter kit is one-time; losing the custom chip must not brick crafting.
+        internal static void AddPrinterSupplies()
+        {
+            AddStock("printer");
+            AddStock("printer_module_cnc");
+            AddStock("printer_module_metal");
+            AddStock(ItemFactory.BlankKeycardChipId);
+            for (int i = 0; i < 5; i++)
+            {
+                AddStock("common_electronic");
+                AddStock("printer_plastic");
+            }
+        }
+
         internal static void AddTier1()
         {
             foreach (CardFamily family in AllFamilies)
@@ -2197,12 +2213,14 @@ namespace DeepSpaceQoL
             return client;
         }
 
-        // The cardmaker no longer sells machines: CF_FENCE_PRO hands over the
-        // printer/chip/CNC kit once, and the inventor sells the desequencer and
-        // batch module. What the cardmaker always carries is the T1 card/core set;
-        // the T2/T3 upgrades widen that list.
+        // CF_FENCE_PRO still hands over the first printer/chip/CNC kit once, but
+        // the cardmaker now also restocks those supplies on every visit so a lost
+        // custom chip or a worn-out printer is recoverable. The desequencer and
+        // batch module remain the inventor's stock. T1 is the cardmaker's baseline
+        // card/core list; T2/T3 upgrades widen it.
         private static void StockUp()
         {
+            CfCardStock.AddPrinterSupplies();
             CfCardStock.AddTier1();
             if (CfNetwork.Unlocked(CfNetwork.Tier2))
             {
@@ -2217,6 +2235,7 @@ namespace DeepSpaceQoL
         private static string StockSummary()
         {
             List<string> parts = new List<string>();
+            parts.Add("supplies");
             parts.Add("t1");
             if (CfNetwork.Unlocked(CfNetwork.Tier2))
             {

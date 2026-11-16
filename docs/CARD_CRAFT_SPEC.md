@@ -684,6 +684,12 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 | 解鎖升級 | 物品 id | 數量 | 單價 |
 |---|---|---|---:|
+| 無（PRO 起，每次補給） | `printer` | 1 | 350 |
+| 無（PRO 起，每次補給） | `printer_module_cnc` | 1 | 400 |
+| 無（PRO 起，每次補給） | `printer_module_metal` | 1 | 300 |
+| 無（PRO 起，每次補給） | `cf_printer_chip_blank_keycard` | 1 | 250 |
+| 無（PRO 起，每次補給） | `common_electronic` | 5 | 33 |
+| 無（PRO 起，每次補給） | `printer_plastic` | 5 | 12 |
 | 無（PRO 起） | 5 家族 T1 卡（`cmd/sec/med/eng/ser_keycard`） | 各 1 | 125／100／75／75／40 |
 | 無（PRO 起） | 5 家族 T1 核（`crypto_module_cmd/sec/med/eng/ser`） | 各 1 | 350／300／250／250／200 |
 | `CF_FENCE_T2` | 隨機 3 個**不同家族**的 T2 卡 | 3 | 200／150／110／110／60 |
@@ -692,8 +698,10 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 | `CF_FENCE_T3` | 同家族的 T3 核 | 1 | 900／750／600／600／450 |
 
 - **不賣箱子**（任何 T1／T2／T3 箱都不在工匠庫存）。
-- 製卡匠**不再賣機器**：印表機／晶片／CNC 由 PRO 一次性發；解序器與批量模組
-  由博士賣（見下）。
+- **製卡週邊是補給，不是解鎖**：`CF_FENCE_PRO` 仍一次性發第一套工具包，但卡匠
+  每次到訪都重新上架印表機／CNC／金屬列印模組／空白卡晶片／電子×5／耗材×5，
+  不消耗、不限量。理由：空白卡晶片是自訂物品，只有工具包那一顆時遺失就再也
+  做不出空白卡；CNC 與耗材也需要穩定來源。專業解序器與批量模組仍由博士賣（見下）。
 - T2／T3 的隨機抽選用遊戲 `RNG`；T3 卡與核同家族，方便直接拿去解序。
 - 全部 `isOwend: false`：玩家要付 `unitValue` 買；沒有額外 markup。
 
@@ -709,7 +717,7 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 ### §3.8.6 診斷 log
 
-- `[CF-MAKER] visit day=… gate=weekly|catchup stock=t1,t2,t3`
+- `[CF-MAKER] visit day=… gate=weekly|catchup stock=supplies,t1,t2,t3`
 - `[CF-MAKER] skip: already visited today day=…`
 - `[CF-MAKER] skip: CF_FENCE_PRO not unlocked`
 - `[CF-INVENTOR] stock desequencer+batch tier2=… tier3=…`
