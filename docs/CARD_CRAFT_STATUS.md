@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-16（0.5.3：製卡匠每次到訪補給製卡週邊；0.5.2 啟動 NRE 修正延續）
+更新時間：2026-11-16（0.5.4：櫃台放不下時改丟後台，不銷毀箱子／貨物）
 
 ## 階段
 
@@ -25,17 +25,19 @@
   PRO 工具包另加 `energy_credit`（100 電）。
   **0.5.3 製卡匠補給**：PRO 後每次到訪都上架 printer／CNC／`printer_module_metal`／
   空白卡晶片／電子×5／耗材×5，不消耗；避免自訂晶片遺失後無法再生產。
-  實機驗證（到訪、買賣、分頁、T3 fit、染色外觀、啟動）尚未跑。
-  **P5（索耶）依指示未開。**
+  **0.5.4 櫃台滿**：箱子／貨物先 `CanAccept` 探測，放不下就
+  `EmporiumTryAdd(backInvinvElement)`，不再被 `TryAddDirectSellingItemToTable`
+  銷毀。實機驗證（到訪、買賣、分頁、T3 fit、染色外觀、啟動、滿台 fallback）
+  尚未跑。**P5（索耶）依指示未開。**
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.5.3 |
+| ModVersion | 0.5.4 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 59,904 bytes |
-| SHA256 | `CD8C9E99022BC9A66681C47E6A5B81586E3BE6B75113140F95BE7224CA7A1FC7` |
+| 大小 | 60,416 bytes |
+| SHA256 | `1E0E0ED129D3D707A79CCB69F5E14E647926D3C9E468431D596E5A2FC0F08716` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
 | git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1 貼圖）、`50204fb`（0.5.2 啟動修正）、`3bfd15c`（0.5.3 補給）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
@@ -78,7 +80,7 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 
 ## P4 修訂已驗收（本輪實際輸出，2026-11-16）
 
-- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／59,904 bytes）。
+- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／60,416 bytes）。
 - `tools/Verify-Mods.ps1`：`RESULT: PASS`；CardCraft **7 個 patch**：
   `CfTryOpenLockPatch -> LockHelper.TryOpenLock`、
   `CfCrateTooltipPatch -> LockHelper.CreateLockerContainerTooltip`、
@@ -185,6 +187,11 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
   T3＝解鎖 `CF_FENCE_T3` 且聲望 ≥85；T2＝聲望 ≥60 或（≥30 且解鎖
   `CF_FENCE_THIEF_T2`）；兩者都不成立就不給 CF 箱。權重 SEC 32／MED 27／
   ENG 21／SER 20。全部 `isStolen: true`；不再改 `acceptRetailMarkup`。
+- **櫃台滿 fallback（0.5.4）**：前台原版 18×4、箱子 6×4，需要 6 個連續空欄；
+  箱子／卡匠貨物先 `GraphUtils.CanAccept(front, item)` 探測，放不下就
+  `GraphUtils.EmporiumTryAdd(backInvinvElement, item)`，不再被
+  `TryAddDirectSellingItemToTable` 的 `TryAcceptAllOrDestroy` 銷毀。
+  log：`[CF-THIEF]`／`[CF-STOCK] counter full, moved … to back inventory`。
 - **T3 箱**：`cf_*_box_t3`、9×8（CMD 10×8）、300／500、rolls 11/11/6/7/11；
   `CF_CRATE_TIER=3`、同一組 `LOCK_ID_*`、T3 卡可開。Loot 以 T2 池為底，
   加 T3 卡／核與最高價稀有物；model EV 3.9–4.5。
@@ -272,6 +279,9 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
   `[CF-NET] registered 4/4`，且沒有 `Init failed`。
 - **PRO 電池**：`energy_credit` 是原版 100 電／10 bandwidth；放進後台是否足夠
   印表機開機，未實機試。
+- **滿台 fallback 未實機**：`CanAccept` 探測後丟 `backInvinvElement` 只在離線
+  IL 驗過；實際 18×4 前台何時算滿、後台是否也滿、`EmporiumTryAdd` 落點，
+  都要看 `Player.log` 的 `counter full, moved …`。
 - **CMD 箱染色未實機**：深藍 `0.24/0.35/0.62` 的觀感、6×4 輪廓、`SetNativeSize`
   大小、解鎖 `cmd_box_u`、存讀檔重貼，全部只有 IL／字串核對。
 - **`ModLoader.Mods` 時序**：`OnEnable` 在 `Mods.Add` 之前，本輪用
@@ -309,7 +319,7 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
 
 ## 下一步
 
-1. 本輪 0.5.3（卡匠製卡週邊補給）已提交（`3bfd15c`，本機 commit、未 push）。
+1. 本輪 0.5.4（滿台 fallback）待提交；0.5.3 補給已在 `3bfd15c`。
 2. 人類實機跑 P4 修訂與 CMD 貼圖驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／
    `[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`，並補 T3 in-game `[CF-EV]`。
 3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
@@ -330,7 +340,7 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
   `CfInventorStock`、`CfInventorPatch`；0.5.1 新增 `CfCmdBoxSprite`；
   `CfNetwork` 縮成 4 個升級；`CfThiefBoxes` 只賣 T2/T3；
   `ItemFactory`／`LootTables` 擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.5.3）
+- `src/CardCraftAndFence/manifest.xml`（0.5.4）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、§3.10、§3.11、§3.12）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、

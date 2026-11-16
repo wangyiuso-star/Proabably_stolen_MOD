@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.3";
+        internal const string ModVersion = "0.5.4";
 
         public void Init(ModManifest manifest)
         {
@@ -2106,15 +2106,42 @@ namespace DeepSpaceQoL
         {
             try
             {
-                if (!PlayerStore.Instance.TryAddDirectSellingItemToTable(id))
+                // TryAddDirectSellingItemToTable destroys the item when the front
+                // counter rejects it, so probe first: a full counter must move the
+                // item to the back inventory, not lose it.
+                GameItem item = DirectoryMaster.Item(id);
+                if (item == null)
                 {
-                    Log.Warn("[CF-STOCK] counter full, skipped " + id);
+                    Log.Warn("[CF-STOCK] missing item " + id);
+                    return;
+                }
+                if (!GraphUtils.CanAccept(EmporiumEntry.Instance.frontInvinvElement, item))
+                {
+                    MoveToBack(item, id, false);
+                    return;
+                }
+                if (!PlayerStore.Instance.TryAddDirectSellingItemToTable(item, isOwend: false))
+                {
+                    // CanAccept was true, so this is a client-policy refusal
+                    // (e.g. a distrusted faction), not a full counter.
+                    Log.Warn("[CF-STOCK] refused by client policy, skipped " + id);
                 }
             }
             catch (Exception e)
             {
                 Log.Warn("[CF-STOCK] cannot offer " + id + ": " + e.GetType().Name + ": " + e.Message);
             }
+        }
+
+        internal static void MoveToBack(GameItem item, string id, bool stolen)
+        {
+            GeneralHelper.SetItemOwned(item, false);
+            if (stolen && PlayerStore.Instance.isStolenItemIntroduced)
+            {
+                StolenHelper.InitStolenItem(item, 0);
+            }
+            GraphUtils.EmporiumTryAdd(EmporiumEntry.Instance.backInvinvElement, item);
+            Log.Warn("[CF-STOCK] counter full, moved " + id + " to back inventory");
         }
     }
 
@@ -2334,6 +2361,20 @@ namespace DeepSpaceQoL
                 return;
             }
             // All families in the table are non-CMD, so every CF box is stolen.
+            // Probe first: TryAddDirectSellingItemToTable destroys the box if the
+            // front counter rejects it, and a 6x4 box needs six consecutive free
+            // columns on the vanilla 18x4 counter.
+            if (!GraphUtils.CanAccept(EmporiumEntry.Instance.frontInvinvElement, box))
+            {
+                GeneralHelper.SetItemOwned(box, false);
+                if (PlayerStore.Instance.isStolenItemIntroduced)
+                {
+                    StolenHelper.InitStolenItem(box, 0);
+                }
+                GraphUtils.EmporiumTryAdd(EmporiumEntry.Instance.backInvinvElement, box);
+                Log.Info("[CF-THIEF] counter full, moved " + id + " to back inventory");
+                return;
+            }
             bool added = PlayerStore.Instance.TryAddDirectSellingItemToTable(
                 box, isOwend: false, isStolen: true);
             if (!added)

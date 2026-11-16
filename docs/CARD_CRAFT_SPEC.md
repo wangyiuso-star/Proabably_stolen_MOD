@@ -704,6 +704,11 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
   做不出空白卡；CNC 與耗材也需要穩定來源。專業解序器與批量模組仍由博士賣（見下）。
 - T2／T3 的隨機抽選用遊戲 `RNG`；T3 卡與核同家族，方便直接拿去解序。
 - 全部 `isOwend: false`：玩家要付 `unitValue` 買；沒有額外 markup。
+- **櫃台放不下不銷毀**：前台是原版 18×4；櫃台滿（或形狀放不下）時，
+  貨物改丟 `GraphUtils.EmporiumTryAdd(backInvinvElement, item)`，
+  並印 `[CF-STOCK] counter full, moved <id> to back inventory`。
+  先 `GraphUtils.CanAccept(front, item)` 探測，避免
+  `TryAddDirectSellingItemToTable` 在失敗時把物品 `Destroy()`。
 
 ### §3.8.5 博士（`StoreClientList.CreateInventor`）庫存
 
@@ -721,7 +726,7 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - `[CF-MAKER] skip: already visited today day=…`
 - `[CF-MAKER] skip: CF_FENCE_PRO not unlocked`
 - `[CF-INVENTOR] stock desequencer+batch tier2=… tier3=…`
-- `[CF-STOCK] counter full, skipped …`（工匠／博士共用）
+- `[CF-STOCK] counter full, moved <id> to back inventory`（工匠／博士共用）
 
 ## §3.10 黑市與小偷（P4 只做第 2 項）
 
@@ -770,10 +775,18 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - 所有 CF 箱（只有 SEC／MED／ENG／SER）都 `isStolen: true`。
 - 售價 = 箱子的 `unitValue`（T2 225、T3 300），不加零售 markup。
 - CMD 箱不經過小偷，`isStolen` 的 CMD 例外不再適用。
+- **櫃台形狀限制**：原版前台是 **18×4**，箱子是 **6×4**，因此需要
+  **6 個連續空欄**才放得下；這是原版 `GameGridInventory` 的限制，不是本 MOD
+  造成的。放不下時**不銷毀**，改
+  `GraphUtils.EmporiumTryAdd(backInvinvElement, box)`，並印
+  `[CF-THIEF] counter full, moved <id> to back inventory`。
+  先 `GraphUtils.CanAccept(front, box)` 探測，避免
+  `TryAddDirectSellingItemToTable` 在失敗時把箱子 `Destroy()`。
 
 ### §3.10.5 診斷 log
 
 - `[CF-THIEF] box family=… tier=… id=… bm=… added=…`
+- `[CF-THIEF] counter full, moved <id> to back inventory`
 - `[CF-THIEF] skip: no T2/T3 box (bm=…)`（同原因只印一次）
 
 ## §3.11 Wild Network「CardFence」分頁（P4）
