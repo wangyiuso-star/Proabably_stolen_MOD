@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-16（0.6.1：核心改回 2 顆／day%5 連續 2 家族）
+更新時間：2026-11-16（0.6.2：博士住所 hook、小偷先放 CF 箱、patch 診斷 log）
 
 ## 階段
 
@@ -32,18 +32,22 @@
   `CountOwned(chip/cnc) < CountOwned(printer)` 時各補 1；材料 2+2、
   核心 2（最高等級、`day%5` 連續 2 家族）；不賣金屬模組。
   7–9 件、上限 11。博士固定只賣解序器＋批量模組；T1 CMD rare 也移除
-  `crypto_module_cmd`。
-  實機驗證（到訪、買賣、分頁、T3 fit、染色外觀、啟動、滿台 skip）尚未跑。
+  `crypto_module_cmd`。**0.6.2 博士住所／小偷順序**：
+  `OnPlaceInventorInventoryItemEarly` hook 在住所與特殊庫存都補兩件；
+  `CreateInventor`／`CreateInventorStorage` postfix 先印
+  `[CF-INVENTOR] client=… pro=…`；小偷改成先放 CF 箱、再跑原版庫存。
+  實機驗證（到訪、買賣、分頁、T3 fit、染色外觀、啟動、滿台 skip、
+  住所庫存）尚未跑。
   **P5（索耶）依指示未開。**
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.6.1 |
+| ModVersion | 0.6.2 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 57,856 bytes |
-| SHA256 | `23DA889D8494C7C29EB163003FBC5C1D7C42738E6D62FEBC8590A45EFDBF9A5D` |
+| 大小 | 58,880 bytes |
+| SHA256 | `84FF14E6149CC6ECA1EBA004B899204789F1558EF9D21993E15A8ACA18543BC7` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
 | git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
@@ -86,16 +90,17 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 
 ## P4 修訂已驗收（本輪實際輸出，2026-11-16）
 
-- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／57,856 bytes）。
-- `tools/Verify-Mods.ps1`：`RESULT: PASS`；CardCraft **7 個 patch**：
+- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／58,880 bytes）。
+- `tools/Verify-Mods.ps1`：`RESULT: PASS`；CardCraft **8 個 patch**：
   `CfTryOpenLockPatch -> LockHelper.TryOpenLock`、
   `CfCrateTooltipPatch -> LockHelper.CreateLockerContainerTooltip`、
   `CfCrateFillPatch -> DirectoryMaster.Item`、
   `CfPrinterBatchPatch -> MachinePrinter.FinishPrinting`、
   `CfSawyerHidePatch -> NetworkUpgrade.IsHiddenForRun`、
   `CfThiefPatch -> StoreClientList.CreateThief`、
-  `CfInventorPatch -> StoreClientList.CreateInventor`；無 banned API。
-- `tools/Probe-Patches.ps1`：`patched 8 / 4 / 7`，`RESULT: PASS`。
+  `CfInventorPatch -> StoreClientList.CreateInventor`、
+  `CfInventorStoragePatch -> StoreClientList.CreateInventorStorage`；無 banned API。
+- `tools/Probe-Patches.ps1`：`patched 8 / 4 / 8`，`RESULT: PASS`。
 - `tools/Probe-Logic.ps1`：CardCraft scan `refused=False capabilities=[] findings=0`，PASS。
 - 動作指令註記：本機沒有 PowerShell 7，`pwsh` 不在 PATH，四條指令實際以
   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\…` 執行（同一腳本、
@@ -261,6 +266,34 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
 `cf_crypto_module_<family>_t3`，舊錯序 id 保留 alias。`.scratch/idcheck`
 改成「T3 卡在 loot、T3 核不在 loot」，`ID CHECK: PASS`。
 
+## 0.6.2 博士住所／小偷順序
+
+**博士住所**：
+
+- `OnEnable` 訂閱 `ModHook.OnPlaceInventorInventoryItemEarly` →
+  `CfInventorStock.OnInventorCounter`；`OnDisable` `-=`。
+- `OnInventorCounter(List<GameItem> owned)`：PRO 未解鎖 return；否則
+  `PlayerStore.Instance.TryAddDirectSellingItemToTable` 各放一件
+  `cf_pro_desequencer`、`cf_batch_card_module`。
+- 回 false 只印 `[CF-INVENTOR] counter full, skipped <id>`；不 Destroy、
+  不丟後台、不進玩家背包。
+- hook 在 `PlaceInventorInventory` 與 `PlaceInventorSpecialStock` 都會觸發，
+  所以特殊庫存日也有兩件。
+- `CfInventorPatch`（CreateInventor）與 `CfInventorStoragePatch`
+  （CreateInventorStorage）postfix 一進來都印
+  `[CF-INVENTOR] client=<identifier> pro=<bool>`。
+  Storage patch **只 log 不 Attach**，住所庫存由 hook 負責，避免同一批加兩次。
+- 原本 `CreateInventor` 的 Attach 保留（博士臨時來店裡）。
+
+**小偷順序**：
+
+- `CfThiefBoxes.Attach` 的 endAction 改成 **`Offer()` 先、原版 `original()` 後**。
+- 6×4 箱需要 6 個連續空欄；原版先鋪會讓箱子幾乎永遠 `counter full, skipped`。
+- 若原版商品被擠掉，這是**刻意取捨**，spec §3.10.1／§3.10.4 已註明。
+- 兩個 try/catch 分開：Offer 失敗不會阻止原版庫存執行。
+
+Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
+
 ## P4 修訂實作要點（詳見 spec §3.8／§3.10／§3.11）
 
 - **升級只剩 4 個**：`CF_FENCE_PRO` 1500（無前置）、`CF_FENCE_T2` 1200
@@ -303,7 +336,8 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
 | 1 | 買 `CF_FENCE_PRO` | 後台多印表機／晶片／CNC／電子×2／耗材×2／`energy_credit` 電池×1（`[CF-NET] PRO kit granted …+battery`）；製卡匠下次 `GenerateClient` 到訪（`gate=catchup`） |
 | 2 | 每週第 6 天 | 製卡匠再訪（`gate=weekly`）；同一天不重複 |
 | 3 | 製卡匠買賣 | printer×1；chip／CNC 只在擁有數 < printer 數時各補 1；電子×2／plastic×2＋2 顆核心（最高等級、`day%5` 連續 2 家族）；7–9 件、上限 11；不賣 metal、不賣卡 |
-| 4 | 遇博士 | `[CF-INVENTOR] stock desequencer+batch`；前台固定只有專業解序器與批量模組 |
+| 4 | 遇博士 | `[CF-INVENTOR] client=… pro=…`；前台固定只有專業解序器與批量模組；住所 hook 另有 `[CF-INVENTOR] counter …` |
+| 4b | 晚上博士住所 | 櫃台多 `cf_pro_desequencer`＋`cf_batch_card_module`；log 有 `client=…` 與 `counter …`（或 `counter full, skipped`） |
 | 5 | 黑市聲望 <30 遇小偷 | 沒有 CF 箱（只有原版 thief 貨） |
 | 6 | 聲望 ≥60 或（≥30＋`CF_FENCE_THIEF_T2`） | 小偷給 1 個 T2 箱（SEC/MED/ENG/SER） |
 | 7 | 解鎖 `CF_FENCE_T3` + 聲望 ≥85 | 小偷給 1 個 T3 箱；用 T3 卡可開 |
@@ -373,9 +407,14 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
   `[CF-NET] registered 4/4`，且沒有 `Init failed`。
 - **PRO 電池**：`energy_credit` 是原版 100 電／10 bandwidth；放進後台是否足夠
   印表機開機，未實機試。
-- **滿台 fallback 未實機**：`CanAccept` 探測後丟 `backInvinvElement` 只在離線
-  IL 驗過；實際 18×4 前台何時算滿、後台是否也滿、`EmporiumTryAdd` 落點，
-  都要看 `Player.log` 的 `counter full, moved …`。
+- **滿台 skip 未實機**：`CanAccept` 後 `Destroy()`＋`skipped` 只在離線 IL
+  驗過；實際 18×4 何時算滿、小偷先放 CF 箱後原版商品是否被擠掉，
+  都要看 `Player.log` 的 `counter full, skipped …`。
+- **博士住所 hook 未實機**：`OnPlaceInventorInventoryItemEarly` 是否在
+  `PlaceInventorInventory`／`PlaceInventorSpecialStock` 都觸發、`owned` 數量、
+  `TryAddDirectSellingItemToTable` 放不下時是否真的 skip，尚未看 log。
+- **CreateInventorStorage patch 只 log**：確認 client identifier 用；住所庫存
+  由 hook 加，避免 storage patch 再 Attach 造成重複。
 - **CMD 箱染色未實機**：深藍 `0.24/0.35/0.62` 的觀感、6×4 輪廓、`SetNativeSize`
   大小、解鎖 `cmd_box_u`、存讀檔重貼，全部只有 IL／字串核對。
 - **`ModLoader.Mods` 時序**：`OnEnable` 在 `Mods.Add` 之前，本輪用
@@ -418,8 +457,8 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
 
 ## 下一步
 
-1. 本輪 0.6.1（核心 2 顆／day%5 連續 2 家族）已提交
-   （`6a3387e`，本機 commit、未 push）。
+1. 本輪 0.6.2（博士住所 hook／小偷順序）待提交；
+   0.6.1 的 2 核心在 `6a3387e`。
 2. 人類實機跑 P4 修訂與 CMD 貼圖驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／
    `[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`，並補 T3 in-game `[CF-EV]`。
 3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
@@ -440,7 +479,7 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
   `CfInventorStock`、`CfInventorPatch`；0.5.1 新增 `CfCmdBoxSprite`；
   `CfNetwork` 縮成 4 個升級；`CfThiefBoxes` 只賣 T2/T3；
   `ItemFactory`／`LootTables` 擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.6.1）
+- `src/CardCraftAndFence/manifest.xml`（0.6.2）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、§3.10、§3.11、§3.12）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、

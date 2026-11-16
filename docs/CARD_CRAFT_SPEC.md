@@ -623,12 +623,28 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - **批量模組是 per-machine**：只有插了模組的那台 batch = 2；其他台仍是 1。
   同一台插兩張模組不會變 3／4，`BatchSize` 上限就是 2（第二張不生效）。
 
-### §3.8.5 博士（`StoreClientList.CreateInventor`）庫存
+### §3.8.5 博士（住所 hook + 臨時店 patch）
 
-- Postfix 包住 `CreateInventor` 最後一句對話的 `endAction`，先跑原版 `endAction`
-  （若有），再上架：
-  - `CF_FENCE_PRO`：`cf_pro_desequencer`（800）、`cf_batch_card_module`（250）。
-- **每次來訪固定這兩件**，不再抽 T2／T3 卡或核；博士不是核心來源。
+**兩條路並存**，都是固定 `cf_pro_desequencer`（800）＋
+`cf_batch_card_module`（250），不抽 T2/T3 卡核：
+
+1. **住所**：`OnEnable` 訂閱
+   `ModHook.OnPlaceInventorInventoryItemEarly += CfInventorStock.OnInventorCounter`，
+   `OnDisable` 取消。`PlaceInventorInventory` 與 `PlaceInventorSpecialStock`
+   都會觸發，所以特殊庫存日也有兩件。
+   - `OnInventorCounter(List<GameItem> owned)`：PRO 未解鎖就 return；
+     否則呼叫 `PlayerStore.Instance.TryAddDirectSellingItemToTable(id)`。
+   - 回 false 只印 `[CF-INVENTOR] counter full, skipped <id>`；
+     **不手動 Destroy、不丟後台、不進玩家背包**。
+2. **博士臨時來店裡**：`CfInventorPatch` postfix 包 `CreateInventor` 最後一句
+   `endAction`，先跑原版再上架同兩件。
+3. **`CreateInventorStorage`**：另有 `CfInventorStoragePatch` postfix，只印
+   `[CF-INVENTOR] client=inventorStorage pro=…`；住所庫存由 hook 負責，
+   不在 storage patch 再 Attach，避免同一批加兩次。
+4. 進入 patch 一律先印
+   `[CF-INVENTOR] client=<identifier> pro=<bool>`，用來確認 patch 命中與
+   client 種類。
+
 - 兩件都 `isOwend: false`，售價 = `unitValue`；PRO 未解鎖時不賣。
 
 ### §3.8.6 診斷 log
@@ -636,8 +652,10 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - `[CF-MAKER] visit day=… gate=weekly|catchup stock=fixed,materials,cores,t2,t3`
 - `[CF-MAKER] skip: already visited today day=…`
 - `[CF-MAKER] skip: CF_FENCE_PRO not unlocked`
-- `[CF-INVENTOR] stock desequencer+batch`
-- `[CF-STOCK] counter full, skipped <id>`（工匠／博士共用）
+- `[CF-INVENTOR] client=<identifier> pro=<bool>`（CreateInventor／Storage postfix）
+- `[CF-INVENTOR] counter desequencer=<bool> batch=<bool> owned=<n>`
+- `[CF-INVENTOR] counter full, skipped <id>`（住所 hook 放不下）
+- `[CF-STOCK] counter full, skipped <id>`（僅卡匠貨架）
 
 ## §3.10 黑市與小偷（P4 只做第 2 項）
 
@@ -645,8 +663,10 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 ### §3.10.1 觸發
 
-- 掛在 `StoreClientList.CreateThief` 的 postfix：走完原版 thief 對話的
-  `endAction` 後，**最多再給 1 個 CF 分級箱**（原版 thief 的雜物／原版箱照舊）。
+- 掛在 `StoreClientList.CreateThief` 的 postfix：**先放 1 個 CF 分級箱，
+  再跑原版 `endAction`**。
+- 這樣 6×4 箱一定先拿到六個連續空欄；若原版 thief 商品因此被擠掉，
+  是**刻意取捨**（櫃台 18×4，原版先鋪會讓箱子永遠 `counter full, skipped`）。
 - 每次 thief 到訪只給 1 箱；不因 `GetBMRepStockMult()` 增加數量。
 - **T1 一律不加**：原版 thief 已經會賣 T1 箱，CF 這條只補 T2／T3。
 - **永不給 CMD 箱**：小偷的家族池只有 SEC／MED／ENG／SER。
@@ -691,6 +711,8 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
   造成的。**櫃台滿＝該件本次不販售**：先 `GraphUtils.CanAccept(front, box)`
   探測，放不下就 `Destroy()`＋`[CF-THIEF] counter full, skipped <id>`，
   不進後台、不進玩家背包。
+- **先 CF 箱、再原版庫存**：若原版 thief 商品因此被擠掉，這是刻意取捨；
+  CF 箱需要 6 個連續空欄，原版先鋪會讓箱子幾乎永遠放不下。
 
 ### §3.10.5 診斷 log
 

@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.6.1";
+        internal const string ModVersion = "0.6.2";
 
         public void Init(ModManifest manifest)
         {
@@ -37,6 +37,8 @@ namespace DeepSpaceQoL
             // -= before += so a mod reload cannot subscribe the handler twice.
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
             ModHook.OnGenerateCustomerVeryLate += CfRetiredCardmaker.OnGenerateCustomerVeryLate;
+            ModHook.OnPlaceInventorInventoryItemEarly -= CfInventorStock.OnInventorCounter;
+            ModHook.OnPlaceInventorInventoryItemEarly += CfInventorStock.OnInventorCounter;
             ModHook.OnGameLoadedLate -= CfNetwork.OnGameLoadedLate;
             ModHook.OnGameLoadedLate += CfNetwork.OnGameLoadedLate;
             ModHook.OnNewGameStarted -= CfNetwork.OnNewGameStarted;
@@ -54,6 +56,7 @@ namespace DeepSpaceQoL
         public void OnDisable()
         {
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
+            ModHook.OnPlaceInventorInventoryItemEarly -= CfInventorStock.OnInventorCounter;
             ModHook.OnGameLoadedLate -= CfNetwork.OnGameLoadedLate;
             ModHook.OnNewGameStarted -= CfNetwork.OnNewGameStarted;
             ModHook.OnGameLoadedLate -= CfCmdBoxSprite.OnGameLoadedLate;
@@ -2318,17 +2321,27 @@ namespace DeepSpaceQoL
             Action original = last.endAction;
             last.endAction = delegate
             {
+                // CF box first: a 6x4 box needs six consecutive free columns.
+                // Vanilla stock placed first would fill the 18x4 counter and the
+                // box would almost always be skipped.
+                try
+                {
+                    Offer();
+                }
+                catch (Exception e)
+                {
+                    Log.Error("[CF-THIEF] box offer failed: " + e.GetType().Name + ": " + e.Message);
+                }
                 try
                 {
                     if (original != null)
                     {
                         original();
                     }
-                    Offer();
                 }
                 catch (Exception e)
                 {
-                    Log.Error("[CF-THIEF] box offer failed: " + e.GetType().Name + ": " + e.Message);
+                    Log.Error("[CF-THIEF] vanilla stock failed: " + e.GetType().Name + ": " + e.Message);
                 }
             };
         }
@@ -2414,6 +2427,35 @@ namespace DeepSpaceQoL
     /// </summary>
     internal static class CfInventorStock
     {
+        // House path: fires from PlaceInventorInventory and
+        // PlaceInventorSpecialStock before vanilla stock is placed.
+        internal static void OnInventorCounter(List<GameItem> owned)
+        {
+            if (!CfNetwork.Unlocked(CfNetwork.Pro) || PlayerStore.Instance == null)
+            {
+                return;
+            }
+            AddCounterStock(owned == null ? 0 : owned.Count);
+        }
+
+        internal static void AddCounterStock(int ownedCount)
+        {
+            bool desequencer = PlayerStore.Instance.TryAddDirectSellingItemToTable(
+                "cf_pro_desequencer");
+            bool batch = PlayerStore.Instance.TryAddDirectSellingItemToTable(
+                "cf_batch_card_module");
+            if (!desequencer)
+            {
+                Log.Warn("[CF-INVENTOR] counter full, skipped cf_pro_desequencer");
+            }
+            if (!batch)
+            {
+                Log.Warn("[CF-INVENTOR] counter full, skipped cf_batch_card_module");
+            }
+            Log.Info("[CF-INVENTOR] counter desequencer=" + desequencer
+                + " batch=" + batch + " owned=" + ownedCount);
+        }
+
         internal static void Attach(StoreClient client)
         {
             if (client == null || !CfNetwork.Unlocked(CfNetwork.Pro))
@@ -2441,9 +2483,7 @@ namespace DeepSpaceQoL
                     }
                     // Fixed every visit: the only two card-craft machines the
                     // doctor sells. Cards/cores are not his stock anymore.
-                    CfCardStock.AddStock("cf_pro_desequencer");
-                    CfCardStock.AddStock("cf_batch_card_module");
-                    Log.Info("[CF-INVENTOR] stock desequencer+batch");
+                    AddCounterStock(0);
                 }
                 catch (Exception e)
                 {
@@ -2458,7 +2498,22 @@ namespace DeepSpaceQoL
     {
         private static void Postfix(StoreClient __result)
         {
+            string id = __result == null ? "<null>" : __result.identifier;
+            Log.Info("[CF-INVENTOR] client=" + id + " pro=" + CfNetwork.Unlocked(CfNetwork.Pro));
             CfInventorStock.Attach(__result);
+        }
+    }
+
+    // Dr. Jackson's house uses the storage client. The house stock itself comes
+    // from ModHook.OnPlaceInventorInventoryItemEarly; this patch only confirms
+    // which client the game created, otherwise Attach would add a second pair.
+    [HarmonyPatch(typeof(StoreClientList), nameof(StoreClientList.CreateInventorStorage))]
+    internal static class CfInventorStoragePatch
+    {
+        private static void Postfix(StoreClient __result)
+        {
+            string id = __result == null ? "<null>" : __result.identifier;
+            Log.Info("[CF-INVENTOR] client=" + id + " pro=" + CfNetwork.Unlocked(CfNetwork.Pro));
         }
     }
 
