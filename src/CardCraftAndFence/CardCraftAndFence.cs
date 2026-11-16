@@ -18,7 +18,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.7.2";
+        internal const string ModVersion = "0.7.3";
 
         public void Init(ModManifest manifest)
         {
@@ -3000,9 +3000,11 @@ namespace DeepSpaceQoL
             return true;
         }
 
-        // Desaturate then tint, so the original highlights/shadows survive. Do
-        // not multiply the RGB directly: that turns black outlines black-blue and
-        // loses the box's light structure.
+        // Tint the painted body but keep the crate's neutral rim/highlights white.
+        // A plain tint*luminance collapses the metal edges into the body blue, so
+        // the whole crate reads as one flat blue box (reported in game). Bright,
+        // low-saturation pixels are the vanilla white rim; blend those to white,
+        // keep saturated body pixels blue, and let dark outlines stay deep blue.
         private static Sprite Colorize(Sprite source, Color tint)
         {
             Rect rect = source.rect;
@@ -3028,7 +3030,19 @@ namespace DeepSpaceQoL
             {
                 Color c = pixels[i];
                 float lum = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
-                pixels[i] = new Color(tint.r * lum, tint.g * lum, tint.b * lum, c.a);
+                float max = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+                float min = Mathf.Min(c.r, Mathf.Min(c.g, c.b));
+                // Saturated pixels are the painted body; neutral bright pixels are
+                // the vanilla crate's white rim. Blend the latter toward white.
+                float neutral = 1f - Mathf.Clamp01((max - min) * 8f);
+                float highlight = Mathf.Clamp01((lum - 0.62f) / 0.30f) * neutral;
+                float shade = 0.32f + 0.68f * lum;
+                float white = highlight * 0.92f;
+                pixels[i] = new Color(
+                    Mathf.Lerp(tint.r * shade, 1f, white),
+                    Mathf.Lerp(tint.g * shade, 1f, white),
+                    Mathf.Lerp(tint.b * shade, 1f, white),
+                    c.a);
             }
             Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
             texture.filterMode = FilterMode.Point;

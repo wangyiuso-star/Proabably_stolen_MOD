@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-17（0.7.2：P5 容量與填充修訂——SEC T3／CMD T3／CMD T2）
+更新時間：2026-11-17（0.7.3：CMD 箱染色保留白邊；0.7.2 容量與填充見下）
 
 ## 階段
 
@@ -58,13 +58,16 @@
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.7.2 |
+| ModVersion | 0.7.3 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
 | 大小 | 75,264 bytes |
-| SHA256 | `CBB1EEFCD1DFA9FB6867CB184A29C794D79AF5548EE446E1299BBA12C483F19F` |
+| SHA256 | `EE4843898E281EB0F4721915551827CAA033BBD5503BDB42ED033CDAC22FE077` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
-| dist / Mods hash | 尚未同步（Mods 仍是 0.6.2 的 58,880 bytes／`84FF14E6…`，P5 未覆蓋） |
+| dist / Mods hash | 尚未同步（Mods 仍是 0.7.2 的 75,264 bytes／`CBB1EEFC…`；0.7.3 請重新複製） |
 | git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+
+> **0.7.3**：只改 §3.12 的 `Colorize`——暗部染 `CmdBlue`、亮部中性色（原版白邊）
+> 轉白，讓 CMD 箱不再整顆糊成一片藍。索耶、容量、掉寶池、patch 數全部不動。
 
 ## P3 實機驗證（2026-11-16，Player.log 逐行）
 

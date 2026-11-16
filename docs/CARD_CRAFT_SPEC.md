@@ -1086,7 +1086,8 @@ Error: NullReferenceException ... at CardCraftAndFenceMod.OnEnable () [0x000a]
 
 ## §3.12 CMD 箱貼圖＝執行期染色（0.5.1）
 
-CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期去色再染成指揮卡的深藍，
+CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期把暗部染成指揮卡的深藍、
+亮部保留原版箱的白邊，
 註冊成本 MOD 自帶的 `cmd_box`／`cmd_box_u`，再由 `SetSpriteAndShapeFromMod` 使用。
 輪廓（6×4 格）、alpha 與明暗結構都跟原版治安箱一致。
 
@@ -1106,9 +1107,11 @@ CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期去色
 - 取子區域：`Rect r = src.rect;` →
   `src.texture.GetPixels((int)r.x, (int)r.y, (int)r.width, (int)r.height)`；
   不要拿整張 atlas。
-- 逐像素：`lum = 0.299r + 0.587g + 0.114b`；
-  `out = (tint.r*lum, tint.g*lum, tint.b*lum, a)`（去色再上色，保留明暗；
-  不是直接把 RGB 乘藍色）。
+- 逐像素：`lum = 0.299r + 0.587g + 0.114b`、
+  `sat = max(r,g,b) - min(r,g,b)`、`neutral = 1 - clamp01(sat*8)`；
+  `highlight = clamp01((lum-0.62)/0.30) * neutral`、`shade = 0.32 + 0.68*lum`；
+  `out = lerp(tint*shade, white, highlight*0.92)`（暗部藍、亮部中性色轉白；
+  0.7.3 起，保留原版治安箱的白邊）。
 - `new Texture2D(w, h, TextureFormat.RGBA32, false)`、`filterMode = Point`、
   `wrapMode = Clamp`、`SetPixels` + `Apply`；
   `Sprite.Create(tex, new Rect(0,0,w,h), new Vector2(0.5f,0.5f), 100f)`。
