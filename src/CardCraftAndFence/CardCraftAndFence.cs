@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.7";
+        internal const string ModVersion = "0.5.8";
 
         public void Init(ModManifest manifest)
         {
@@ -2049,33 +2049,24 @@ namespace DeepSpaceQoL
             CardFamily.CMD
         };
 
-        // The cardmaker's whole visit is 10 items: 3 fixed supplies, 4 materials
-        // and 3 randomly drawn cards/cores from the unlocked tiers. The trade
-        // panel buys the whole batch, so 18 items would force a 5000+ purchase;
-        // vanilla retired merchants carry 5-8.
-        internal static void AddMakerStock()
+        // Hard cap 10 items: 5 fixed supplies + 5 cores (one per family). The
+        // printer is not sold here; CF_FENCE_PRO already hands it over. Cores
+        // are no longer in any T2/T3 loot table, so this is their only stable
+        // source. The material list is 6 units on paper; plastic is trimmed to
+        // one to keep the cap at 10.
+        internal static void AddMakerStock(int day)
         {
             List<string> ids = new List<string>();
-            if (CfNetwork.Unlocked(CfNetwork.Pro))
-            {
-                ids.Add("printer");
-            }
             ids.Add(ItemFactory.BlankKeycardChipId);
-            ids.Add(RNG.GetRandomInt(0, 1) == 0 ? "printer_module_cnc" : "printer_module_metal");
+            ids.Add("printer_module_cnc");
             ids.Add("common_electronic");
             ids.Add("common_electronic");
-            ids.Add("printer_plastic");
             ids.Add("printer_plastic");
 
-            // Cores are no longer in any T2/T3 loot table, so the cardmaker is
-            // their only stable source: one of each family for every unlocked
-            // tier. They are fixed, never randomly dropped from the shelf.
-            foreach (int tier in UnlockedTiers())
+            int coreTier = RotatingCoreTier(day);
+            foreach (CardFamily family in AllFamilies)
             {
-                foreach (CardFamily family in AllFamilies)
-                {
-                    ids.Add(ItemFactory.CryptoModuleId(family, tier));
-                }
+                ids.Add(ItemFactory.CryptoModuleId(family, coreTier));
             }
             foreach (string id in ids)
             {
@@ -2083,9 +2074,12 @@ namespace DeepSpaceQoL
             }
         }
 
-        private static List<int> UnlockedTiers()
+        // Both T2 and T3 unlocked: day % 2 picks the tier. Only one unlocked:
+        // that tier. Neither: T1 (PRO without a card-tier upgrade still gets a
+        // stable core shelf).
+        private static int RotatingCoreTier(int day)
         {
-            List<int> tiers = new List<int> { 1 };
+            List<int> tiers = new List<int>();
             if (CfNetwork.Unlocked(CfNetwork.Tier2))
             {
                 tiers.Add(2);
@@ -2094,16 +2088,19 @@ namespace DeepSpaceQoL
             {
                 tiers.Add(3);
             }
-            return tiers;
+            if (tiers.Count == 0)
+            {
+                return 1;
+            }
+            return tiers[Math.Abs(day) % tiers.Count];
         }
 
         internal static void AddStock(string id)
         {
             try
             {
-                // TryAddDirectSellingItemToTable destroys the item when the front
-                // counter rejects it, so probe first: a full counter must move the
-                // item to the back inventory, not lose it.
+                // Never move shop stock into any player/store inventory. A full
+                // front counter means this unit is simply not for sale this visit.
                 GameItem item = DirectoryMaster.Item(id);
                 if (item == null)
                 {
@@ -2112,7 +2109,8 @@ namespace DeepSpaceQoL
                 }
                 if (!GraphUtils.CanAccept(EmporiumEntry.Instance.frontInvinvElement, item))
                 {
-                    MoveToBack(item, id, false);
+                    item.Destroy();
+                    Log.Warn("[CF-STOCK] counter full, skipped " + id);
                     return;
                 }
                 if (!PlayerStore.Instance.TryAddDirectSellingItemToTable(item, isOwend: false))
@@ -2128,16 +2126,6 @@ namespace DeepSpaceQoL
             }
         }
 
-        internal static void MoveToBack(GameItem item, string id, bool stolen)
-        {
-            GeneralHelper.SetItemOwned(item, false);
-            if (stolen && PlayerStore.Instance.isStolenItemIntroduced)
-            {
-                StolenHelper.InitStolenItem(item, 0);
-            }
-            GraphUtils.EmporiumTryAdd(EmporiumEntry.Instance.backInvinvElement, item);
-            Log.Warn("[CF-STOCK] counter full, moved " + id + " to back inventory");
-        }
     }
 
     /// <summary>
@@ -2242,9 +2230,9 @@ namespace DeepSpaceQoL
         // card/core list; T2/T3 upgrades widen it.
         private static void StockUp()
         {
-            // One fixed 10-item batch, re-rolled every visit. No paging, no
-            // per-family dump: the trade panel buys the whole table at once.
-            CfCardStock.AddMakerStock();
+            // One fixed 10-item batch per visit. No paging, no per-family dump:
+            // the trade panel buys the whole table at once.
+            CfCardStock.AddMakerStock(StoreStation.Instance.dayCounter);
         }
 
         private static string StockSummary()
@@ -2355,13 +2343,8 @@ namespace DeepSpaceQoL
             // columns on the vanilla 18x4 counter.
             if (!GraphUtils.CanAccept(EmporiumEntry.Instance.frontInvinvElement, box))
             {
-                GeneralHelper.SetItemOwned(box, false);
-                if (PlayerStore.Instance.isStolenItemIntroduced)
-                {
-                    StolenHelper.InitStolenItem(box, 0);
-                }
-                GraphUtils.EmporiumTryAdd(EmporiumEntry.Instance.backInvinvElement, box);
-                Log.Info("[CF-THIEF] counter full, moved " + id + " to back inventory");
+                box.Destroy();
+                Log.Info("[CF-THIEF] counter full, skipped " + id);
                 return;
             }
             bool added = PlayerStore.Instance.TryAddDirectSellingItemToTable(
@@ -2569,13 +2552,12 @@ namespace DeepSpaceQoL
             });
             Register(RareId(CardFamily.CMD, 1), new (string, float)[]
             {
-                ("cmd_keycard", 30f),
-                ("crypto_module_cmd", 20f),
+                ("cmd_keycard", 25f),
                 ("stun_gun", 15f),
                 ("glock_receiver", 10f),
                 ("smg", 10f),
-                ("shotgun", 5f),
-                ("current_converter", 10f)
+                ("shotgun", 20f),
+                ("current_converter", 20f)
             });
 
             Register(CommonId(CardFamily.CMD, 2), new (string, float)[]

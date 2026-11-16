@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-16（0.5.7：箱子不再掉核心、T2/T3 價值地板池、核心固定供貨）
+更新時間：2026-11-16（0.5.8：滿台不再進背包、卡匠 10 件核心輪換、T1 CMD 也不掉核心）
 
 ## 階段
 
@@ -24,23 +24,24 @@
   4 個升級改在 `OnGameLoadedLate`／`OnNewGameStarted` 註冊，OnEnable 只設分頁標籤。
   PRO 工具包另加 `energy_credit`（100 電）。
   **0.5.3 製卡匠補給**：PRO 後每次到訪都上架製卡週邊，避免自訂晶片遺失後
-  無法再生產。**0.5.4 櫃台滿**：箱子／貨物先 `CanAccept` 探測，放不下就
-  `EmporiumTryAdd(backInvinvElement)`，不再被 `TryAddDirectSellingItemToTable`
-  銷毀。**0.5.7 核心／地板**：T2/T3 箱移除全部核心；common 改成
+  無法再生產。**0.5.8 櫃台滿**：箱子／貨物先 `CanAccept` 探測，放不下就
+  `Destroy()`＋`skipped` log，**不進後台、不進玩家背包**。
+  **0.5.7 核心／地板**：T2/T3 箱移除全部核心；common 改成
   T2 `value>=60`、T3 `value>=120` 的同家族主題池，rare 只放高階卡＋最高價
-  裝備。卡匠改成固定供核心（每個已解鎖等級 × 五家族各 1）＋機器／晶片／材料；
-  博士固定只賣解序器＋批量模組。實機驗證（到訪、買賣、分頁、T3 fit、
-  染色外觀、啟動、滿台 fallback、核心供貨）尚未跑。
+  裝備。**0.5.8 卡匠 10 件**：5 固定（晶片／CNC／電子×2／plastic×1）＋
+  5 核心（五家族各 1，`day%2` 輪換 T2/T3）；不賣印表機／金屬模組。
+  博士固定只賣解序器＋批量模組；T1 CMD rare 也移除 `crypto_module_cmd`。
+  實機驗證（到訪、買賣、分頁、T3 fit、染色外觀、啟動、滿台 skip）尚未跑。
   **P5（索耶）依指示未開。**
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.5.7 |
+| ModVersion | 0.5.8 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
 | 大小 | 57,856 bytes |
-| SHA256 | `F5465D66E8E842FA56D289907511A6C1428507EEE340E4B2940C58184B273056` |
+| SHA256 | `74563DF668BA53D5092078B59E8293242A064C5FBE075AC21C6857798BF9D908` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
 | git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
@@ -206,13 +207,13 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
   - `MED core t3 = cf_crypto_module_med_t3`、`CMD core t3 = cf_crypto_module_cmd_t3`；
   - `BuildCryptoModule` 用 `RequireCardTier`、沒有 `RequireTier2`；`ID CHECK: PASS`。
 
-## 0.5.7 價值地板／核心供貨
+## 0.5.7 價值地板／0.5.8 核心供貨
 
 三件事一起做：
 
 1. **箱子不再掉核心**：5 張 T2 + 5 張 T3 loot 表移除所有
-   `crypto_module_*`／`cf_crypto_module_*`。T1 CMD 箱的
-   `crypto_module_cmd` 不在這 10 張內，維持原樣。
+   `crypto_module_*`／`cf_crypto_module_*`；0.5.8 也把 T1 CMD rare 的
+   `crypto_module_cmd` 移除，現在 11 張 cf 表都不掉核心。
 2. **價值地板**：
    - T2 common 只收 `unitValue >= 60`；T3 common 只收 `>= 120`；
      低價繃帶／止痛藥／廢金屬／種子全部移除。
@@ -235,12 +236,14 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
 
    T2 全部 3.6–3.9，且都 >= 同家族 T1 + 0.2（MED +0.226、CMD +0.288）；
    T3 全部 3.9–4.5。200 樣本離線模擬誤差 -3.12%～+0.86%。
-3. **核心穩定供貨**：
-   - 卡匠：固定 7 件機器／晶片／材料 + 每個已解鎖等級 × 五家族核心各 1
-     （T1 12 件、T2 17 件、T3 22 件）；核心不隨機抽掉，取消 0.5.5 的 10 件上限。
+3. **核心穩定供貨（0.5.8 修訂）**：
+   - 卡匠硬上限 10 件：5 固定（晶片、CNC、電子×2、plastic×1）＋
+     5 核心（五家族各 1，`day%2` 在已解鎖 T2/T3 間輪換；只有一邊就用那一邊，
+     都沒解鎖退回 T1）。不賣印表機／金屬模組。
    - 博士：PRO 後固定只賣 `cf_pro_desequencer` + `cf_batch_card_module`；
      不再抽 T2/T3 卡核。
    - 卡匠／博士都不再賣卡；卡只從箱子 rare／小偷箱來。
+   - T1 CMD rare 也移除 `crypto_module_cmd`（0.5.8），與「箱子不掉核心」一致。
 
 **0.5.6 的 T3 核 id 修正仍然有效**：`CryptoModuleId(...,3)` 現在是
 `cf_crypto_module_<family>_t3`，舊錯序 id 保留 alias。`.scratch/idcheck`
@@ -256,10 +259,9 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
   同時解鎖製卡匠到訪。
 - **製卡匠**：掛 `OnGenerateCustomerVeryLate`；`dayCounter % 7 == 6` 每週一次，
   PRO 首次解鎖後補訪一次；`maker_last_day` 存在存檔 modData。
-  **固定供貨**：printer（PRO）、空白卡晶片、CNC 或 metal 模組（隨機 1）、
-  電子×2、耗材×2，加上「每個已解鎖等級 × 五家族」的核心各 1 個
-  （T1 12 件／T2 17 件／T3 22 件）；不隨機抽掉核心、同日不重複、不做翻頁。
-  不賣箱子／卡；解序器與批量模組由博士固定賣。
+  **固定 10 件**：晶片、CNC、電子×2、plastic×1，加上五家族核心各 1
+  （`day%2` 在已解鎖 T2/T3 間輪換）；不賣 printer／metal、不賣箱／卡，
+  同日不重複、不做翻頁。解序器與批量模組由博士固定賣。
 - **博士**：`CfInventorPatch` postfix 包 `StoreClientList.CreateInventor` 最後一句
   對話的 `endAction`（先跑原版）；PRO 後**固定只賣** `cf_pro_desequencer` 與
   `cf_batch_card_module`，不再抽 T2／T3 卡核。
@@ -267,11 +269,10 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
   T3＝解鎖 `CF_FENCE_T3` 且聲望 ≥85；T2＝聲望 ≥60 或（≥30 且解鎖
   `CF_FENCE_THIEF_T2`）；兩者都不成立就不給 CF 箱。權重 SEC 32／MED 27／
   ENG 21／SER 20。全部 `isStolen: true`；不再改 `acceptRetailMarkup`。
-- **櫃台滿 fallback（0.5.4）**：前台原版 18×4、箱子 6×4，需要 6 個連續空欄；
-  箱子／卡匠貨物先 `GraphUtils.CanAccept(front, item)` 探測，放不下就
-  `GraphUtils.EmporiumTryAdd(backInvinvElement, item)`，不再被
-  `TryAddDirectSellingItemToTable` 的 `TryAcceptAllOrDestroy` 銷毀。
-  log：`[CF-THIEF]`／`[CF-STOCK] counter full, moved … to back inventory`。
+- **櫃台滿 skip（0.5.8）**：前台原版 18×4、箱子 6×4，需要 6 個連續空欄；
+  箱子／卡匠／博士貨物先 `GraphUtils.CanAccept(front, item)` 探測，放不下就
+  `Destroy()`＋`[CF-THIEF]`／`[CF-STOCK] counter full, skipped <id>`，
+  **不進後台、不進玩家背包**；該件本次不販售。
 - **T3 箱**：`cf_*_box_t3`、9×8（CMD 10×8）、300／500、0.5.7 rolls
   4/4/4/4/7；`CF_CRATE_TIER=3`、同一組 `LOCK_ID_*`、T3 卡可開。
   Loot 用 T3 值地板池（`>=120`），rare 只放 T3 卡＋最高價裝備，**不掉核心**；
@@ -289,13 +290,13 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
 |---|---|---|
 | 1 | 買 `CF_FENCE_PRO` | 後台多印表機／晶片／CNC／電子×2／耗材×2／`energy_credit` 電池×1（`[CF-NET] PRO kit granted …+battery`）；製卡匠下次 `GenerateClient` 到訪（`gate=catchup`） |
 | 2 | 每週第 6 天 | 製卡匠再訪（`gate=weekly`）；同一天不重複 |
-| 3 | 製卡匠買賣 | 每次固定：printer（PRO）／晶片／CNC 或 metal（隨機）／電子×2／耗材×2，加上每個已解鎖等級 × 五家族的核心各 1（T1 12／T2 17／T3 22 件）；同日不重複、無翻頁；價格 = `unitValue` |
-| 4 | 遇博士 | `[CF-INVENTOR] stock …`；前台有專業解序器與批量模組；T2／T3 後加卡核 |
+| 3 | 製卡匠買賣 | 每次固定 10 件：晶片／CNC／電子×2／plastic×1＋五家族核心各 1（`day%2` 輪換 T2/T3）；不賣 printer／metal、不賣卡；價格 = `unitValue` |
+| 4 | 遇博士 | `[CF-INVENTOR] stock desequencer+batch`；前台固定只有專業解序器與批量模組 |
 | 5 | 黑市聲望 <30 遇小偷 | 沒有 CF 箱（只有原版 thief 貨） |
 | 6 | 聲望 ≥60 或（≥30＋`CF_FENCE_THIEF_T2`） | 小偷給 1 個 T2 箱（SEC/MED/ENG/SER） |
 | 7 | 解鎖 `CF_FENCE_T3` + 聲望 ≥85 | 小偷給 1 個 T3 箱；用 T3 卡可開 |
 | 8 | 打開 Wild Network | 第 3 個分頁「制卡」只有 4 個升級、無第 4 個分頁 |
-| 9 | T3 箱 12 件 | 9×8／CMD 10×8 放得下（未實機量） |
+| 9 | T3 箱 5–8 件 | 9×8／CMD 10×8 放得下（未實機量） |
 | 10 | 生成 CMD T1/T2/T3 | 深藍箱、6×4、輪廓與治安箱一致；`[CF-SPRITE] registered …` |
 | 11 | 用對應卡開 CMD 箱 | 換成深藍 `cmd_box_u`；無 `unknown`、無 `Mod sprite … not found` |
 | 12 | 存檔→重載 | CMD 箱仍是深藍；應有 `[CF-SPRITE] reapplied … after load` |
@@ -372,15 +373,14 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
 - **tabBar 實際寬度**：spec §3.11.1 的 1060 來自 `WildNetworkStyle.TABS_W` 常數，
   不是 prefab 或 runtime `RectTransform` 量測；如果 prefab 的 tabBar 不是 1060，
   第 3 個分頁的結論要重算。
-- **T3 箱 12 件 fit**：9×8（CMD 10×8）只在紙上算過，沒有 runtime 量過；
+- **T3 箱 5–8 件 fit**：9×8（CMD 10×8）只在紙上算過，沒有 runtime 量過；
   若放不下，`/CF-LOOT/` 的 `remaining` 會大於 0，箱子會少東西。
 - **T3「200 樣本」是離線模擬**：同權重、同 `Pick` 演算法，但不是 in-game
   `CfLootProbe`；實機 `[CF-EV]` 數字仍待人類補。
-- **工匠庫存份量**：T1 12 件、T2 17 件、T3 22 件（7 件固定／材料 + 5／10／15
-  核心）；前台 18×4 可能放不下，會走 0.5.4 的 back fallback，但沒有實機確認
-  核心是否全部買得到。
-- **核心固定供貨**：`AddMakerStock` 只用 `UnlockedTiers` × 五家族，
-  沒有隨機抽；實機要到 T2／T3 才能確認 17／22 件的實際貨架。
+- **工匠 10 件**：5 固定＋5 核心；前台 18×4 理論上放得下，放不下則該件
+  `skipped`、本次不賣（0.5.8），不會掉進背包。
+- **核心輪換**：`day%2` 只在 T2/T3 都解鎖時輪；只有一邊或都沒解鎖的實際
+  日期行為未實機驗。
 - **`premiumBuy15` 對 SELL 客戶的實際效果**：照原版退休匠加，但這個 flag 主要
   影響客戶「買」東西的價格；SELL 客戶是否真的用到，未在 runtime 核。
 - **黑市聲望門檻 85／60／30**：是我方定案（spec §3.10.2），不是原版常數；
@@ -402,7 +402,8 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
 
 ## 下一步
 
-1. 本輪 0.5.7（價值地板／核心供貨）已提交（`e83c586`，本機 commit、未 push）。
+1. 本輪 0.5.8（滿台 skip／10 件核心輪換／T1 CMD 去核心）待提交；
+   0.5.7 價值地板在 `e83c586`。
 2. 人類實機跑 P4 修訂與 CMD 貼圖驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／
    `[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`，並補 T3 in-game `[CF-EV]`。
 3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
@@ -423,7 +424,7 @@ Could not find GameItem identifier 'cf_crypto_module_med_t3'
   `CfInventorStock`、`CfInventorPatch`；0.5.1 新增 `CfCmdBoxSprite`；
   `CfNetwork` 縮成 4 個升級；`CfThiefBoxes` 只賣 T2/T3；
   `ItemFactory`／`LootTables` 擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.5.7）
+- `src/CardCraftAndFence/manifest.xml`（0.5.8）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、§3.10、§3.11、§3.12）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、

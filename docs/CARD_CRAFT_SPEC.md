@@ -82,6 +82,30 @@ smoke／combat_knife／tazer）。
 `EV = rolls × EV_common + 1 × EV_rare`；每表權重合計 100；件數 = rolls + 1。
 rare 保底 1。
 
+#### CMD T1
+
+**CMD T1**（rolls 8；common EV 55.50、rare EV 238.75）
+
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `heavy_pistol_ammo` | 30 | 25 | common |
+| `heavy_pistol_ammo_p` | 36 | 15 | common |
+| `flashbang_grenade` | 85 | 10 | common |
+| `smoke_grenade` | 60 | 10 | common |
+| `bandage_item` | 8 | 10 | common |
+| `common_electronic` | 33 | 10 | common |
+| `stun_baton` | 165 | 10 | common |
+| `combat_knife` | 75 | 10 | common |
+| `cmd_keycard` | 125 | 25 | rare |
+| `stun_gun` | 250 | 15 | rare |
+| `glock_receiver` | 200 | 10 | rare |
+| `smg` | 280 | 10 | rare |
+| `shotgun` | 310 | 20 | rare |
+| `current_converter` | 300 | 20 | rare |
+
+> 0.5.8 起 rare 移除 `crypto_module_cmd`；權重已重配到 keycard／shotgun／converter，
+> EV/價維持 3.414。
+
 #### T2
 
 **SEC T2**（rolls 6；common EV 109.75、rare EV 208.50）
@@ -244,7 +268,7 @@ rare 保底 1。
 | MED T2 | 225 | 152.50 | 235.00 | 4 | 5 | 845.00 | **3.756** | 818.60 | -3.12% | 3.6–3.9 |
 | ENG T2 | 225 | 190.75 | 255.00 | 3 | 4 | 827.25 | **3.677** | 805.62 | -2.61% | 3.6–3.9 |
 | SER T2 | 225 | 225.00 | 180.00 | 3 | 4 | 855.00 | **3.800** | 838.20 | -1.96% | 3.6–3.9 |
-| CMD T1 | 200 | 55.50 | 238.50 | 8 | 9 | 682.50 | **3.413** | 674.13 | -1.23% | 不變 |
+| CMD T1 | 200 | 55.50 | 238.75 | 8 | 9 | 682.75 | **3.414** | 669.92 | -1.88% | 不變 |
 | CMD T2 | 350 | 172.75 | 259.00 | 6 | 7 | 1295.50 | **3.701** | 1274.25 | -1.64% | 3.6–3.9 |
 | SEC T3 | 300 | 238.50 | 266.50 | 4 | 5 | 1220.50 | **4.068** | 1209.35 | -0.91% | 3.9–4.5 |
 | MED T3 | 300 | 249.50 | 239.50 | 4 | 5 | 1237.50 | **4.125** | 1214.38 | -1.87% | 3.9–4.5 |
@@ -545,34 +569,31 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 ### §3.8.4 製卡匠庫存（售價 = 物品 `unitValue`，不標 stolen、不賣箱子）
 
-**每次到訪固定供貨，不保存庫存，不做翻頁**。核心已從所有 T2/T3 loot 表移除，
-所以卡匠是核心唯一穩定來源：**每個已解鎖等級，五家族的核心各固定 1 個**，
-不隨機抽掉。**同一天不重複**：一天最多一位製卡匠，`maker_last_day` 已擋。
+**每次到訪固定 10 件，不保存庫存，不做翻頁**。核心已從所有 T2/T3 loot 表移除，
+所以卡匠是核心唯一穩定來源。**同一天不重複**：一天最多一位製卡匠，
+`maker_last_day` 已擋。
 
 | 類別 | 物品 | 數量 | 單價 |
 |---|---|---:|---:|
-| 固定 | `printer`（PRO 後） | 1 | 350 |
 | 固定 | `cf_printer_chip_blank_keycard` | 1 | 250 |
-| 固定 | `printer_module_cnc` **或** `printer_module_metal` | 1（50/50） | 400／300 |
+| 固定 | `printer_module_cnc` | 1 | 400 |
 | 材料 | `common_electronic` | 2 | 33 |
-| 材料 | `printer_plastic` | 2 | 12 |
-| 核心 | 每個已解鎖等級 × 5 家族（T1／T2／T3） | 5／10／15 | 依 id |
+| 材料 | `printer_plastic` | 1 | 12 |
+| 核心 | 五家族各 1，`day % 2` 輪換 T2／T3 | 5 | 依 id |
 
-- 核心池：T1 永遠有；解鎖 `CF_FENCE_T2` 加 T2；解鎖 `CF_FENCE_T3` 加 T3。
-  所以 T1 到訪 12 件、T2 17 件、T3 22 件；**不再有所謂 10 件上限**，
-  這是 0.5.7 為了核心穩定供貨刻意覆蓋 0.5.5 的規則。
+- 固定項照原列表其實是 6 件（1＋1＋2＋2），加 5 核心＝11；為了守住
+  10 件上限，`printer_plastic` 只放 1。若要 plastic×2，需把上限放寬到 11。
+- 核心等級：T2／T3 都解鎖時 `day % 2` 選一邊；只有一邊解鎖就用那一邊；
+  兩者都未解鎖則退回 T1。每次只給 5 顆，不再一次倒 15 顆。
 - 卡匠不再賣卡；卡只從箱子 rare／小偷箱來。博士也不賣卡／核。
 - **不賣箱子**（任何 T1／T2／T3 箱都不在工匠庫存）。
-- **製卡週邊是補給，不是解鎖**：`CF_FENCE_PRO` 仍一次性發第一套工具包，但卡匠
-  每次到訪都重新上架印表機、晶片、CNC／金屬模組、電子×2、耗材×2。
-  理由：空白卡晶片是自訂物品，只有工具包那一顆時遺失就再也做不出空白卡；
-  CNC 與耗材也需要穩定來源。專業解序器與批量模組仍由博士賣（見下）。
+- **不賣印表機／金屬模組**：PRO 工具包已給第一套，不重複賣。
 - 全部 `isOwend: false`：玩家要付 `unitValue` 買；沒有額外 markup。
-- **櫃台放不下不銷毀**：前台是原版 18×4；櫃台滿（或形狀放不下）時，
-  貨物改丟 `GraphUtils.EmporiumTryAdd(backInvinvElement, item)`，
-  並印 `[CF-STOCK] counter full, moved <id> to back inventory`。
-  先 `GraphUtils.CanAccept(front, item)` 探測，避免
-  `TryAddDirectSellingItemToTable` 在失敗時把物品 `Destroy()`。
+- **櫃台滿＝該件本次不販售**：先 `GraphUtils.CanAccept(front, item)` 探測；
+  放不下就 `Destroy()`＋`[CF-STOCK] counter full, skipped <id>`，
+  **絕對不** `EmporiumTryAdd(backInvinvElement, …)`，也不進玩家背包。
+  `TryAddDirectSellingItemToTable` 在失敗時本來就會銷毀，先探測是為了留下
+  可讀的 skip log。
 
 ### §3.8.5 博士（`StoreClientList.CreateInventor`）庫存
 
@@ -588,7 +609,7 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - `[CF-MAKER] skip: already visited today day=…`
 - `[CF-MAKER] skip: CF_FENCE_PRO not unlocked`
 - `[CF-INVENTOR] stock desequencer+batch`
-- `[CF-STOCK] counter full, moved <id> to back inventory`（工匠／博士共用）
+- `[CF-STOCK] counter full, skipped <id>`（工匠／博士共用）
 
 ## §3.10 黑市與小偷（P4 只做第 2 項）
 
@@ -639,16 +660,14 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - CMD 箱不經過小偷，`isStolen` 的 CMD 例外不再適用。
 - **櫃台形狀限制**：原版前台是 **18×4**，箱子是 **6×4**，因此需要
   **6 個連續空欄**才放得下；這是原版 `GameGridInventory` 的限制，不是本 MOD
-  造成的。放不下時**不銷毀**，改
-  `GraphUtils.EmporiumTryAdd(backInvinvElement, box)`，並印
-  `[CF-THIEF] counter full, moved <id> to back inventory`。
-  先 `GraphUtils.CanAccept(front, box)` 探測，避免
-  `TryAddDirectSellingItemToTable` 在失敗時把箱子 `Destroy()`。
+  造成的。**櫃台滿＝該件本次不販售**：先 `GraphUtils.CanAccept(front, box)`
+  探測，放不下就 `Destroy()`＋`[CF-THIEF] counter full, skipped <id>`，
+  不進後台、不進玩家背包。
 
 ### §3.10.5 診斷 log
 
 - `[CF-THIEF] box family=… tier=… id=… bm=… added=…`
-- `[CF-THIEF] counter full, moved <id> to back inventory`
+- `[CF-THIEF] counter full, skipped <id>`
 - `[CF-THIEF] skip: no T2/T3 box (bm=…)`（同原因只印一次）
 
 ## §3.11 Wild Network「CardFence」分頁（P4）
