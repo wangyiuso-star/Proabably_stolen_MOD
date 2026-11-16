@@ -1086,8 +1086,8 @@ Error: NullReferenceException ... at CardCraftAndFenceMod.OnEnable () [0x000a]
 
 ## §3.12 CMD 箱貼圖＝執行期染色（0.5.1）
 
-CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期把暗部染成指揮卡的深藍、
-亮部保留原版箱的白邊，
+CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期把來源 hue 換成藍色
+（HSV 換色，保留原陰影與飽和），
 註冊成本 MOD 自帶的 `cmd_box`／`cmd_box_u`，再由 `SetSpriteAndShapeFromMod` 使用。
 輪廓（6×4 格）、alpha 與明暗結構都跟原版治安箱一致。
 
@@ -1107,15 +1107,13 @@ CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期把暗
 - 取子區域：`Rect r = src.rect;` →
   `src.texture.GetPixels((int)r.x, (int)r.y, (int)r.width, (int)r.height)`；
   不要拿整張 atlas。
-- 逐像素：`lum = 0.299r + 0.587g + 0.114b`；
-  `t = clamp01(lum/0.45)`、`shade = pow(t, 0.45)`；
-  `highlight = clamp01((lum-0.48)/0.20)`；
-  `out = lerp(tint*shade, white, highlight*0.90)`（gamma 提亮箱身、保留飽和；
-  0.7.5 起只有亮部轉白，箱身不變淺）。
+- 逐像素：轉 HSV；`s<0.15`（白標籤）或綠色指示燈（`h` 0.25–0.45）保留原色；
+  其餘 `out = HSVToRGB(0.60, s, min(1, v*1.18))`——把紅／橙底換成藍，
+  保留原陰影與飽和，不再對亮部加白（0.7.6 起）。
+- `BlueHue = 0.60`、`BlueValueGain = 1.18`；**只調這兩個常數**再實機看。
 - `new Texture2D(w, h, TextureFormat.RGBA32, false)`、`filterMode = Point`、
   `wrapMode = Clamp`、`SetPixels` + `Apply`；
   `Sprite.Create(tex, new Rect(0,0,w,h), new Vector2(0.5f,0.5f), 100f)`。
-- `CmdBlue = new Color(0.24f, 0.45f, 0.95f)`；**只調這一個常數**再實機看。
 - `sec_box` 是 96×64 px，`gridSize = 16` → 6×4 格；`SetSpriteAndShapeFromMod`
   用 `sprite.rect.width / gridSize` 算形狀，所以形狀與治安箱一致。
 

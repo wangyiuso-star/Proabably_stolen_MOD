@@ -18,7 +18,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.7.5";
+        internal const string ModVersion = "0.7.6";
 
         public void Init(ModManifest manifest)
         {
@@ -2837,9 +2837,11 @@ namespace DeepSpaceQoL
         internal const string LockedKey = "cmd_box";
         internal const string UnlockedKey = "cmd_box_u";
 
-        // 0.7.5: brighter royal blue (V 0.95, S 0.75). The old 0.24/0.35/0.62
-        // plus the 0.32+0.68*lum shade made the ~0.27-luminance body read black.
-        private static readonly Color CmdBlue = new Color(0.24f, 0.45f, 0.95f);
+        // 0.7.6: recolour, do not light-paint. Shift the source hue to blue and
+        // lift value; keep saturation and the original shading. Neutral white
+        // (label) and the green indicator are left alone.
+        private const float BlueHue = 0.60f;
+        private const float BlueValueGain = 1.18f;
 
         private static readonly HashSet<string> _warned = new HashSet<string>();
         private static readonly HashSet<string> _loggedStats = new HashSet<string>();
@@ -2926,8 +2928,8 @@ namespace DeepSpaceQoL
             _registered = locked && unlocked;
             if (_registered)
             {
-                Log.Info("[CF-SPRITE] registered cmd_box/cmd_box_u (runtime tint "
-                    + CmdBlue.r + "," + CmdBlue.g + "," + CmdBlue.b + ")");
+                Log.Info("[CF-SPRITE] registered cmd_box/cmd_box_u (hue "
+                    + BlueHue + ", value x" + BlueValueGain + ")");
             }
             return _registered;
         }
@@ -2993,7 +2995,7 @@ namespace DeepSpaceQoL
                 WarnOnce("source:" + sourceKey, "[CF-SPRITE] source sprite " + sourceKey + " is not readable");
                 return false;
             }
-            Sprite tinted = Colorize(source, CmdBlue);
+            Sprite tinted = Colorize(source);
             if (tinted == null)
             {
                 return false;
@@ -3012,7 +3014,7 @@ namespace DeepSpaceQoL
         // the whole crate reads as one flat blue box (reported in game). Bright,
         // low-saturation pixels are the vanilla white rim; blend those to white,
         // keep saturated body pixels blue, and let dark outlines stay deep blue.
-        private static Sprite Colorize(Sprite source, Color tint)
+        private static Sprite Colorize(Sprite source)
         {
             Rect rect = source.rect;
             int width = (int)rect.width;
@@ -3059,20 +3061,19 @@ namespace DeepSpaceQoL
             for (int i = 0; i < pixels.Length; i++)
             {
                 Color c = pixels[i];
-                float lum = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
-                // Gamma-lift the mid tones so the body stays a saturated blue
-                // instead of reading black; deep outlines keep a dark floor.
-                float t = Mathf.Clamp01(lum / 0.45f);
-                float shade = Mathf.Pow(t, 0.45f);
-                // Only the top of the source range (the rim/label highlights)
-                // goes white; the body keeps its saturation.
-                float highlight = Mathf.Clamp01((lum - 0.48f) / 0.20f);
-                float white = highlight * 0.90f;
-                pixels[i] = new Color(
-                    Mathf.Lerp(tint.r * shade, 1f, white),
-                    Mathf.Lerp(tint.g * shade, 1f, white),
-                    Mathf.Lerp(tint.b * shade, 1f, white),
-                    c.a);
+                float h;
+                float s;
+                float v;
+                Color.RGBToHSV(c, out h, out s, out v);
+                // Keep the white label and the green indicator; recolour the
+                // red/orange body to blue instead of painting light over it.
+                if (s < 0.15f || (h > 0.25f && h < 0.45f))
+                {
+                    pixels[i] = c;
+                    continue;
+                }
+                Color blue = Color.HSVToRGB(BlueHue, s, Mathf.Clamp01(v * BlueValueGain));
+                pixels[i] = new Color(blue.r, blue.g, blue.b, c.a);
             }
             Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
             texture.filterMode = FilterMode.Point;
