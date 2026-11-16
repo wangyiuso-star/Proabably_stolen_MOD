@@ -25,6 +25,8 @@
   - `LootTables.Fill` 改成**先 roll 全部、再按 shape 面積大→小放入**（遊戲的
     grid 放置本身會試 4 種旋轉＋2 種翻轉）；`smg`／`shotgun`（7×3）從
     SEC T3／CMD T2／CMD T3 的 **common** 池移除，只留在 rare。
+  - 原始 worst-case（7×3 還在 common）是 SEC T3 85、CMD T3 136、CMD T2 112；
+    移到 rare-only 後的最大面積降到 57／87／77，容量才有多排餘量。
   - 容量：SEC T2 10×8、CMD T1 10×8、CMD T2 12×9、SEC T3 13×8、CMD T3 15×9；
     MED／ENG／SER 不變。9 高是因為 6–7 個 4×3 common ＋ 1 個 7×3 rare 需要
     3～4 排。
@@ -876,8 +878,9 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 **0.7.2 容量修正（待實機重測）**：
 
 - 0.7.1 實機仍抓到 SEC T3 掉件；CMD T3／T2 高度可疑。用 66 個存檔的實際
-  `itemShape` 面積＋10 萬次 rolls 重算：SEC T3 最大 85、CMD T3 最大 136、
-  CMD T2 最大 112（0.7.1 的 9×8／10×8／9×8 明顯不夠）。
+  `itemShape` 面積＋10 萬次 rolls 重算：7×3 還在 common 時 SEC T3 最大 85、
+  CMD T3 136、CMD T2 112（0.7.1 的 9×8／10×8／9×8 明顯不夠）；把 7×3 移到
+  rare-only 後降到 57／87／77。
 - 修法：`LootTables.Fill` 先 roll 全部、再按 shape 面積**大→小**放入
   （grid 放置本身會試 4 旋轉＋2 翻轉）；`smg`／`shotgun`（7×3）從 SEC T3／
   CMD T2／CMD T3 的 **common** 池移除（rare 保留），三張表權重重配、
