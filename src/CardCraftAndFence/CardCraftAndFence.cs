@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.8";
+        internal const string ModVersion = "0.5.9";
 
         public void Init(ModManifest manifest)
         {
@@ -2049,11 +2049,10 @@ namespace DeepSpaceQoL
             CardFamily.CMD
         };
 
-        // Hard cap 10 items: 5 fixed supplies + 5 cores (one per family). The
-        // printer is not sold here; CF_FENCE_PRO already hands it over. Cores
-        // are no longer in any T2/T3 loot table, so this is their only stable
-        // source. The material list is 6 units on paper; plastic is trimmed to
-        // one to keep the cap at 10.
+        // Cap 11; actual batch is 9: 6 fixed supplies (materials 2+2) + 3 cores.
+        // The printer is not sold here; CF_FENCE_PRO already hands it over.
+        // Cores are no longer in any loot table, so this is their only source.
+        // The 3 families rotate on day % 5; the tier is the highest unlocked.
         internal static void AddMakerStock(int day)
         {
             List<string> ids = new List<string>();
@@ -2062,11 +2061,18 @@ namespace DeepSpaceQoL
             ids.Add("common_electronic");
             ids.Add("common_electronic");
             ids.Add("printer_plastic");
+            ids.Add("printer_plastic");
 
-            int coreTier = RotatingCoreTier(day);
-            foreach (CardFamily family in AllFamilies)
+            int coreTier = HighestCoreTier();
+            int start = ((day % 5) + 5) % 5;
+            for (int i = 0; i < 3; i++)
             {
+                CardFamily family = AllFamilies[(start + i) % 5];
                 ids.Add(ItemFactory.CryptoModuleId(family, coreTier));
+            }
+            while (ids.Count > 11)
+            {
+                ids.RemoveAt(ids.Count - 1);
             }
             foreach (string id in ids)
             {
@@ -2074,25 +2080,18 @@ namespace DeepSpaceQoL
             }
         }
 
-        // Both T2 and T3 unlocked: day % 2 picks the tier. Only one unlocked:
-        // that tier. Neither: T1 (PRO without a card-tier upgrade still gets a
-        // stable core shelf).
-        private static int RotatingCoreTier(int day)
+        // Highest unlocked tier: T3, then T2, then T1.
+        private static int HighestCoreTier()
         {
-            List<int> tiers = new List<int>();
-            if (CfNetwork.Unlocked(CfNetwork.Tier2))
-            {
-                tiers.Add(2);
-            }
             if (CfNetwork.Unlocked(CfNetwork.Tier3))
             {
-                tiers.Add(3);
+                return 3;
             }
-            if (tiers.Count == 0)
+            if (CfNetwork.Unlocked(CfNetwork.Tier2))
             {
-                return 1;
+                return 2;
             }
-            return tiers[Math.Abs(day) % tiers.Count];
+            return 1;
         }
 
         internal static void AddStock(string id)
