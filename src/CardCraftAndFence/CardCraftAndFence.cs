@@ -11,12 +11,14 @@ namespace DeepSpaceQoL
     /// keycard printer chip, professional desequencer and the batch card module.
     /// P4: the retired cardmaker client, Dr. Jackson's card stock, the thief's
     /// graded-box offer, the four Wild Network "CardFence" upgrades that gate
-    /// those channels, and the T3 crates.
+    /// those channels, and the T3 crates. P5: Sawyer's nightly card/box and
+    /// core exchange in the storefront trash, its permanent-channel upgrade,
+    /// and the paper card catalogue.
     /// </summary>
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.6.2";
+        internal const string ModVersion = "0.7.0";
 
         public void Init(ModManifest manifest)
         {
@@ -30,15 +32,24 @@ namespace DeepSpaceQoL
             LootTables.EnsureRegistered();
             // Only the label is safe here: ModHelper.AddNetworkUpgrade touches
             // PlayerStore.Instance, whose getter *creates* a PlayerStore when the
-            // game is still at the main menu, and that constructor NREs. The four
+            // game is still at the main menu, and that constructor NREs. The seven
             // upgrades are registered from OnGameLoadedLate / OnNewGameStarted,
             // where a real PlayerStore exists.
             CfNetwork.EnsureTabLabel();
+            // Paper registration only touches PaperBookRegistry and ModItemDirectory
+            // (both static), so it is safe before a run is loaded. The item factory
+            // is re-registered from OnGameLoadedLate / OnNewGameStarted as well,
+            // because the live ModItemDirectory may not exist yet at this point.
+            CfSawyerPaper.EnsureRegistered();
             // -= before += so a mod reload cannot subscribe the handler twice.
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
             ModHook.OnGenerateCustomerVeryLate += CfRetiredCardmaker.OnGenerateCustomerVeryLate;
             ModHook.OnPlaceInventorInventoryItemEarly -= CfInventorStock.OnInventorCounter;
             ModHook.OnPlaceInventorInventoryItemEarly += CfInventorStock.OnInventorCounter;
+            // Runs inside PlayerStore.EndNight, before HandleJanitorial: everything
+            // Sawyer consumes is still in the trashcan at that point.
+            ModHook.OnHandlingNightlyServicesEarly -= CfSawyerExchange.OnHandlingNightlyServicesEarly;
+            ModHook.OnHandlingNightlyServicesEarly += CfSawyerExchange.OnHandlingNightlyServicesEarly;
             ModHook.OnGameLoadedLate -= CfNetwork.OnGameLoadedLate;
             ModHook.OnGameLoadedLate += CfNetwork.OnGameLoadedLate;
             ModHook.OnNewGameStarted -= CfNetwork.OnNewGameStarted;
@@ -57,6 +68,7 @@ namespace DeepSpaceQoL
         {
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
             ModHook.OnPlaceInventorInventoryItemEarly -= CfInventorStock.OnInventorCounter;
+            ModHook.OnHandlingNightlyServicesEarly -= CfSawyerExchange.OnHandlingNightlyServicesEarly;
             ModHook.OnGameLoadedLate -= CfNetwork.OnGameLoadedLate;
             ModHook.OnNewGameStarted -= CfNetwork.OnNewGameStarted;
             ModHook.OnGameLoadedLate -= CfCmdBoxSprite.OnGameLoadedLate;
@@ -1625,9 +1637,10 @@ namespace DeepSpaceQoL
     }
 
     /// <summary>
-    /// P4 Wild Network "CardFence" tab. All four upgrades are acquisition gates,
-    /// not stat buffs: each one only widens what the retired cardmaker or the
-    /// thief is allowed to sell. The tab arithmetic is fixed by the prefab:
+    /// P4/P5 Wild Network "CardFence" tab. All seven upgrades (four CF_FENCE_*
+    /// plus three CF_SAWYER_*) are acquisition/service gates, not stat buffs:
+    /// each one only opens a buy channel or a nightly exchange service. The tab
+    /// arithmetic is fixed by the prefab:
     /// TABS_W = 1060, TAB_W = 256, step = 268 (TAB_W + TAB_GAP). Three tabs use
     /// 792 px, so CardFence fits with 268 px to spare; a fourth tab would be
     /// exactly 1060 px with no margin, which is why this mod never adds one.
@@ -1641,10 +1654,19 @@ namespace DeepSpaceQoL
         internal const string Tier3 = "CF_FENCE_T3";
         internal const string ThiefTier2 = "CF_FENCE_THIEF_T2";
 
+        // P5 Sawyer chain. All three sit in the same CardFence tab: a fourth tab
+        // would be exactly 1060 px wide with no margin (see the class comment).
+        internal const string SawyerPermanent = "CF_SAWYER_PERMANENT";
+        internal const string SawyerBatch = "CF_SAWYER_BATCH";
+        internal const string SawyerChip = "CF_SAWYER_CHIP";
+
         internal const int ProCost = 1500;
         internal const int Tier2Cost = 1200;
         internal const int Tier3Cost = 3000;
         internal const int ThiefTier2Cost = 2200;
+        internal const int SawyerPermanentCost = 400;
+        internal const int SawyerBatchCost = 700;
+        internal const int SawyerChipCost = 900;
 
         internal static void EnsureTabLabel()
         {
@@ -1656,11 +1678,20 @@ namespace DeepSpaceQoL
         internal static void OnGameLoadedLate()
         {
             EnsureRegistered();
+            // Re-register the paper item so a save loaded before ModItemDirectory
+            // went live still gets the catalogue item factory. Register is a
+            // remove+add inside PaperBookRegistry, so calling it again is safe.
+            CfSawyerPaper.EnsureRegistered();
+            // ExchangeManager.Init() rebuilds promotionalBarter; if Sawyer is
+            // already bought, drop the three vanilla crate barters again.
+            CfSawyerExchange.EnsurePromotionalRemoved();
         }
 
         internal static void OnNewGameStarted(string scenarioId)
         {
             EnsureRegistered();
+            CfSawyerPaper.EnsureRegistered();
+            CfSawyerExchange.EnsurePromotionalRemoved();
         }
 
         // Must run with a real PlayerStore loaded. ModHelper.AddNetworkUpgrade ->
@@ -1687,11 +1718,46 @@ namespace DeepSpaceQoL
                 "黑市声望 30 以上就能从小偷手里拿到中级箱（原本要 60）；解锁高级制卡门路后，声望 85 以上能拿到高级箱。",
                 null,
                 null) ? 1 : 0;
+            ok += Add(SawyerPermanent, SawyerPermanentCost, "索耶", "索耶的常驻摊位",
+                "索耶每晚在交易所后院收货：垃圾桶里同家族的钥匙卡按比例换成已装满物资、已上锁的箱子（SEC 3／MED 4／ENG 4／SER 4／CMD 3），并附赠一本换卡目录。解锁后夜市不再提供治安／医疗／工程箱的旧换购，改由索耶统一供货。",
+                null,
+                OnSawyerPermanentUnlock) ? 1 : 0;
+            ok += Add(SawyerBatch, SawyerBatchCost, "索耶", "索耶的批量换卡",
+                "一夜不限 1 个箱子：索耶会把垃圾桶里所有能凑满的钥匙卡都换掉。",
+                new[] { SawyerPermanent },
+                null) ? 1 : 0;
+            ok += Add(SawyerChip, SawyerChipCost, "索耶", "索耶的芯片拆解",
+                "索耶也拆加密模块：3 个同家族同级的模块换 1 个同家族下一级（T1→T2、T2→T3，T3 不再升）。每晚每个家族最多 1 次，不占换卡名额。",
+                new[] { SawyerPermanent },
+                null) ? 1 : 0;
 
-            Log.Info("[CF-NET] registered " + ok + "/4 CardFence upgrades tab=CardFence width=792/1060");
-            if (ok == 4)
+            Log.Info("[CF-NET] registered " + ok + "/7 CardFence upgrades tab=CardFence width=792/1060");
+            if (ok == 7)
             {
                 Log.Info("[CF-NET] hide CF_SAWYER_* until the exchange is unlocked");
+            }
+        }
+
+        // Buying CF_SAWYER_PERMANENT must never break the purchase flow. Both
+        // steps already swallow their own exceptions; the extra try/catch here
+        // keeps even a future change from escaping into NetworkUpgrade.
+        private static void OnSawyerPermanentUnlock()
+        {
+            try
+            {
+                CfSawyerExchange.EnsurePromotionalRemoved();
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-NET] Sawyer promo removal failed: " + e.GetType().Name + ": " + e.Message);
+            }
+            try
+            {
+                CfSawyerPaper.Grant();
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-NET] Sawyer paper grant failed: " + e.GetType().Name + ": " + e.Message);
             }
         }
 
@@ -1784,6 +1850,569 @@ namespace DeepSpaceQoL
                     + " stage=ModHelper.AddNetworkUpgrade "
                     + e.GetType().Name + ": " + e.Message);
                 return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// P5 Sawyer. Once CF_SAWYER_PERMANENT is bought, Sawyer works the storefront
+    /// trash every night from ModHook.OnHandlingNightlyServicesEarly — inside
+    /// PlayerStore.EndNight, after the service charge and before HandleJanitorial
+    /// (PlayerStore.cs:1687). That timing is what makes the cards safe to consume:
+    /// HandleExchange has not run yet, ClearTrash has not emptied the trashcan,
+    /// and TransferBuffer (which delivers our crates) runs after ClearTrash, so a
+    /// crate put on itemsBuffer is never cleared.
+    ///
+    /// Rules (spec §3.9):
+    /// - Cards: a family's cards are sorted low tier -> high tier and cut into
+    ///   groups of CardRatio (SEC 3 / MED 4 / ENG 4 / SER 4 / CMD 3); each group
+    ///   becomes one crate of the group's LOWEST tier. Cards are destroyed only
+    ///   after the crate object was created.
+    /// - Without CF_SAWYER_BATCH, at most one crate per night across all families.
+    ///   The order is fixed (SEC, MED, ENG, SER, CMD; low tier before high) so the
+    ///   same trash consumes the same cards every run.
+    /// - Cores: three same-family same-tier cores become one core of the next tier
+    ///   (T1->T2, T2->T3); T3 never goes up. One core per family per night, and
+    ///   cores do not count against the crate cap.
+    /// </summary>
+    internal static class CfSawyerExchange
+    {
+        internal const string Permanent = CfNetwork.SawyerPermanent;
+        internal const string Batch = CfNetwork.SawyerBatch;
+        internal const string Chip = CfNetwork.SawyerChip;
+
+        // Fixed processing order: the crate cap has to pick the same family on
+        // every run, no matter how the trashcan happens to be ordered.
+        private static readonly CardFamily[] Order =
+        {
+            CardFamily.SEC,
+            CardFamily.MED,
+            CardFamily.ENG,
+            CardFamily.SER,
+            CardFamily.CMD
+        };
+
+        private static readonly HashSet<string> _diag = new HashSet<string>();
+        private static bool _removalLogged;
+
+        // A card waiting in the trash, with its tier resolved once.
+        private struct TrashCard
+        {
+            public GameItem Item;
+            public int Tier;
+        }
+
+        internal static int CardRatio(CardFamily family)
+        {
+            switch (family)
+            {
+                case CardFamily.SEC: return 3;
+                case CardFamily.MED: return 4;
+                case CardFamily.ENG: return 4;
+                case CardFamily.SER: return 4;
+                case CardFamily.CMD: return 3;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown card family.");
+            }
+        }
+
+        // Hook entry point. EndNight must never be interrupted, so nothing throws
+        // out of here.
+        internal static void OnHandlingNightlyServicesEarly()
+        {
+            try
+            {
+                RunNight();
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-SAWYER] night handler failed: " + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        private static void RunNight()
+        {
+            PlayerStore store = PlayerStore.Instance;
+            if (store == null || store.exchangeManager == null || EmporiumEntry.Instance == null)
+            {
+                return;
+            }
+            StoreService janitorial = StoreService.GetJanitorialService();
+            if (janitorial == null || !janitorial.unlocked || !janitorial.isUsing)
+            {
+                Diag("janitorial", "[CF-SAWYER] skip: janitorial off");
+                return;
+            }
+            ExchangeManager exchange = store.exchangeManager;
+            if (!exchange.isExchangeUnlocked)
+            {
+                Diag("exchange", "[CF-SAWYER] skip: exchange locked");
+                return;
+            }
+            if (!CfNetwork.Unlocked(Permanent))
+            {
+                Diag("permanent", "[CF-SAWYER] skip: CF_SAWYER_PERMANENT not unlocked");
+                return;
+            }
+            // ExchangeManager.Init() rebuilds promotionalBarter; strip the three
+            // vanilla crate barters again right before the night is handled.
+            EnsurePromotionalRemoved();
+
+            List<GameItem> trash = GraphUtils.FindAllChildrenType<GameItem>(EmporiumEntry.Instance.trashcan);
+            if (trash == null)
+            {
+                return;
+            }
+            int cards = 0;
+            int cores = 0;
+            foreach (GameItem item in trash)
+            {
+                CardFamily family;
+                int tier;
+                if (ItemFactory.TryGetCardInfo(item, out family, out tier))
+                {
+                    cards++;
+                }
+                else if (TryGetCoreInfo(item, out family, out tier))
+                {
+                    cores++;
+                }
+            }
+            bool capped = !CfNetwork.Unlocked(Batch);
+            int boxes = ExchangeCards(trash, capped);
+            int chips = CfNetwork.Unlocked(Chip) ? UpgradeCores(trash) : 0;
+            Log.Info("[CF-SAWYER] night cards=" + cards + " cores=" + cores
+                + " boxes=" + boxes + " chip=" + chips);
+        }
+
+        // Card -> crate. Returns the number of crates produced; when capped it
+        // stops after the first crate and leaves the remaining cards untouched.
+        private static int ExchangeCards(List<GameItem> trash, bool capped)
+        {
+            // How many crates the whole trash could make, per family. This is what
+            // the cap is compared against: cards that cannot fill a group are not
+            // "withheld" by the cap, so they must not produce the cap log.
+            int totalGroups = 0;
+            foreach (CardFamily family in Order)
+            {
+                int count = 0;
+                foreach (GameItem item in trash)
+                {
+                    CardFamily cardFamily;
+                    int tier;
+                    if (ItemFactory.TryGetCardInfo(item, out cardFamily, out tier) && cardFamily == family)
+                    {
+                        count++;
+                    }
+                }
+                totalGroups += count / CardRatio(family);
+            }
+            if (totalGroups <= 0)
+            {
+                return 0;
+            }
+            ExchangeManager exchange = PlayerStore.Instance.exchangeManager;
+            int boxes = 0;
+            foreach (CardFamily family in Order)
+            {
+                List<TrashCard> cards = new List<TrashCard>();
+                foreach (GameItem item in trash)
+                {
+                    CardFamily cardFamily;
+                    int tier;
+                    if (!ItemFactory.TryGetCardInfo(item, out cardFamily, out tier) || cardFamily != family)
+                    {
+                        continue;
+                    }
+                    TrashCard card = new TrashCard();
+                    card.Item = item;
+                    card.Tier = ClampTier(tier);
+                    cards.Add(card);
+                }
+                if (cards.Count < CardRatio(family))
+                {
+                    continue;
+                }
+                cards.Sort(delegate(TrashCard a, TrashCard b)
+                {
+                    return a.Tier.CompareTo(b.Tier);
+                });
+                int ratio = CardRatio(family);
+                int groups = cards.Count / ratio;
+                for (int g = 0; g < groups; g++)
+                {
+                    int start = g * ratio;
+                    // Sorted ascending, so the group's lowest tier is its first card.
+                    int tier = cards[start].Tier;
+                    GameItem box = BuildBox(family, tier);
+                    if (box == null)
+                    {
+                        // Do not consume a group whose crate could not be created.
+                        WarnOnce("box:" + family + ":" + tier,
+                            "[CF-SAWYER] cannot build box family=" + family + " tier=" + tier
+                            + "; cards kept");
+                        break;
+                    }
+                    for (int i = 0; i < ratio; i++)
+                    {
+                        cards[start + i].Item.Destroy();
+                    }
+                    exchange.itemsBuffer.Add(box);
+                    boxes++;
+                    Log.Info("[CF-SAWYER] box family=" + family + " tier=" + tier
+                        + " id=" + box.identifier + " cards=" + ratio);
+                    if (capped)
+                    {
+                        if (totalGroups > boxes)
+                        {
+                            Log.Info("[CF-SAWYER] cap: 1 box/night until CF_SAWYER_BATCH");
+                        }
+                        return boxes;
+                    }
+                }
+            }
+            return boxes;
+        }
+
+        private static GameItem BuildBox(CardFamily family, int tier)
+        {
+            GameItem box;
+            if (tier == 1 && family != CardFamily.CMD)
+            {
+                // Vanilla T1 crates keep their original id and fillers: the helper
+                // fills the loot and locks the crate itself (PreBuiltItemHelper.
+                // CreateLootCrate -> crateFillers + LockHelper.LockUpContainer).
+                switch (family)
+                {
+                    case CardFamily.SEC:
+                        box = PreBuiltItemHelper.LootCrateSecurity();
+                        break;
+                    case CardFamily.MED:
+                        box = PreBuiltItemHelper.LootCrateMedical();
+                        break;
+                    case CardFamily.ENG:
+                        box = PreBuiltItemHelper.LootCrateEngineering();
+                        break;
+                    case CardFamily.SER:
+                        box = PreBuiltItemHelper.LootCrateService();
+                        break;
+                    default:
+                        box = null;
+                        break;
+                }
+            }
+            else
+            {
+                // T2/T3 crates and the new CMD T1 crate: CfCrateFillPatch fills the
+                // loot and locks it inside DirectoryMaster.Item.
+                box = DirectoryMaster.Item(ItemFactory.ContainerId(family, tier));
+            }
+            if (box == null || box.contentWindow == null)
+            {
+                // DirectoryMaster.Item falls back to a dummy item for an unknown
+                // id; a crate without a content window is not a crate. Keep the
+                // cards instead of trading them for a broken item.
+                if (box != null)
+                {
+                    box.Destroy();
+                }
+                return null;
+            }
+            return box;
+        }
+
+        // Cores: three same-family same-tier cores -> one core of the next tier.
+        // One conversion per family per night (T1 first, so 3 T1 + 3 T2 only makes
+        // the T1->T2 core and leaves the T2 cores alone).
+        private static int UpgradeCores(List<GameItem> trash)
+        {
+            int produced = 0;
+            ExchangeManager exchange = PlayerStore.Instance.exchangeManager;
+            foreach (CardFamily family in Order)
+            {
+                for (int tier = 1; tier <= 2; tier++)
+                {
+                    List<GameItem> cores = FindCores(trash, family, tier);
+                    if (cores.Count < 3)
+                    {
+                        continue;
+                    }
+                    GameItem upgraded = ItemFactory.NewCryptoModule(family, tier + 1);
+                    if (upgraded == null)
+                    {
+                        WarnOnce("chip:" + family + ":" + tier,
+                            "[CF-SAWYER] cannot build core family=" + family
+                            + " tier=" + (tier + 1) + "; cores kept");
+                        break;
+                    }
+                    for (int i = 0; i < 3; i++)
+                    {
+                        cores[i].Destroy();
+                    }
+                    exchange.itemsBuffer.Add(upgraded);
+                    produced++;
+                    Log.Info("[CF-SAWYER] chip family=" + family + " " + tier
+                        + "->" + (tier + 1) + " id=" + upgraded.identifier);
+                    break;
+                }
+            }
+            return produced;
+        }
+
+        private static List<GameItem> FindCores(List<GameItem> trash, CardFamily family, int tier)
+        {
+            List<GameItem> cores = new List<GameItem>();
+            foreach (GameItem item in trash)
+            {
+                CardFamily coreFamily;
+                int coreTier;
+                if (TryGetCoreInfo(item, out coreFamily, out coreTier)
+                    && coreFamily == family
+                    && coreTier == tier)
+                {
+                    cores.Add(item);
+                }
+            }
+            return cores;
+        }
+
+        // Core identity is by id, not by tag: neither the vanilla T1 cores nor the
+        // cf cores carry a family/tier tag. The 0.5.4 alias
+        // cf_<family>_crypto_module_t3 is read-only (never produced).
+        internal static bool TryGetCoreInfo(GameItem item, out CardFamily family, out int tier)
+        {
+            family = CardFamily.SEC;
+            tier = 1;
+            if (item == null || string.IsNullOrEmpty(item.identifier))
+            {
+                return false;
+            }
+            string id = item.identifier;
+            foreach (CardFamily candidate in Order)
+            {
+                if (id == ItemFactory.CryptoModuleId(candidate, 1))
+                {
+                    family = candidate;
+                    tier = 1;
+                    return true;
+                }
+                if (id == ItemFactory.CryptoModuleId(candidate, 2))
+                {
+                    family = candidate;
+                    tier = 2;
+                    return true;
+                }
+                if (id == ItemFactory.CryptoModuleId(candidate, 3))
+                {
+                    family = candidate;
+                    tier = 3;
+                    return true;
+                }
+                if (id == "cf_" + candidate.ToString().ToLowerInvariant() + "_crypto_module_t3")
+                {
+                    family = candidate;
+                    tier = 3;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Drops sec_crate_barter, med_crate_barter and eng_crate_barter from the
+        /// promotional barter pool, and their ids from activePromotionalBarterIds
+        /// (a save that already rolled them would otherwise keep a dead UI entry).
+        /// Does nothing at all before CF_SAWYER_PERMANENT is bought, so vanilla
+        /// keeps its three crate barters untouched. Idempotent: called from load,
+        /// new game, the upgrade's onUnlock and every night.
+        /// </summary>
+        internal static void EnsurePromotionalRemoved()
+        {
+            try
+            {
+                if (!CfNetwork.Unlocked(Permanent))
+                {
+                    return;
+                }
+                PlayerStore store = PlayerStore.Instance;
+                if (store == null || store.exchangeManager == null)
+                {
+                    return;
+                }
+                ExchangeManager exchange = store.exchangeManager;
+                int fromPool = 0;
+                if (exchange.promotionalBarter != null)
+                {
+                    fromPool = exchange.promotionalBarter.RemoveAll(IsRemovedBarter);
+                }
+                int fromActive = 0;
+                if (exchange.activePromotionalBarterIds != null)
+                {
+                    fromActive = exchange.activePromotionalBarterIds.RemoveAll(IsRemovedBarterId);
+                }
+                if ((fromPool > 0 || fromActive > 0) && !_removalLogged)
+                {
+                    _removalLogged = true;
+                    Log.Info("[CF-SAWYER] removed promotional barters "
+                        + "sec_crate_barter,med_crate_barter,eng_crate_barter");
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-SAWYER] promotional removal failed: " + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        private static bool IsRemovedBarter(ExchangeBarter barter)
+        {
+            return barter != null && IsRemovedBarterId(barter.identifier);
+        }
+
+        private static bool IsRemovedBarterId(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return false;
+            }
+            return id == "sec_crate_barter" || id == "med_crate_barter" || id == "eng_crate_barter";
+        }
+
+        private static int ClampTier(int tier)
+        {
+            if (tier < 1)
+            {
+                return 1;
+            }
+            return tier > 3 ? 3 : tier;
+        }
+
+        private static void Diag(string key, string message)
+        {
+            if (_diag.Add(key))
+            {
+                Log.Info(message);
+            }
+        }
+
+        private static void WarnOnce(string key, string message)
+        {
+            if (_diag.Add("warn:" + key))
+            {
+                Log.Warn(message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// P5 paper catalogue ("索耶的换卡目录"). Registered through
+    /// ModHelper.RegisterPaperBook, which stores the book in PaperBookRegistry and
+    /// registers data.item.id in the live ModItemDirectory. That directory may not
+    /// exist during OnEnable, so EnsureRegistered is called again from
+    /// CfNetwork.OnGameLoadedLate / OnNewGameStarted. Registration is deliberately
+    /// not guarded by a "registered once" bool: re-registering is a remove+add in
+    /// the registry and is what makes the item factory appear once the directory
+    /// is live.
+    /// </summary>
+    internal static class CfSawyerPaper
+    {
+        internal const string BookId = "cf_sawyer_card_catalog";
+        internal const string ItemId = "cf_sawyer_card_catalog_item";
+
+        internal static void EnsureRegistered()
+        {
+            try
+            {
+                ModHelper.RegisterPaperBook(CardCraftAndFenceMod.ModId, Build());
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-SAWYER] paper registration failed: "
+                    + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        internal static PaperBookData Build()
+        {
+            PaperBookData data = new PaperBookData();
+            data.id = BookId;
+            data.title = "索耶的换卡目录";
+            data.background = "notebook_manual";
+            data.designWidth = 314f;
+            data.designHeight = 402f;
+            data.chrome = PaperStarters.DefaultChrome(new Vector2(314f, 402f), 2f);
+
+            PaperPageData page = new PaperPageData();
+            page.name = "换卡比例";
+            PaperElementData text = new PaperElementData();
+            text.type = "text";
+            text.x = 24f;
+            text.y = 34f;
+            text.w = 266f;
+            text.h = 336f;
+            text.style = "body";
+            text.wrap = true;
+            text.text =
+                "索耶的换卡目录\n\n"
+                + "一、换卡（垃圾桶里的旧钥匙卡）\n"
+                + "同家族的钥匙卡攒够一组，换 1 个同家族物资箱：\n"
+                + "SEC 3 张／MED 4 张／ENG 4 张／SER 4 张／CMD 3 张。\n\n"
+                + "二、箱子等级\n"
+                + "同家族的卡按等级从低到高排序，每满一组切一组；\n"
+                + "箱子取这一组里最低的等级。\n"
+                + "例：3 T1 + 3 T2 → 1 个 T1 箱 + 1 个 T2 箱；\n"
+                + "1 T1 + 2 T2 → 只够 1 个 T1 箱（零散卡由低到高凑满）；\n"
+                + "4 T1 + 2 T2 → 2 个 T1 箱。\n"
+                + "箱子已装好物资并上锁，等级越高锁越硬。\n\n"
+                + "三、批量\n"
+                + "未解锁「批量换卡」前，每晚最多换 1 个箱子（跨家族）；\n"
+                + "解锁后当晚把能凑满的全部换完。\n\n"
+                + "四、芯片\n"
+                + "3 个同家族同级的加密模块 → 1 个同家族下一级：\n"
+                + "T1→T2、T2→T3；T3 不再升。\n"
+                + "每晚每个家族最多 1 次，芯片不占换卡名额。";
+            page.elements.Add(text);
+            data.pages.Add(page);
+
+            data.item = new PaperItemData();
+            data.item.id = ItemId;
+            data.item.name = "索耶的换卡目录";
+            data.item.description = "记录旧城交易所的换卡比例与凑单规则。";
+            data.item.sprite = "items_misc/manual1";
+            data.item.value = 50L;
+            data.item.important = false;
+            return data;
+        }
+
+        /// <summary>
+        /// Hands the catalogue to the player. Called from CF_SAWYER_PERMANENT's
+        /// onUnlock, so it must never throw into the purchase flow.
+        /// </summary>
+        internal static void Grant()
+        {
+            try
+            {
+                EnsureRegistered();
+                GameItem book = ModHelper.SpawnPaperItem(CardCraftAndFenceMod.ModId, BookId);
+                if (book == null)
+                {
+                    Log.Warn("[CF-SAWYER] paper book item not registered yet id=" + BookId);
+                    return;
+                }
+                GeneralHelper.SetItemOwned(book, true);
+                if (EmporiumEntry.Instance == null || EmporiumEntry.Instance.backInvinvElement == null)
+                {
+                    Log.Warn("[CF-SAWYER] paper book not granted: emporium is not ready");
+                    book.Destroy();
+                    return;
+                }
+                // Falls through to the other store inventories when the back
+                // counter is full, so the book cannot be lost.
+                GraphUtils.EmporiumTryAdd(EmporiumEntry.Instance.backInvinvElement, book);
+                Log.Info("[CF-SAWYER] paper book granted id=" + BookId);
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-SAWYER] paper grant failed: " + e.GetType().Name + ": " + e.Message);
             }
         }
     }

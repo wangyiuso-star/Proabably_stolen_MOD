@@ -4,7 +4,8 @@
 > §3.3 箱體定案表（含 T3 箱）與 loot 表（含 T3 loot／EV）、貼圖決策與 errata、
 > §3.4b 的 T3 卡／核定價、§3.5 的 P3 實作（空白卡晶片、專業密序器、批量模組），
 > 以及 P4 的 §3.8（退休製卡匠／博士）、§3.10(2)（小偷分級箱）、
-> §3.11（Wild Network 4 個升級）、§3.12（CMD 箱執行期染色貼圖）。
+> §3.11（Wild Network 7 個升級）、§3.12（CMD 箱執行期染色貼圖），
+> 和 P5 的 §3.9（索耶換卡／芯片／常駐服務／紙本目錄）。
 
 ## §3.3 箱子 — 定案表（P2／P4 已實作）
 
@@ -657,9 +658,198 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - `[CF-INVENTOR] counter full, skipped <id>`（住所 hook 放不下）
 - `[CF-STOCK] counter full, skipped <id>`（僅卡匠貨架）
 
+## §3.9 索耶換卡（P5，0.7.0 實作）
+
+> 本節只寫「已寫進代碼、且已用離線核對過」的規則。實機（每晚換卡、芯片升級、
+> 紙本渲染）尚未驗，見 §3.9.9 與 `CARD_CRAFT_STATUS.md`。
+
+### §3.9.1 觸發與前置
+
+- 掛 `ModHook.OnHandlingNightlyServicesEarly`：`OnEnable` 先 `-=` 再 `+=`
+  `CfSawyerExchange.OnHandlingNightlyServicesEarly`，`OnDisable` `-=`；
+  **沒有新增 Harmony patch**。
+- 這個 hook 在 `PlayerStore.EndNight()` 內、`HandleJanitorial()` 之前
+  （PlayerStore.cs:1687）。這個位置讓三件事同時成立：
+  - 卡與核心還在垃圾桶（`ClearTrash()` 還沒跑）；
+  - 原版 `exchangeManager.HandleExchange()` 也還沒跑，被索耶吃掉的卡
+    不會再被原版 barter 拿去換；
+  - 產出放進 `exchangeManager.itemsBuffer`，而 `TransferBuffer()` 在
+    `ClearTrash()` 之後才跑（PlayerStore.cs:1937-1943），所以新箱子不會被清掉。
+- 前置（缺一就整晚跳過，同一原因只印一次 log）：
+  1. `StoreService.GetJanitorialService().unlocked && .isUsing`；
+  2. `PlayerStore.Instance.exchangeManager.isExchangeUnlocked`；
+  3. `CF_SAWYER_PERMANENT` 已解鎖。
+- 掃描垃圾桶：`GraphUtils.FindAllChildrenType<GameItem>(EmporiumEntry.Instance.trashcan)`
+  （與原版 `ExchangeBarter.GetRequiredItems` 同一個掃法，含箱子裡的子物品）。
+- handler 全程 try/catch：例外只 `Log.Error`，**不讓 `EndNight` 中斷**。
+
+### §3.9.2 換卡（垃圾桶裡的同家族鑰匙卡 → 物資箱）
+
+- 比例（一張卡換 1 箱的張數）：**SEC 3、MED 4、ENG 4、SER 4、CMD 3**。
+- 同家族的卡按等級**低→高**排序，每滿一組切一組；**箱子等級 = 該組最低等級**：
+  - 3 T1 + 3 T2（比例 3）→ 1 個 T1 箱 + 1 個 T2 箱；
+  - 1 T1 + 2 T2 → 只夠 1 個 T1 箱（零散的高級卡不會自己湊成箱）；
+  - 4 T1 + 2 T2 → 2 個 T1 箱。
+  - 結果與垃圾桶的擺放順序無關（先按等級排序再切組）。
+- 卡識別：`ItemFactory.TryGetCardInfo`（既有）——只認有 `CF_CARD_FAMILY` /
+  `CF_CARD_TIER` 的卡，或原版 T1 id（`sec_keycard`／`med_keycard`／
+  `eng_keycard`／`ser_keycard`／`cmd_keycard`）。等級夾在 1–3。
+- 箱體（**都是已填 loot＋已上鎖**）：
+  - T1 非 CMD：`PreBuiltItemHelper.LootCrateSecurity()`／`LootCrateMedical()`／
+    `LootCrateEngineering()`／`LootCrateService()`——原版 T1 箱 id、原版
+    `crateFillers` 填 loot、`LockHelper.LockUpContainer` 上鎖；
+  - 其餘（T2／T3 五家族、CMD T1）：`DirectoryMaster.Item(ItemFactory.ContainerId(family,tier))`，
+    由既有 `CfCrateFillPatch` 自動填 loot 並上鎖。
+- 建立失敗（`null`，或拿回的東西沒有 `contentWindow`＝`DirectoryMaster.Item`
+  對未知 id 的 dummy fallback）→ **該組卡不銷毀**，跳過這個家族剩下的組。
+- 每組**成功後**才 `Destroy()` 該組的卡（避免同一晚再被原版 barter 用）。
+- 箱加進 `exchangeManager.itemsBuffer`。
+- **批次上限**：`CF_SAWYER_BATCH` 未解鎖 → 全夜總產出上限 **1 箱（跨家族）**；
+  已解鎖 → 全部做完。
+
+### §3.9.3 換卡的實作裁定
+
+- **固定處理順序**（可重現）：家族 `SEC → MED → ENG → SER → CMD`，
+  同家族內等級低→高；同級卡彼此等價，先銷毀哪一張不影響結果。
+- 未解鎖批量時，達到 1 箱就**立刻停止整個換卡流程**，剩下的卡不消耗、
+  留給原版 barter／`ClearTrash`。只有「垃圾桶裡還有其他湊得滿的組」時才印
+  `[CF-SAWYER] cap: 1 box/night until CF_SAWYER_BATCH`（真的是被上限扣下一個
+  箱子才印；剛好湊滿 1 箱、或剩下的零散卡本來就湊不成箱，都不會多印）。
+- 箱子的 loot 與鎖**不自己填**：一律交給原版 helper 或既有
+  `CfCrateFillPatch`，本輪不新增任何填箱程式碼。
+- 箱子的 `unitValue`／id 完全照 §3.3 表；T1 沿用原版 id（SEC／MED／ENG 200、
+  SER 175、CMD T1 200）。
+- 箱子放 `itemsBuffer` 後由原版 `TransferBuffer` → `TryAcceptAllOrDestroy`
+  進垃圾桶；垃圾桶滿時原版會印 `exchange delivery, trashcan full` 並丟棄，
+  這是原版行為，本 MOD 不另外搬運。
+
+### §3.9.4 芯片升級（加密模組）
+
+- 前提：`CF_SAWYER_PERMANENT` + `CF_SAWYER_CHIP` 都已解鎖（handler 本身也要求
+  PERMANENT）。
+- **3 個同家族同級核心 → 1 個同家族下一級核心**：T1→T2、T2→T3；**T3 不再升**。
+- **每晚每家族最多 1 次**（不是每級）：同家族同時有 3 個 T1 與 3 個 T2 時，
+  只做 T1→T2 那一組，T2 那組留著（實作：T1 先試、成功就 `break` 出該家族）。
+- 核心來源同樣是垃圾桶。核心**照 id 識別、不看 tag**（T1 原版核心與本 MOD 核心
+  都沒有 family/tier tag）：
+
+  | id | 家族 | 等級 |
+  |---|---|---|
+  | `crypto_module_sec`／`med`／`eng`／`ser`／`cmd` | 對應家族 | T1 |
+  | `cf_crypto_module_<slug>_t2` | 對應家族 | T2 |
+  | `cf_crypto_module_<slug>_t3` | 對應家族 | T3 |
+  | `cf_<slug>_crypto_module_t3`（0.5.4 舊 alias） | 對應家族 | T3（**只讀，不再產生**） |
+
+- 產出用 `ItemFactory.NewCryptoModule(family, tier+1)`；**成功才** `Destroy()`
+  那 3 個輸入核心，新核心加進 `itemsBuffer`。
+- 芯片產出**不佔**換卡的「1 箱」上限（批量沒解鎖時照樣可以升芯片）。
+
+### §3.9.5 常駐服務與原版促銷 barter 的接管（`CF_SAWYER_PERMANENT`）
+
+- **只有 PERMANENT 已解鎖時才動原版資料**：
+  - 從 `ExchangeManager.promotionalBarter` 移除 `sec_crate_barter`、
+    `med_crate_barter`、`eng_crate_barter`；
+  - 同時把它們從 `activePromotionalBarterIds` 移除（舊存檔若已抽到這三個，
+    UI 才不會留一條點不動的條目）；
+  - 由自訂 handler（§3.9.2／§3.9.4）接管。
+- **未解鎖時完全不動原版資料**：三個 crate barter 仍會隨機出現在促銷池、
+  也仍能正常換（測試 6）。
+- 移除要在多個時機 **idempotent** 執行：`OnGameLoadedLate`、`OnNewGameStarted`、
+  PERMANENT 的 `onUnlock`、以及每晚 handler 開頭（防
+  `ExchangeManager.Init()`／`ResetPromotional()` 重建清單）。全部有 null 防護。
+- 只在**成功移除**時印一次 log（process 內只印一次，避免每晚洗版）：
+  `[CF-SAWYER] removed promotional barters sec_crate_barter,med_crate_barter,eng_crate_barter`。
+
+### §3.9.6 換卡目錄紙本 `cf_sawyer_card_catalog`
+
+- `CfSawyerPaper`：`BookId = "cf_sawyer_card_catalog"`、
+  `ItemId = "cf_sawyer_card_catalog_item"`。
+- `EnsureRegistered()` 建 `PaperBookData` 後呼叫
+  `ModHelper.RegisterPaperBook(CardCraftAndFenceMod.ModId, data)`。
+  **每次呼叫都重新註冊**（registry 內部是 remove+add；item factory 也每次
+  重註冊），刻意**不用**「只註冊一次」的 bool——否則在 `ModItemDirectory`
+  還沒 live 時註冊的那一次會讓後來的 item 註冊被跳過。
+- 書籍內容：title「索耶的换卡目录」、background `notebook_manual`、
+  designWidth 314／designHeight 402、`chrome = PaperStarters.DefaultChrome(new Vector2(314f,402f), 2f)`；
+  一頁 name「换卡比例」，頁面用一個 text element 直接寫（x=24、y=34、w=266、h=336、
+  style `body`、wrap），**不用 template**。文字至少列出：五家族比例、
+  箱子取該組最低等級、零散卡由低到高湊滿＋「1 T1 + 2 T2 → 1 個 T1 箱」例子、
+  未解鎖批量每晚 1 箱、芯片 3 同家族同級→下一級、每晚每家族 1 次、T3 不升。
+- `item`：`PaperItemData { id=ItemId, name="索耶的换卡目录",
+  description="记录旧城交易所的换卡比例与凑单规则。",
+  sprite="items_misc/manual1", value=50, important=false }`。
+- 註冊時機：`OnEnable`（純 static，不碰 PlayerStore）、`OnGameLoadedLate`、
+  `OnNewGameStarted`，以及 `Grant()` 之前。
+- **發放時機**：PERMANENT 的 `onUnlock`（`CfSawyerPaper.Grant()`）：先
+  `EnsureRegistered()`，再 `ModHelper.SpawnPaperItem(ModId, BookId)`；
+  非 null 才 `GeneralHelper.SetItemOwned(book,true)`＋
+  `GraphUtils.EmporiumTryAdd(EmporiumEntry.Instance.backInvinvElement, book)`
+  （後台滿會落到其他店內庫存，不會憑空消失），並印
+  `[CF-SAWYER] paper book granted id=cf_sawyer_card_catalog`。
+- 只用 registry 的紙本 item factory（`PaperBookRegistry.CreateItem` 會設
+  `DOCUMENT`／`GUIDE_PAPER_TAG`／`BookHelper.InitPaperGuide`），本 MOD 不自己
+  建紙本物品、不加新 id 到 `CfItemDirectory`。
+
+### §3.9.7 三個新升級（`tab="CardFence"`、`subtitle="索耶"`）
+
+| id | 價格 | 前置 | 效果 |
+|---|---:|---|---|
+| `CF_SAWYER_PERMANENT` | 400 | —（無 prerequisites） | 索耶常駐：每夜換卡＋接管原版三個 crate barter；`onUnlock` 發紙本目錄 |
+| `CF_SAWYER_BATCH` | 700 | `CF_SAWYER_PERMANENT` | 取消「每晚 1 箱」上限 |
+| `CF_SAWYER_CHIP` | 900 | `CF_SAWYER_PERMANENT` | 開啟芯片升級（3 同級→下一級） |
+
+- 「交換所已解鎖」不是 prerequisites，而是既有 `CfSawyerHidePatch`
+  （`NetworkUpgrade.IsHiddenForRun` postfix，§3.11.4）負責把 `CF_SAWYER_*`
+  在交換所未解鎖前藏起來；**不要**再加一個前置 id。
+- 三個都在 `CfNetwork.EnsureRegistered()` 裡用既有 `Add(...)` 包裝與 try/catch；
+  註冊 log 改成 `[CF-NET] registered N/7 CardFence upgrades tab=CardFence width=792/1060`，
+  只有 `ok == 7` 才印 hide 那行。
+- 分頁寬度不變：`CardFence` 仍是第 3 個分頁、佔 792/1060（§3.11.1），
+  **沒有第 4 個分頁**。
+- PERMANENT 的 `onUnlock` 用 try/catch 包住
+  `CfSawyerExchange.EnsurePromotionalRemoved()` 與 `CfSawyerPaper.Grant()`，
+  不可讓購買流程炸掉。
+
+### §3.9.8 診斷 log
+
+- `[CF-SAWYER] skip: janitorial off`
+- `[CF-SAWYER] skip: exchange locked`
+- `[CF-SAWYER] skip: CF_SAWYER_PERMANENT not unlocked`
+  （以上同一原因只印一次）
+- `[CF-SAWYER] night cards=N cores=M boxes=B chip=K`
+- `[CF-SAWYER] box family=SEC tier=1 id=sec_box cards=3`
+- `[CF-SAWYER] cap: 1 box/night until CF_SAWYER_BATCH`
+- `[CF-SAWYER] chip family=SEC 1->2 id=cf_crypto_module_sec_t2`
+- `[CF-SAWYER] removed promotional barters sec_crate_barter,med_crate_barter,eng_crate_barter`
+- `[CF-SAWYER] paper book granted id=cf_sawyer_card_catalog`
+- `[CF-NET] registered N/7 CardFence upgrades tab=CardFence width=792/1060`
+
+### §3.9.9 P5 未核實（截至本輪）
+
+- 每晚 handler 的**實際觸發時機**（janitorial 開著、交換所已解鎖、PERMANENT
+  已買）只在反編譯源對過行號，沒有 `Player.log` 樣本。
+- `CF_SAWYER_PERMANENT` 未解鎖時「原版三個 crate barter 仍正常」只有程式路徑
+  證明（handler 直接 return、`EnsurePromotionalRemoved` 直接 return），未實機測。
+- 箱子填 loot／上鎖的**觀感**：T1 走原版 helper、T2/T3/CMD T1 走 `CfCrateFillPatch`，
+  兩條路都沿用既有已驗證的機制，但「從 itemsBuffer 進垃圾桶後箱子是上鎖的、
+  內容物齊全」沒有實機看過。
+- 紙本的中文渲染與版面（314×402 design、266×336 body 文字會不會溢出、
+  換行位置）完全沒在遊戲裡看過；`PaperStarters.DefaultChrome` 是純數學，
+  但也只離線核對呼叫簽名。
+- 芯片升級「每晚每家族最多 1 次」與舊 alias 讀取（`cf_<slug>_crypto_module_t3`）
+  只有離線邏輯核對，沒有實機把 3 T1＋3 T2 放進垃圾桶跑過。
+- `activePromotionalBarterIds` 移除後，`ExchangeUIManager` 的促銷條目是否
+  立即消失、重開 UI 後是否復活，未實機看。
+- `_removalLogged` 是 process 內 static：同一行程切換存檔時，第二個存檔
+  的移除不會再印 log（行為正確、只是沒有第二條 log），未實機驗。
+- 紙本 item 註冊在 `ModItemDirectory` 尚未 live 時的第一輪會靜默失敗，
+  依賴 `OnGameLoadedLate`／`OnNewGameStarted`（與 `Grant` 前）補註冊；
+  這個時序沒有實機 log 證明。
+
 ## §3.10 黑市與小偷（P4 只做第 2 項）
 
-> 第 2 項「小偷賣分級箱」本輪實作；其餘黑市內容（紙本、索耶）不做。
+> 第 2 項「小偷賣分級箱」P4 實作；其餘黑市內容 P4 不做。
+> 紙本與索耶在 P5（§3.9）補上。
 
 ### §3.10.1 觸發
 
@@ -720,7 +910,7 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - `[CF-THIEF] counter full, skipped <id>`
 - `[CF-THIEF] skip: no T2/T3 box (bm=…)`（同原因只印一次）
 
-## §3.11 Wild Network「CardFence」分頁（P4）
+## §3.11 Wild Network「CardFence」分頁（P4／P5）
 
 ### §3.11.1 分頁寬度先量 tabBar
 
@@ -741,19 +931,21 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 結論：**CardFence 用第 3 個分頁，`tab = "CardFence"`，不需要塞進 Advanced。**
 但**不准再加第 4 個分頁**（例：P5 索耶若想要獨立分頁，會剛好 1060、沒有邊距）；
 P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新增分頁。
+**P5 裁定：三個索耶升級全部放進 `CardFence`（`tab="CardFence"`），分頁數仍是 3、
+寬度仍是 792/1060。**
 若未來真的需要第 4 個分頁，必須先重做 `tabBar` 寬度（改 prefab），不是改這段算術。
 
 ### §3.11.2 標籤與註冊
 
 - `OnEnable` 呼叫 `ModHelper.SetNetworkTabLabel("CardFence", () => "制卡")`；
   `GetTabLabel` 會先找 `UI` 表的 `network_ui_tab_CardFence`，沒有才用這個 provider。
-- **4 個升級**全部用 `ModHelper.AddNetworkUpgrade(...)`，`tab: "CardFence"`，
-  `subtitle` 只有 `Cardmaker` 與 `Thief` 兩種。
+- **7 個升級**全部用 `ModHelper.AddNetworkUpgrade(...)`，`tab: "CardFence"`，
+  `subtitle` 只有 `Cardmaker`、`Thief` 與 `索耶` 三種。
 - title／description 用 `Func<string>` provider 直接回中文（本 MOD 沒有自己的
   在地化檔）；`GetLocalizedTitle` 會先找 `NetworkUpgrade` 表的 `network_<id>_title`
   key，找不到才用 provider，所以之後補在地化不用改代碼。
 
-### §3.11.3 4 個升級（價格定案）
+### §3.11.3 7 個升級（價格定案）
 
 | id | 價格 | 前置 | subtitle | 效果 |
 |---|---:|---|---|---|
@@ -761,12 +953,18 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
 | `CF_FENCE_T2` | 1200 | `CF_FENCE_PRO` | Cardmaker | 製卡匠與博士加賣 3 張 T2 卡 + 3 個 T2 核 |
 | `CF_FENCE_T3` | 3000 | `CF_FENCE_T2` | Cardmaker | 製卡匠與博士加賣 1 張 T3 卡 + 同家族 1 個 T3 核；小偷 T3 箱的前置 |
 | `CF_FENCE_THIEF_T2` | 2200 | — | Thief | 黑市聲望 30 就能買 T2 箱（原本 60） |
+| `CF_SAWYER_PERMANENT` | 400 | — | 索耶 | 索耶常駐：每夜換卡、接管原版三個 crate barter；`onUnlock` 發換卡目錄紙本（§3.9） |
+| `CF_SAWYER_BATCH` | 700 | `CF_SAWYER_PERMANENT` | 索耶 | 取消「每晚 1 箱」上限 |
+| `CF_SAWYER_CHIP` | 900 | `CF_SAWYER_PERMANENT` | 索耶 | 芯片升級：3 個同家族同級核心 → 下一級（T3 不升） |
 
-- 4 個升級都是**取得管道**的開關；只有 `CF_FENCE_PRO` 會直接發物品（一次性）。
+- 7 個升級都是**取得管道**的開關；只有 `CF_FENCE_PRO` 與 `CF_SAWYER_PERMANENT`
+  會直接發物品（各一次性）。
+- `CF_SAWYER_*` 的三個**沒有**「交換所已解鎖」的 prerequisites id：那條由
+  `IsHiddenForRun` postfix（§3.11.4）負責，不要重複加前置。
 - `state = 1`（未買）、不可重複、無 cooldown；`recommended` 不設，避免佔用
   recommended 卡位。
 - 圖示 `iconKey` 不指定：`WildNetworkUI.ResolveIcon` 會 fallback 到 `BUY_REFERAL`，
-  不會出現空圖；P5 有專屬 icon 再補。
+  不會出現空圖；7 個升級都還沒有專屬 icon。
 - **刪除的舊 id**：`CF_FENCE_CONTACT`、`CF_FENCE_BATCH`、`CF_FENCE_SUPPLY`、
   `CF_FENCE_T1`、`CF_FENCE_THIEF`。舊存檔若買過這些 id，`networkUpgrade`
   字典裡會留下孤兒條目，但 `GetDefinitionsInOrder` 只認已註冊的定義，
@@ -777,8 +975,8 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
 - Postfix `NetworkUpgrade.IsHiddenForRun(string id)`：`id` 以 `CF_SAWYER_` 開頭，
   且 `PlayerStore.Instance.exchangeManager.isExchangeUnlocked == false` 時回 `true`。
 - 也就是：**交換所未解鎖前**索耶鏈完全隱藏；交換所解鎖後回歸原版判斷
-  （原版仍會依 `Advanced`／`IsPropertyPaid` 決定）。本輪不註冊任何
-  `CF_SAWYER_*`（P5 才做），只先把規則掛好。
+  （原版仍會依 `Advanced`／`IsPropertyPaid` 決定）。0.7.0（P5）起三個
+  `CF_SAWYER_*` 已註冊，這條規則才真正看得到效果。
 - postfix 只在 `__result` 為 false 時補 true，不動其他 id、不覆寫原版已判定的隱藏。
 
 ### §3.11.5 診斷 log
@@ -786,10 +984,11 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
 - `[CF-NET] register start id=… prereq=…`
 - `[CF-NET] register ok id=…`
 - `[CF-NET] register failed id=… stage=ModHelper.AddNetworkUpgrade …`
-- `[CF-NET] registered N/4 CardFence upgrades tab=CardFence width=792/1060`
-- `[CF-NET] hide CF_SAWYER_* until the exchange is unlocked`
+- `[CF-NET] registered N/7 CardFence upgrades tab=CardFence width=792/1060`
+- `[CF-NET] hide CF_SAWYER_* until the exchange is unlocked`（只有 `ok == 7` 才印）
 - `[CF-NET] PRO kit granted printer+chip+cnc+2 electronic+2 plastic+battery`
 - `[CF-INVENTOR] stock desequencer+batch`
+- 索耶本身的 log（`[CF-SAWYER] …`）見 §3.9.8。
 
 ### §3.11.6 註冊時序（0.5.2 修正）
 
@@ -813,13 +1012,17 @@ Error: NullReferenceException ... at CardCraftAndFenceMod.OnEnable () [0x000a]
 
 修正：
 
-- `OnEnable` **只做** `CfNetwork.EnsureTabLabel()`（純 static 字典，不碰 PlayerStore）。
-- 4 個升級改在 `ModHook.OnGameLoadedLate`（讀檔）與 `ModHook.OnNewGameStarted`
+- `OnEnable` **只做** `CfNetwork.EnsureTabLabel()`（純 static 字典，不碰 PlayerStore）；
+  0.7.0 起再加一個同樣純 static 的 `CfSawyerPaper.EnsureRegistered()`（只碰
+  `PaperBookRegistry`／`ModItemDirectory`，不碰 PlayerStore）。
+  `CfNetwork.EnsureRegistered`／`CfCmdBoxSprite.EnsureRegistered` 仍然不在 OnEnable。
+- 升級改在 `ModHook.OnGameLoadedLate`（讀檔）與 `ModHook.OnNewGameStarted`
   （新遊戲）註冊；这时 `PlayerStore.Instance` 已存在且 `networkUpgrade` 可用。
 - 每個 `Add` 各自 `try/catch`，印 `register start/ok/failed id=…`，
-  最後一定印 `registered N/4`；任何一個失敗都不會讓後面三個消失。
+  最後一定印 `registered N/7`（0.5.2 當時是 `N/4`）；任何一個失敗都不會讓後面的消失。
 - 每個讀檔／新遊戲都重跑一次（`RegisterModUpgrade` 對同 id 是 remove+add，
-  `PlayerStore.networkUpgrade` 只在缺 id 時補），所以第二輪新遊戲也會有 4 個定義。
+  `PlayerStore.networkUpgrade` 只在缺 id 時補），所以第二輪新遊戲也會有全部定義
+  （0.7.0 起 7 個）。
 - 這條也讓 `CF_FENCE_*` 在製卡匠／小偷第一次生成前就存在，gate 不會讀到缺 id。
 
 ## §3.12 CMD 箱貼圖＝執行期染色（0.5.1）
