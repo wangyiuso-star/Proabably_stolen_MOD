@@ -18,7 +18,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.7.4";
+        internal const string ModVersion = "0.7.5";
 
         public void Init(ModManifest manifest)
         {
@@ -2837,8 +2837,9 @@ namespace DeepSpaceQoL
         internal const string LockedKey = "cmd_box";
         internal const string UnlockedKey = "cmd_box_u";
 
-        // Only tune this constant after looking at it in game.
-        private static readonly Color CmdBlue = new Color(0.24f, 0.35f, 0.62f);
+        // 0.7.5: brighter royal blue (V 0.95, S 0.75). The old 0.24/0.35/0.62
+        // plus the 0.32+0.68*lum shade made the ~0.27-luminance body read black.
+        private static readonly Color CmdBlue = new Color(0.24f, 0.45f, 0.95f);
 
         private static readonly HashSet<string> _warned = new HashSet<string>();
         private static readonly HashSet<string> _loggedStats = new HashSet<string>();
@@ -3059,12 +3060,13 @@ namespace DeepSpaceQoL
             {
                 Color c = pixels[i];
                 float lum = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
-                // The vanilla security crate has no neutral white rim: its
-                // highlights are saturated light blue (screenshot sampling:
-                // brightest pixel ~= CmdBlue * 0.78). Gate on luminance alone so
-                // the bright rim can turn white; the body stays blue.
-                float highlight = Mathf.Clamp01((lum - 0.55f) / 0.25f);
-                float shade = 0.32f + 0.68f * lum;
+                // Gamma-lift the mid tones so the body stays a saturated blue
+                // instead of reading black; deep outlines keep a dark floor.
+                float t = Mathf.Clamp01(lum / 0.45f);
+                float shade = Mathf.Pow(t, 0.45f);
+                // Only the top of the source range (the rim/label highlights)
+                // goes white; the body keeps its saturation.
+                float highlight = Mathf.Clamp01((lum - 0.48f) / 0.20f);
                 float white = highlight * 0.90f;
                 pixels[i] = new Color(
                     Mathf.Lerp(tint.r * shade, 1f, white),

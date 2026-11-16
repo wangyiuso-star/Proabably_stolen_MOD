@@ -1108,14 +1108,14 @@ CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期把暗
   `src.texture.GetPixels((int)r.x, (int)r.y, (int)r.width, (int)r.height)`；
   不要拿整張 atlas。
 - 逐像素：`lum = 0.299r + 0.587g + 0.114b`；
-  `highlight = clamp01((lum-0.55)/0.25)`、`shade = 0.32 + 0.68*lum`；
-  `out = lerp(tint*shade, white, highlight*0.90)`（暗部藍、亮部按亮度轉白；
-  0.7.4 起不再用 saturation 門檻，因為治安箱亮部本身是飽和淡藍，會被
-  `neutral` 擋掉。首次註冊會印一行 `tint stats` 供調參）。
+  `t = clamp01(lum/0.45)`、`shade = pow(t, 0.45)`；
+  `highlight = clamp01((lum-0.48)/0.20)`；
+  `out = lerp(tint*shade, white, highlight*0.90)`（gamma 提亮箱身、保留飽和；
+  0.7.5 起只有亮部轉白，箱身不變淺）。
 - `new Texture2D(w, h, TextureFormat.RGBA32, false)`、`filterMode = Point`、
   `wrapMode = Clamp`、`SetPixels` + `Apply`；
   `Sprite.Create(tex, new Rect(0,0,w,h), new Vector2(0.5f,0.5f), 100f)`。
-- `CmdBlue = new Color(0.24f, 0.35f, 0.62f)`；**只調這一個常數**再實機看。
+- `CmdBlue = new Color(0.24f, 0.45f, 0.95f)`；**只調這一個常數**再實機看。
 - `sec_box` 是 96×64 px，`gridSize = 16` → 6×4 格；`SetSpriteAndShapeFromMod`
   用 `sprite.rect.width / gridSize` 算形狀，所以形狀與治安箱一致。
 
