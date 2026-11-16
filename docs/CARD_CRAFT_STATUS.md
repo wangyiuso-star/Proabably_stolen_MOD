@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-16（0.5.5：製卡匠改成 10 件少量＋每次輪換，不做翻頁）
+更新時間：2026-11-16（0.5.6：MED T3 rare dummy 修正，T3 核 id 統一到 crypto_module_<family>_t3）
 
 ## 階段
 
@@ -35,10 +35,10 @@
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.5.5 |
+| ModVersion | 0.5.6 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
 | 大小 | 61,440 bytes |
-| SHA256 | `EE5CE54DCE37DF2E10E66AE0B4D1DAD71BD6691C3EBEEE600658E0DC7E33403A` |
+| SHA256 | `07DD186E14F6C09817A04FE7966FCA4B0AE12E2E291BCA0986EBB8D8F5E7FF8B` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
 | git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
@@ -167,6 +167,41 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
   `EnsureRegistered` 有 4 次 `Add`、`Add` 有 exception handler、PRO kit 有
   `energy_credit`。
 - **PRO 工具包加電池**：`energy_credit`（原版 `PowerHelper.InitPowerSourceItem(100,10)`）。
+
+## 0.5.6 MED T3 rare dummy 修正
+
+實機：
+
+```text
+[CF-LOOT] spawn table=cf_med_t3_rare item=cf_crypto_module_med_t3
+Could not find GameItem identifier 'cf_crypto_module_med_t3'
+```
+
+根因是 **id 順序不一致**，不是 `Add` 重複、也不是 `RequireTier2`：
+
+- T2 核、T3 loot 表、spec 都是 `cf_crypto_module_<family>_t3`
+  （例：`cf_crypto_module_med_t3`）。
+- 0.5.4 的 `CryptoModuleId(family, 3)` 卻回 `cf_<family>_crypto_module_t3`
+  （例：`cf_med_crypto_module_t3`），所以 `InitDirectory` 註冊的是錯的 key；
+  loot 抽到 `cf_crypto_module_med_t3` 時查不到 → dummy。
+- CMD 也有一樣的錯，只是貨架上那顆是用錯的 key 建的，看起來正常；
+  CMD T3 箱的 rare 其實也會 dummy。
+- 這不是 `Directory.Add` 回 false：錯的 key 是**另一個新 id**，Add 會成功；
+  正確的 key 根本沒進字典。
+
+修正：
+
+- `CryptoModuleId(family, 3)` 改成 `cf_crypto_module_<family>_t3`，與 T2／loot／
+  spec 一致。
+- 舊的 `cf_<family>_crypto_module_t3` 保留成 **alias**，讓 0.5.4 存檔裡的舊物品
+  不會變 unknown；0.5.6 之後不再產生舊 id。
+- `BuildCryptoModule` 本來就只用 `RequireCardTier`，沒有 `RequireTier2`。
+- 驗證用 `.scratch/idcheck`（離線逐一比對 factory 與 loot 字串，取代再加一次
+  in-game InitDirectory dump）：
+  - 30 個 cf_* id（5 家族 × T2/T3 × 卡核箱）全部唯一；
+  - 5 家族的 T3 核／卡都在 `LootTables` 字串裡；
+  - `MED core t3 = cf_crypto_module_med_t3`、`CMD core t3 = cf_crypto_module_cmd_t3`；
+  - `BuildCryptoModule` 用 `RequireCardTier`、沒有 `RequireTier2`；`ID CHECK: PASS`。
 
 ## P4 修訂實作要點（詳見 spec §3.8／§3.10／§3.11）
 
@@ -321,7 +356,7 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
 
 ## 下一步
 
-1. 本輪 0.5.5（卡匠 10 件輪換）已提交（`7f96242`，本機 commit、未 push）。
+1. 本輪 0.5.6（T3 核 id 修正）待提交；0.5.5 卡匠輪換在 `7f96242`。
 2. 人類實機跑 P4 修訂與 CMD 貼圖驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／
    `[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`，並補 T3 in-game `[CF-EV]`。
 3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
@@ -342,7 +377,7 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
   `CfInventorStock`、`CfInventorPatch`；0.5.1 新增 `CfCmdBoxSprite`；
   `CfNetwork` 縮成 4 個升級；`CfThiefBoxes` 只賣 T2/T3；
   `ItemFactory`／`LootTables` 擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.5.5）
+- `src/CardCraftAndFence/manifest.xml`（0.5.6）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、§3.10、§3.11、§3.12）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、

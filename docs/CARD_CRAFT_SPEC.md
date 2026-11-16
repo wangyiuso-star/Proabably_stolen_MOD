@@ -489,6 +489,13 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - **T3 箱已是本輪新增**（§3.3：9×8、CMD 10×8、300／500、`CF_CRATE_TIER=3`），
   所以 T3 卡可以直接開 T3 箱；T3 卡也是製卡匠／博士的高價庫存與交易品。
 - T3 核的 `DESEQUENCER_TARGET_ID_TAG` 指向同家族 T3 卡，專業解序器可直接做。
+- **0.5.6 id errata**：0.5.4 的 `CryptoModuleId(family,3)` 回
+  `cf_<family>_crypto_module_t3`（家族在前），但 T2、loot 表與本表都是
+  `cf_crypto_module_<family>_t3`（crypto_module 在前）。MED T3 rare 因此
+  spawn 出未註冊的 `cf_crypto_module_med_t3` → dummy；CMD 也一樣，只是先被
+  貨架上的舊 id 擋住視線。0.5.6 統一為 `cf_crypto_module_<family>_t3`；
+  舊的 `cf_<family>_crypto_module_t3` 仍註冊成 alias，讓存檔裡的舊物品
+  不會變 unknown（0.5.6 之後不再產生舊 id）。
 
 ## §3.5 P3 — 空白卡晶片、專業密碼解序器、批量模組（0.3.0 已實作）
 

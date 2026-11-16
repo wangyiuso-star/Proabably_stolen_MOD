@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.5";
+        internal const string ModVersion = "0.5.6";
 
         public void Init(ModManifest manifest)
         {
@@ -256,6 +256,12 @@ namespace DeepSpaceQoL
                     () => ItemFactory.BuildKeycard(captured, 3));
                 Add(ItemFactory.CryptoModuleId(captured, 3),
                     () => ItemFactory.BuildCryptoModule(captured, 3));
+                // 0.5.4 registered T3 cores under the wrong order
+                // (cf_<family>_crypto_module_t3). Keep that id as a read-only
+                // alias so items already sitting in a save keep resolving;
+                // loot/factory/shelf all use cf_crypto_module_<family>_t3 now.
+                Add("cf_" + captured.ToString().ToLowerInvariant() + "_crypto_module_t3",
+                    () => ItemFactory.BuildCryptoModule(captured, 3));
                 Add(ItemFactory.ContainerId(captured, 3),
                     () => ItemFactory.BuildContainer(captured, 3));
             }
@@ -318,7 +324,11 @@ namespace DeepSpaceQoL
             RequireCardTier(tier);
             if (tier == 3)
             {
-                return "cf_" + Slug(family) + "_crypto_module_t3";
+                // Keep the T2 order: cf_crypto_module_<family>_t3. The loot
+                // tables and spec use this order; the old cf_<family>_crypto_
+                // module_t3 id registered a different key, so MED T3 rare
+                // rolled a missing item and the renderer fell back to dummy.
+                return "cf_crypto_module_" + Slug(family) + "_t3";
             }
             switch (family)
             {
