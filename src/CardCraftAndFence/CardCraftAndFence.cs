@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.9";
+        internal const string ModVersion = "0.6.0";
 
         public void Init(ModManifest manifest)
         {
@@ -2049,34 +2049,33 @@ namespace DeepSpaceQoL
             CardFamily.CMD
         };
 
-        // Cap 11; actual batch is 9: 6 fixed supplies (materials 2+2) + 3 cores.
-        // The printer is not sold here; CF_FENCE_PRO already hands it over.
-        // Cores are no longer in any loot table, so this is their only source.
-        // The 3 families rotate on day % 5; the tier is the highest unlocked.
+        // Cap 11. The printer is always stocked now (expansion); the chip and CNC
+        // are only added while their owned count is below the printer count.
+        // Cores are no longer in any loot table; 3 families rotate on day % 5 and
+        // the tier is the highest unlocked.
         internal static void AddMakerStock(int day)
         {
-            List<string> ids = new List<string>();
-            ids.Add(ItemFactory.BlankKeycardChipId);
-            ids.Add("printer_module_cnc");
-            ids.Add("common_electronic");
-            ids.Add("common_electronic");
-            ids.Add("printer_plastic");
-            ids.Add("printer_plastic");
+            bool printerAdded = AddStock("printer");
+            int printers = CountOwned("printer") + (printerAdded ? 1 : 0);
+            if (CountOwned(ItemFactory.BlankKeycardChipId) < printers)
+            {
+                AddStock(ItemFactory.BlankKeycardChipId);
+            }
+            if (CountOwned("printer_module_cnc") < printers)
+            {
+                AddStock("printer_module_cnc");
+            }
+            AddStock("common_electronic");
+            AddStock("common_electronic");
+            AddStock("printer_plastic");
+            AddStock("printer_plastic");
 
             int coreTier = HighestCoreTier();
             int start = ((day % 5) + 5) % 5;
             for (int i = 0; i < 3; i++)
             {
                 CardFamily family = AllFamilies[(start + i) % 5];
-                ids.Add(ItemFactory.CryptoModuleId(family, coreTier));
-            }
-            while (ids.Count > 11)
-            {
-                ids.RemoveAt(ids.Count - 1);
-            }
-            foreach (string id in ids)
-            {
-                AddStock(id);
+                AddStock(ItemFactory.CryptoModuleId(family, coreTier));
             }
         }
 
@@ -2094,7 +2093,22 @@ namespace DeepSpaceQoL
             return 1;
         }
 
-        internal static void AddStock(string id)
+        // Owned means IS_OWNED_TAG; the just-added shelf printer is unowned, so
+        // the caller adds it explicitly when computing the target count.
+        private static int CountOwned(string id)
+        {
+            int count = 0;
+            foreach (GameItem item in PlayerStore.Instance.FindAllItem())
+            {
+                if (item != null && item.identifier == id)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        internal static bool AddStock(string id)
         {
             try
             {
@@ -2104,24 +2118,27 @@ namespace DeepSpaceQoL
                 if (item == null)
                 {
                     Log.Warn("[CF-STOCK] missing item " + id);
-                    return;
+                    return false;
                 }
                 if (!GraphUtils.CanAccept(EmporiumEntry.Instance.frontInvinvElement, item))
                 {
                     item.Destroy();
                     Log.Warn("[CF-STOCK] counter full, skipped " + id);
-                    return;
+                    return false;
                 }
                 if (!PlayerStore.Instance.TryAddDirectSellingItemToTable(item, isOwend: false))
                 {
                     // CanAccept was true, so this is a client-policy refusal
                     // (e.g. a distrusted faction), not a full counter.
                     Log.Warn("[CF-STOCK] refused by client policy, skipped " + id);
+                    return false;
                 }
+                return true;
             }
             catch (Exception e)
             {
                 Log.Warn("[CF-STOCK] cannot offer " + id + ": " + e.GetType().Name + ": " + e.Message);
+                return false;
             }
         }
 

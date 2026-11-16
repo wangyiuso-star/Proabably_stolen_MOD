@@ -569,36 +569,53 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 ### §3.8.4 製卡匠庫存（售價 = 物品 `unitValue`，不標 stolen、不賣箱子）
 
-**每次到訪最多 11 件，實際 9 件**（6 固定＋3 核心），不保存庫存，不做翻頁。
-核心已從所有 loot 表移除，所以卡匠是核心唯一穩定來源。
-**同一天不重複**：一天最多一位製卡匠，`maker_last_day` 已擋。
+**每次到訪最多 11 件，實際 8–10 件**：printer 固定 1，chip／CNC 依數量差
+各加 0–1，材料 2+2，核心 3。不保存庫存，不做翻頁。核心已從所有 loot 表移除，
+所以卡匠是核心唯一穩定來源。**同一天不重複**：一天最多一位製卡匠，
+`maker_last_day` 已擋。
 
 | 類別 | 物品 | 數量 | 單價 |
 |---|---|---:|---:|
-| 固定 | `cf_printer_chip_blank_keycard` | 1 | 250 |
-| 固定 | `printer_module_cnc` | 1 | 400 |
+| 固定 | `printer` | 1 | 350（premiumBuy15） |
+| 條件 | `cf_printer_chip_blank_keycard` | 0 或 1 | 250 |
+| 條件 | `printer_module_cnc` | 0 或 1 | 400 |
 | 材料 | `common_electronic` | 2 | 33 |
 | 材料 | `printer_plastic` | 2 | 12 |
 | 核心 | 3 家族輪換，最高已解鎖等級 | 3 | 依 id |
 
-- 固定 6 件（晶片、CNC、電子×2、plastic×2）＋核心 3 件 = **9 件**；
-  上限 11 只是硬上限，不會補滿。
+- **printer 每次固定 1 台**，售價 = `unitValue` 350，client 已掛
+  `premiumBuy15`。
+- **chip／CNC 用數量差**：先放 printer，再算
+  `CountOwned(id) < CountOwned("printer")`（含剛上架那台），成立才各加 1；
+  一次最多補 1 個，缺很多台就多來幾次。`CountOwned` 用
+  `PlayerStore.Instance.FindAllItem()` 數 `identifier`。
+- 沒有擴產需求時 8 件（printer＋4 材料＋3 核心）；chip／CNC 都補時 10 件；
+  上限 11 不會補滿。
 - 核心等級：只取已解鎖的最高等級（T3 → T2 → T1）。
 - 核心家族：`start = day % 5`，取 `AllFamilies[start..start+2]`（環繞），
   所以 5 天輪完五家族，每天 3 顆。
-- **總價現況**（固定 740＋3 核心）：T1 1440–1640、T2 1840–2240、
-  T3 2390–2990；**T2/T3 沒有落在 1500–2000**。要達標必須降核心
-  `unitValue`、把核心減到 2 顆，或把 CNC／晶片從貨架拿掉；這版先照
-  3 顆實作，等使用者選。
+- **總價**（材料 90；chip 250、CNC 400 依需求）：
+  - 無擴產：T1 1040–1340、T2 1340–1940、T3 1790–2690；
+  - chip+CNC 都補：T1 1690–1990、T2 1990–2590、T3 2440–3340。
+  T2/T3 仍不一定落在 1500–2000；要精準控制需改核心 `unitValue` 或核心數。
 - 卡匠不再賣卡；卡只從箱子 rare／小偷箱來。博士也不賣卡／核。
 - **不賣箱子**（任何 T1／T2／T3 箱都不在工匠庫存）。
-- **不賣印表機／金屬模組**：PRO 工具包已給第一套，不重複賣。
+- **不賣金屬模組**（`printer_module_metal`）；printer 本體有賣，CNC 條件賣。
 - 全部 `isOwend: false`：玩家要付 `unitValue` 買；沒有額外 markup。
 - **櫃台滿＝該件本次不販售**：先 `GraphUtils.CanAccept(front, item)` 探測；
   放不下就 `Destroy()`＋`[CF-STOCK] counter full, skipped <id>`，
   **絕對不** `EmporiumTryAdd(backInvinvElement, …)`，也不進玩家背包。
   `TryAddDirectSellingItemToTable` 在失敗時本來就會銷毀，先探測是為了留下
   可讀的 skip log。
+
+#### 多台機器（2026-11-16 擴產）
+
+- 每台 `printer` 是獨立 GameItem，夜間 tick、進度、晶片與模組狀態都掛在
+  該台自己的 tag／machine tag 上，不共用全域狀態；多台可同時跑。
+- 卡匠每次固定賣 1 台 printer；chip／CNC 依「擁有數 < printer 數」各補 1，
+  所以第 2、3 台要分幾次到訪才能補齊配件。
+- **批量模組是 per-machine**：只有插了模組的那台 batch = 2；其他台仍是 1。
+  同一台插兩張模組不會變 3／4，`BatchSize` 上限就是 2（第二張不生效）。
 
 ### §3.8.5 博士（`StoreClientList.CreateInventor`）庫存
 
