@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.6";
+        internal const string ModVersion = "0.5.7";
 
         public void Init(ModManifest manifest)
         {
@@ -2067,25 +2067,15 @@ namespace DeepSpaceQoL
             ids.Add("printer_plastic");
             ids.Add("printer_plastic");
 
-            List<int> tiers = UnlockedTiers();
-            List<string> cards = new List<string>();
-            List<string> cores = new List<string>();
-            foreach (int tier in tiers)
+            // Cores are no longer in any T2/T3 loot table, so the cardmaker is
+            // their only stable source: one of each family for every unlocked
+            // tier. They are fixed, never randomly dropped from the shelf.
+            foreach (int tier in UnlockedTiers())
             {
                 foreach (CardFamily family in AllFamilies)
                 {
-                    cards.Add(ItemFactory.KeycardId(family, tier));
-                    cores.Add(ItemFactory.CryptoModuleId(family, tier));
+                    ids.Add(ItemFactory.CryptoModuleId(family, tier));
                 }
-            }
-            // 3 draws, split 2+1 or 1+2 so cards and cores are both represented.
-            int cardCount = RNG.GetRandomInt(1, 2);
-            AppendRandomDistinct(ids, cards, cardCount);
-            AppendRandomDistinct(ids, cores, 3 - cardCount);
-
-            while (ids.Count > 10)
-            {
-                ids.RemoveAt(ids.Count - 1);
             }
             foreach (string id in ids)
             {
@@ -2105,61 +2095,6 @@ namespace DeepSpaceQoL
                 tiers.Add(3);
             }
             return tiers;
-        }
-
-        private static void AppendRandomDistinct(List<string> target, List<string> pool, int count)
-        {
-            List<string> copy = new List<string>(pool);
-            for (int i = copy.Count - 1; i > 0; i--)
-            {
-                int j = RNG.GetRandomInt(0, i);
-                string swap = copy[i];
-                copy[i] = copy[j];
-                copy[j] = swap;
-            }
-            int take = Math.Min(count, copy.Count);
-            for (int i = 0; i < take; i++)
-            {
-                target.Add(copy[i]);
-            }
-        }
-
-        internal static void AddTier2()
-        {
-            foreach (CardFamily family in PickFamilies(3))
-            {
-                AddStock(ItemFactory.KeycardId(family, 2));
-            }
-            foreach (CardFamily family in PickFamilies(3))
-            {
-                AddStock(ItemFactory.CryptoModuleId(family, 2));
-            }
-        }
-
-        internal static void AddTier3()
-        {
-            CardFamily family = PickFamilies(1)[0];
-            AddStock(ItemFactory.KeycardId(family, 3));
-            AddStock(ItemFactory.CryptoModuleId(family, 3));
-        }
-
-        // Distinct random families: a Fisher-Yates shuffle over the five-family
-        // pool driven by the game's RNG, not System.Random.
-        internal static List<CardFamily> PickFamilies(int count)
-        {
-            List<CardFamily> pool = new List<CardFamily>(AllFamilies);
-            for (int i = pool.Count - 1; i > 0; i--)
-            {
-                int j = RNG.GetRandomInt(0, i);
-                CardFamily swap = pool[i];
-                pool[i] = pool[j];
-                pool[j] = swap;
-            }
-            if (count < pool.Count)
-            {
-                pool.RemoveRange(count, pool.Count - count);
-            }
-            return pool;
         }
 
         internal static void AddStock(string id)
@@ -2317,7 +2252,7 @@ namespace DeepSpaceQoL
             List<string> parts = new List<string>();
             parts.Add("fixed");
             parts.Add("materials");
-            parts.Add("cards");
+            parts.Add("cores");
             if (CfNetwork.Unlocked(CfNetwork.Tier2))
             {
                 parts.Add("t2");
@@ -2505,19 +2440,11 @@ namespace DeepSpaceQoL
                     {
                         original();
                     }
+                    // Fixed every visit: the only two card-craft machines the
+                    // doctor sells. Cards/cores are not his stock anymore.
                     CfCardStock.AddStock("cf_pro_desequencer");
                     CfCardStock.AddStock("cf_batch_card_module");
-                    if (CfNetwork.Unlocked(CfNetwork.Tier2))
-                    {
-                        CfCardStock.AddTier2();
-                    }
-                    if (CfNetwork.Unlocked(CfNetwork.Tier3))
-                    {
-                        CfCardStock.AddTier3();
-                    }
-                    Log.Info("[CF-INVENTOR] stock desequencer+batch tier2="
-                        + CfNetwork.Unlocked(CfNetwork.Tier2)
-                        + " tier3=" + CfNetwork.Unlocked(CfNetwork.Tier3));
+                    Log.Info("[CF-INVENTOR] stock desequencer+batch");
                 }
                 catch (Exception e)
                 {
@@ -2560,94 +2487,73 @@ namespace DeepSpaceQoL
             }
             _registered = true;
 
+            // Value floor: T2 common only keeps unitValue >= 60, T2 rare only
+            // keycards + the family's highest-value gear. No cores.
             Register(CommonId(CardFamily.SEC, 2), new (string, float)[]
             {
-                ("heavy_pistol_ammo", 20f),
-                ("heavy_pistol_ammo_p", 15f),
-                ("bandage_item", 15f),
-                ("flashbang_grenade", 15f),
-                ("smoke_grenade", 15f),
-                ("stun_baton", 10f),
-                ("combat_knife", 10f)
+                ("flashbang_grenade", 20f),
+                ("smoke_grenade", 20f),
+                ("stun_baton", 30f),
+                ("combat_knife", 15f),
+                ("tazer", 10f),
+                ("glock_receiver", 5f)
             });
             Register(RareId(CardFamily.SEC, 2), new (string, float)[]
             {
-                ("cf_sec_keycard_t2", 30f),
-                ("cf_crypto_module_sec_t2", 20f),
-                ("glock_receiver", 15f),
-                ("stun_gun", 15f),
-                ("tazer", 10f),
-                ("current_converter", 10f)
+                ("cf_sec_keycard_t2", 35f),
+                ("glock_receiver", 25f),
+                ("stun_gun", 30f),
+                ("shotgun", 10f)
             });
 
             Register(CommonId(CardFamily.MED, 2), new (string, float)[]
             {
-                ("bandage_item", 5f),
-                ("hemostatic_bandage_item", 5f),
-                ("blood_bag", 5f),
-                ("salve", 22f),
-                ("rubbing_alcohol", 10f),
-                ("common_medical", 15f),
-                ("common_chemical", 10f),
-                ("pink_injector", 15f),
-                ("surgery_tool", 8f),
-                ("galaxy_blend", 5f)
+                ("salve", 40f),
+                ("large_purple_injector", 30f),
+                ("surgery_tool", 15f),
+                ("blue_blood_bag", 10f),
+                ("black_injector", 5f)
             });
             Register(RareId(CardFamily.MED, 2), new (string, float)[]
             {
                 ("cf_med_keycard_t2", 25f),
-                ("cf_crypto_module_med_t2", 40f),
-                ("black_injector", 15f),
-                ("surgery_tool", 10f),
-                ("blue_blood_bag", 5f),
-                ("bandage_item", 5f)
+                ("surgery_tool", 20f),
+                ("blue_blood_bag", 25f),
+                ("black_injector", 30f)
             });
 
             Register(CommonId(CardFamily.ENG, 2), new (string, float)[]
             {
-                ("common_electronic", 15f),
-                ("nuts_metal", 8f),
-                ("flux_agent", 8f),
-                ("screwdriver", 8f),
-                ("wire_cutter", 8f),
-                ("crowbar", 10f),
-                ("welder", 10f),
-                ("turbo_booster", 5f),
-                ("module_extractor", 10f),
-                ("current_converter", 5f),
-                ("system_capped_neural_core", 10f),
-                ("module_extractor_advanced", 3f)
+                ("crowbar", 15f),
+                ("welder", 15f),
+                ("module_extractor", 20f),
+                ("system_capped_neural_core", 15f),
+                ("current_converter", 15f),
+                ("module_extractor_advanced", 10f),
+                ("turbo_booster_adv", 5f),
+                ("advanced_flux_agent", 5f)
             });
             Register(RareId(CardFamily.ENG, 2), new (string, float)[]
             {
-                ("cf_eng_keycard_t2", 20f),
-                ("cf_crypto_module_eng_t2", 40f),
-                ("module_extractor_advanced", 10f),
-                ("turbo_booster_adv", 10f),
-                ("advanced_flux_agent", 10f),
-                ("current_converter", 10f)
+                ("cf_eng_keycard_t2", 25f),
+                ("system_capped_neural_core", 25f),
+                ("current_converter", 20f),
+                ("module_extractor_advanced", 30f)
             });
 
             Register(CommonId(CardFamily.SER, 2), new (string, float)[]
             {
-                ("processed_cheese", 8f),
-                ("box_cutter", 10f),
-                ("kitchen_knife", 15f),
-                ("hatchet", 12f),
-                ("caffeine_pill", 12f),
-                ("kotton_seed", 5f),
-                ("hydroreed_seed", 5f),
-                ("module_bay_expansion_kit", 26f),
-                ("current_converter", 7f)
+                ("module_bay_expansion_kit", 50f),
+                ("current_converter", 20f),
+                ("turbo_booster_adv", 15f),
+                ("advanced_flux_agent", 15f)
             });
             Register(RareId(CardFamily.SER, 2), new (string, float)[]
             {
-                ("cf_ser_keycard_t2", 20f),
-                ("cf_crypto_module_ser_t2", 40f),
-                ("current_converter", 15f),
-                ("module_bay_expansion_kit", 10f),
-                ("hatchet", 10f),
-                ("box_cutter", 5f)
+                ("cf_ser_keycard_t2", 50f),
+                ("current_converter", 20f),
+                ("turbo_booster_adv", 15f),
+                ("advanced_flux_agent", 15f)
             });
 
             Register(CommonId(CardFamily.CMD, 1), new (string, float)[]
@@ -2674,159 +2580,109 @@ namespace DeepSpaceQoL
 
             Register(CommonId(CardFamily.CMD, 2), new (string, float)[]
             {
-                ("heavy_pistol_ammo", 22f),
-                ("heavy_pistol_ammo_p", 12f),
                 ("flashbang_grenade", 10f),
                 ("smoke_grenade", 10f),
-                ("bandage_item", 4f),
-                ("common_electronic", 5f),
-                ("stun_baton", 8f),
-                ("combat_knife", 8f),
-                ("stun_gun", 9f),
-                ("smg", 5f),
-                ("shotgun", 3f),
-                ("current_converter", 4f)
+                ("stun_baton", 15f),
+                ("combat_knife", 10f),
+                ("glock_receiver", 10f),
+                ("stun_gun", 15f),
+                ("smg", 10f),
+                ("shotgun", 5f),
+                ("current_converter", 5f),
+                ("tazer", 10f)
             });
             Register(RareId(CardFamily.CMD, 2), new (string, float)[]
             {
-                ("cf_cmd_keycard_t2", 20f),
-                ("cf_crypto_module_cmd_t2", 35f),
-                ("stun_gun", 10f),
-                ("smg", 10f),
-                ("shotgun", 10f),
-                ("current_converter", 10f),
-                ("glock_receiver", 5f)
+                ("cf_cmd_keycard_t2", 30f),
+                ("stun_gun", 20f),
+                ("smg", 20f),
+                ("shotgun", 30f)
             });
 
-            // T3 boxes. Base is the T2 common/rare pool plus the T3 card/core and
-            // the highest-value rares. Model EV (price 300 / CMD 500):
-            // SEC 4.332, MED 4.305, ENG 4.356, SER 4.165, CMD 4.150.
+            // T3 boxes. Value floor: common only keeps unitValue >= 120; rare
+            // only the T3 keycard + the family's highest-value gear. No cores.
+            // Model EV/price (300 / CMD 500): SEC 4.068, MED 4.125, ENG 4.271,
+            // SER 4.255, CMD 4.117.
             Register(CommonId(CardFamily.SEC, 3), new (string, float)[]
             {
-                ("heavy_pistol_ammo", 15f),
-                ("heavy_pistol_ammo_p", 10f),
-                ("bandage_item", 10f),
-                ("flashbang_grenade", 15f),
-                ("smoke_grenade", 15f),
                 ("stun_baton", 20f),
-                ("combat_knife", 15f)
+                ("glock_receiver", 20f),
+                ("stun_gun", 25f),
+                ("smg", 15f),
+                ("shotgun", 10f),
+                ("current_converter", 10f)
             });
             Register(RareId(CardFamily.SEC, 3), new (string, float)[]
             {
-                ("cf_sec_keycard_t3", 15f),
-                ("cf_crypto_module_sec_t3", 45f),
-                ("cf_sec_keycard_t2", 5f),
-                ("cf_crypto_module_sec_t2", 5f),
-                ("current_converter", 10f),
-                ("stun_gun", 10f),
-                ("glock_receiver", 5f),
-                ("stun_baton", 3f),
-                ("tazer", 2f)
+                ("cf_sec_keycard_t3", 30f),
+                ("stun_gun", 20f),
+                ("smg", 20f),
+                ("shotgun", 30f)
             });
 
             Register(CommonId(CardFamily.MED, 3), new (string, float)[]
             {
-                ("bandage_item", 4f),
-                ("hemostatic_bandage_item", 4f),
-                ("blood_bag", 4f),
-                ("salve", 15f),
-                ("rubbing_alcohol", 8f),
-                ("common_medical", 10f),
-                ("common_chemical", 10f),
-                ("pink_injector", 15f),
-                ("surgery_tool", 20f),
-                ("galaxy_blend", 10f)
+                ("large_purple_injector", 20f),
+                ("surgery_tool", 25f),
+                ("blue_blood_bag", 25f),
+                ("black_injector", 30f)
             });
             Register(RareId(CardFamily.MED, 3), new (string, float)[]
             {
-                ("cf_med_keycard_t3", 10f),
-                ("cf_crypto_module_med_t3", 60f),
-                ("cf_med_keycard_t2", 4f),
-                ("cf_crypto_module_med_t2", 4f),
-                ("black_injector", 8f),
-                ("blue_blood_bag", 5f),
-                ("current_converter", 3f),
-                ("surgery_tool", 4f),
-                ("bandage_item", 2f)
+                ("cf_med_keycard_t3", 30f),
+                ("surgery_tool", 20f),
+                ("blue_blood_bag", 25f),
+                ("black_injector", 25f)
             });
 
             Register(CommonId(CardFamily.ENG, 3), new (string, float)[]
             {
-                ("common_electronic", 15f),
-                ("nuts_metal", 2f),
-                ("flux_agent", 2f),
-                ("screwdriver", 5f),
-                ("wire_cutter", 7f),
-                ("crowbar", 8f),
-                ("welder", 10f),
-                ("turbo_booster", 5f),
-                ("module_extractor", 10f),
-                ("current_converter", 15f),
-                ("system_capped_neural_core", 10f),
-                ("module_extractor_advanced", 11f)
+                ("module_bay_expansion_kit", 30f),
+                ("system_capped_neural_core", 20f),
+                ("current_converter", 20f),
+                ("module_extractor_advanced", 10f),
+                ("turbo_booster_adv", 10f),
+                ("advanced_flux_agent", 10f)
             });
             Register(RareId(CardFamily.ENG, 3), new (string, float)[]
             {
-                ("cf_eng_keycard_t3", 15f),
-                ("cf_crypto_module_eng_t3", 55f),
-                ("cf_eng_keycard_t2", 5f),
-                ("cf_crypto_module_eng_t2", 5f),
-                ("module_extractor_advanced", 10f),
-                ("turbo_booster_adv", 3f),
-                ("advanced_flux_agent", 3f),
-                ("current_converter", 4f)
+                ("cf_eng_keycard_t3", 25f),
+                ("current_converter", 20f),
+                ("module_extractor_advanced", 30f),
+                ("turbo_booster_adv", 15f),
+                ("advanced_flux_agent", 10f)
             });
 
             Register(CommonId(CardFamily.SER, 3), new (string, float)[]
             {
-                ("processed_cheese", 5f),
-                ("box_cutter", 8f),
-                ("kitchen_knife", 10f),
-                ("hatchet", 10f),
-                ("caffeine_pill", 5f),
-                ("kotton_seed", 6f),
-                ("hydroreed_seed", 5f),
                 ("module_bay_expansion_kit", 25f),
-                ("current_converter", 26f)
+                ("current_converter", 25f),
+                ("turbo_booster_adv", 25f),
+                ("advanced_flux_agent", 25f)
             });
             Register(RareId(CardFamily.SER, 3), new (string, float)[]
             {
-                ("cf_ser_keycard_t3", 10f),
-                ("cf_crypto_module_ser_t3", 55f),
-                ("cf_ser_keycard_t2", 4f),
-                ("cf_crypto_module_ser_t2", 10f),
-                ("current_converter", 10f),
-                ("module_bay_expansion_kit", 5f),
-                ("hatchet", 5f),
-                ("box_cutter", 1f)
+                ("cf_ser_keycard_t3", 35f),
+                ("current_converter", 25f),
+                ("turbo_booster_adv", 20f),
+                ("advanced_flux_agent", 20f)
             });
 
             Register(CommonId(CardFamily.CMD, 3), new (string, float)[]
             {
-                ("heavy_pistol_ammo", 16f),
-                ("heavy_pistol_ammo_p", 12f),
-                ("flashbang_grenade", 10f),
-                ("smoke_grenade", 10f),
-                ("bandage_item", 3f),
-                ("common_electronic", 3f),
-                ("stun_baton", 8f),
-                ("combat_knife", 7f),
-                ("stun_gun", 10f),
-                ("smg", 8f),
-                ("shotgun", 9f),
-                ("current_converter", 4f)
+                ("stun_baton", 15f),
+                ("glock_receiver", 15f),
+                ("stun_gun", 20f),
+                ("smg", 20f),
+                ("shotgun", 20f),
+                ("current_converter", 10f)
             });
             Register(RareId(CardFamily.CMD, 3), new (string, float)[]
             {
-                ("cf_cmd_keycard_t3", 3f),
-                ("cf_crypto_module_cmd_t3", 55f),
-                ("cf_cmd_keycard_t2", 2f),
-                ("glock_receiver", 2f),
-                ("cf_crypto_module_cmd_t2", 5f),
-                ("shotgun", 10f),
-                ("smg", 10f),
-                ("current_converter", 10f),
-                ("stun_gun", 3f)
+                ("cf_cmd_keycard_t3", 30f),
+                ("stun_gun", 20f),
+                ("smg", 20f),
+                ("shotgun", 30f)
             });
 
             Diag("registered", "[CF-LOOT] registered 22 tables");
@@ -2867,11 +2723,23 @@ namespace DeepSpaceQoL
             {
                 switch (family)
                 {
-                    case CardFamily.SEC: return 11;
-                    case CardFamily.MED: return 11;
-                    case CardFamily.ENG: return 6;
-                    case CardFamily.SER: return 7;
-                    case CardFamily.CMD: return 11;
+                    case CardFamily.SEC: return 4;
+                    case CardFamily.MED: return 4;
+                    case CardFamily.ENG: return 4;
+                    case CardFamily.SER: return 4;
+                    case CardFamily.CMD: return 7;
+                    default: return 0;
+                }
+            }
+            if (tier == 2)
+            {
+                switch (family)
+                {
+                    case CardFamily.SEC: return 6;
+                    case CardFamily.MED: return 4;
+                    case CardFamily.ENG: return 3;
+                    case CardFamily.SER: return 3;
+                    case CardFamily.CMD: return 6;
                     default: return 0;
                 }
             }
@@ -2881,7 +2749,7 @@ namespace DeepSpaceQoL
                 case CardFamily.MED: return 10;
                 case CardFamily.ENG: return 5;
                 case CardFamily.SER: return 6;
-                case CardFamily.CMD: return tier == 1 ? 8 : 10;
+                case CardFamily.CMD: return 8;
                 default: return 0;
             }
         }

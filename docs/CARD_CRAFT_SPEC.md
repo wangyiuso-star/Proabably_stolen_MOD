@@ -16,10 +16,9 @@
 | SER | `service_box`（原版） | 7×5 | 175 | `cf_ser_box_t2` | 7×7 | 225 | `cf_ser_box_t3` | 9×8 | 300 | `service_box` |
 | CMD | `cf_cmd_box_t1`（新） | **7×7** | 200 | `cf_cmd_box_t2` | **9×8** | 350 | `cf_cmd_box_t3` | **10×8** | 500 | `cmd_box`（執行期染色，§3.12） |
 
-- **容量校正**：MED T2 用 8×8、CMD T1 用 7×7、CMD T2 用 9×8。原因是
-  10／11 rolls + rare 在原本 7×7／7×5 會放不下（med 實測 -13.36%、
-  CMD T1 -12.79%）；SEC／ENG／SER 的 7×7 實測都 fit，維持不變。
-  容量只影響「放不放得下」，不改 EV／價與件數。
+- **容量校正（歷史）**：MED T2 用 8×8、CMD T1 用 7×7、CMD T2 用 9×8，
+  是舊版 10／11 rolls 的 fit 結果。0.5.7 新池件數變少（T2 4–7、T3 5–8），
+  容量維持不動；容量只影響「放不放得下」，不改 EV／價與件數。
 - T1 SEC／MED／ENG／SER 沿用原版 id，不重新註冊、不加 `CF_CRATE_*`，
   走原版 `LockHelper.TryOpenLock`；原版價格就是 200／200／200／175。
 - **§3.3 T1 價格 errata**：spec 表寫 T1 一般箱 150，與「T1 沿用原版 id」衝突；
@@ -28,7 +27,7 @@
 - 新箱加 `CF_CRATE_FAMILY`、`CF_CRATE_TIER`；`LOCK_ID` 由
   `LockHelper.InitLockedContainerItem` 設定，`LockUpContainer` 上鎖。
 - **T3 箱（P4 新增）**：五家族 id `cf_*_box_t3`，一般 9×8、CMD 10×8、
-  價 300／500；rolls 11／11／6／7／11（件數 rolls+1 = 12／12／7／8／12）。
+  價 300／500；0.5.7 起 rolls 4／4／4／4／7（件數 5／5／5／5／8）。
   `CF_CRATE_TIER=3`、同一組 `LOCK_ID_*`；T3 卡（`CF_CARD_TIER=3`）可開。
   T3 loot 見下一節。
 - **CMD 箱來源**：`cf_cmd_box_t1/t2/t3` 在「江洋大盜」（P6）之前**沒有正常
@@ -53,369 +52,224 @@
 > `Fill*` 生成，`RegisterLootTable` 不會呼叫；因此 T1 表已刪除，只保留這張
 > runtime 基準。T1 CMD（`cf_cmd_box_t1`）是新物品，下表生效。
 
-### 校準後生效表（T2 五箱 + `cf_cmd_box_t1`）
+### 價值地板（0.5.7 起，取代「T1 池重配權重」）
 
-軟目標：T2 不得低於同家族 T1，且至少高 5%。原本的「+0.2」降為軟目標，
-不再為了 SEC 的 0.026 margin 抬權重；SEC 目前 +6.5% 已達標。
-rolls 只用來對齊開箱件數；rare 保底維持 1，稀有池保留 T2 卡／核。
-件數 = rolls + 1（rare 保底）。
+T2／T3 不再把 T1 的低價雜物（繃帶、止痛藥、廢金屬、種子、零食）放進池子再調權重。
+改成**硬地板**：
 
-| 箱 | rolls | 件數 | 原版密度參考 |
-|---|---:|---:|---:|
-| SEC T2 | 10 | 11 | 11.56 |
-| MED T2 | 10 | 11 | 10.57 |
-| ENG T2 | 5 | 6 | 5.13 |
-| SER T2 | 6 | 7 | 6.57 |
-| CMD T1 | 8 | 9 | — |
-| CMD T2 | 10 | 11 | — |
+- T2 common：`unitValue >= 60`，且必須符合同家族主題。
+- T3 common：`unitValue >= 120`，同家族主題。
+- rare：**高階鑰匙卡 + 該家族最高價裝備**；不再放核心。
+- 10 張表（5 T2 + 5 T3）**完全移除** `crypto_module_*` 與
+  `cf_crypto_module_*_t2/t3`；核心只由卡匠賣（§3.8.4）。
 
-**SEC T2（common EV 58.35 / rare EV 252.50）**
+#### 候選清單（含 `unitValue`）
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `heavy_pistol_ammo` | 30 | 20 |
-| `heavy_pistol_ammo_p` | 36 | 15 |
-| `bandage_item` | 8 | 15 |
-| `flashbang_grenade` | 85 | 15 |
-| `smoke_grenade` | 60 | 15 |
-| `stun_baton` | 165 | 10 |
-| `combat_knife` | 75 | 10 |
+| 家族 | 候選 itemId（value） |
+|---|---|
+| SEC | `flashbang_grenade` 85、`smoke_grenade` 60、`stun_baton` 165、`combat_knife` 75、`tazer` 100、`glock_receiver` 200、`stun_gun` 250、`smg` 280、`shotgun` 310、`current_converter` 300 |
+| MED | `salve` 80、`large_purple_injector` 160、`surgery_tool` 200、`blue_blood_bag` 250、`black_injector` 350 |
+| ENG | `crowbar` 75、`welder` 80、`module_extractor` 100、`module_bay_expansion_kit` 150、`system_capped_neural_core` 250、`current_converter` 300、`turbo_booster_adv` 300、`advanced_flux_agent` 300、`module_extractor_advanced` 350 |
+| SER | `module_bay_expansion_kit` 150、`current_converter` 300、`turbo_booster_adv` 300、`advanced_flux_agent` 300 |
+| CMD | `flashbang_grenade` 85、`smoke_grenade` 60、`stun_baton` 165、`combat_knife` 75、`tazer` 100、`glock_receiver` 200、`stun_gun` 250、`smg` 280、`shotgun` 310、`current_converter` 300 |
 
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_sec_keycard_t2` | 150 | 30 |
-| `cf_crypto_module_sec_t2` | 500 | 20 |
-| `glock_receiver` | 200 | 15 |
-| `stun_gun` | 250 | 15 |
-| `tazer` | 100 | 10 |
-| `current_converter` | 300 | 10 |
+T3 只從上表取 `>=120` 的項目（所以 SEC 不用 smoke／combat_knife／tazer，
+MED 不用 salve，ENG 不用 crowbar／welder／module_extractor，CMD 不用
+smoke／combat_knife／tazer）。
 
-**MED T2（common EV 59.70 / rare EV 272.90）**
+### 生效表（T2 五箱 + CMD T1 + T3 五箱）
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `bandage_item` | 8 | 5 |
-| `hemostatic_bandage_item` | 16 | 5 |
-| `blood_bag` | 33 | 5 |
-| `salve` | 80 | 22 |
-| `rubbing_alcohol` | 35 | 10 |
-| `common_medical` | 40 | 15 |
-| `common_chemical` | 50 | 10 |
-| `pink_injector` | 50 | 15 |
-| `surgery_tool` | 200 | 8 |
-| `galaxy_blend` | 25 | 5 |
+`EV = rolls × EV_common + 1 × EV_rare`；每表權重合計 100；件數 = rolls + 1。
+rare 保底 1。
 
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_med_keycard_t2` | 110 | 25 |
-| `cf_crypto_module_med_t2` | 400 | 40 |
-| `black_injector` | 350 | 15 |
-| `surgery_tool` | 200 | 10 |
-| `blue_blood_bag` | 250 | 5 |
-| `bandage_item` | 8 | 5 |
+#### T2
 
-**ENG T2（common EV 89.34 / rare EV 307.00）**
+**SEC T2**（rolls 6；common EV 109.75、rare EV 208.50）
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `common_electronic` | 33 | 15 |
-| `nuts_metal` | 14 | 8 |
-| `flux_agent` | 4 | 8 |
-| `screwdriver` | 25 | 8 |
-| `wire_cutter` | 40 | 8 |
-| `crowbar` | 75 | 10 |
-| `welder` | 80 | 10 |
-| `turbo_booster` | 35 | 5 |
-| `module_extractor` | 100 | 10 |
-| `current_converter` | 300 | 5 |
-| `system_capped_neural_core` | 250 | 10 |
-| `module_extractor_advanced` | 350 | 3 |
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `flashbang_grenade` | 85 | 20 | common |
+| `smoke_grenade` | 60 | 20 | common |
+| `stun_baton` | 165 | 30 | common |
+| `combat_knife` | 75 | 15 | common |
+| `tazer` | 100 | 10 | common |
+| `glock_receiver` | 200 | 5 | common |
+| `cf_sec_keycard_t2` | 150 | 35 | rare |
+| `glock_receiver` | 200 | 25 | rare |
+| `stun_gun` | 250 | 30 | rare |
+| `shotgun` | 310 | 10 | rare |
 
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_eng_keycard_t2` | 110 | 20 |
-| `cf_crypto_module_eng_t2` | 400 | 40 |
-| `module_extractor_advanced` | 350 | 10 |
-| `turbo_booster_adv` | 300 | 10 |
-| `advanced_flux_agent` | 300 | 10 |
-| `current_converter` | 300 | 10 |
+**MED T2**（rolls 4；common EV 152.50、rare EV 235.00）
 
-**SER T2（common EV 80.95 / rare EV 198.90）**
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `salve` | 80 | 40 | common |
+| `large_purple_injector` | 160 | 30 | common |
+| `surgery_tool` | 200 | 15 | common |
+| `blue_blood_bag` | 250 | 10 | common |
+| `black_injector` | 350 | 5 | common |
+| `cf_med_keycard_t2` | 110 | 25 | rare |
+| `surgery_tool` | 200 | 20 | rare |
+| `blue_blood_bag` | 250 | 25 | rare |
+| `black_injector` | 350 | 30 | rare |
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `processed_cheese` | 20 | 8 |
-| `box_cutter` | 28 | 10 |
-| `kitchen_knife` | 45 | 15 |
-| `hatchet` | 55 | 12 |
-| `caffeine_pill` | 10 | 12 |
-| `kotton_seed` | 20 | 5 |
-| `hydroreed_seed` | 20 | 5 |
-| `module_bay_expansion_kit` | 150 | 26 |
-| `current_converter` | 300 | 7 |
+**ENG T2**（rolls 3；common EV 190.75、rare EV 255.00）
 
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_ser_keycard_t2` | 60 | 20 |
-| `cf_crypto_module_ser_t2` | 300 | 40 |
-| `current_converter` | 300 | 15 |
-| `module_bay_expansion_kit` | 150 | 10 |
-| `hatchet` | 55 | 10 |
-| `box_cutter` | 28 | 5 |
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `crowbar` | 75 | 15 | common |
+| `welder` | 80 | 15 | common |
+| `module_extractor` | 100 | 20 | common |
+| `system_capped_neural_core` | 250 | 15 | common |
+| `current_converter` | 300 | 15 | common |
+| `module_extractor_advanced` | 350 | 10 | common |
+| `turbo_booster_adv` | 300 | 5 | common |
+| `advanced_flux_agent` | 300 | 5 | common |
+| `cf_eng_keycard_t2` | 110 | 25 | rare |
+| `system_capped_neural_core` | 250 | 25 | rare |
+| `current_converter` | 300 | 20 | rare |
+| `module_extractor_advanced` | 350 | 30 | rare |
 
-**CMD T1（`cf_cmd_box_t1`，common EV 55.50 / rare EV 238.50）**
+**SER T2**（rolls 3；common EV 225.00、rare EV 180.00）
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `heavy_pistol_ammo` | 30 | 25 |
-| `heavy_pistol_ammo_p` | 36 | 15 |
-| `flashbang_grenade` | 85 | 10 |
-| `smoke_grenade` | 60 | 10 |
-| `bandage_item` | 8 | 10 |
-| `common_electronic` | 33 | 10 |
-| `stun_baton` | 165 | 10 |
-| `combat_knife` | 75 | 10 |
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `module_bay_expansion_kit` | 150 | 50 | common |
+| `current_converter` | 300 | 20 | common |
+| `turbo_booster_adv` | 300 | 15 | common |
+| `advanced_flux_agent` | 300 | 15 | common |
+| `cf_ser_keycard_t2` | 60 | 50 | rare |
+| `current_converter` | 300 | 20 | rare |
+| `turbo_booster_adv` | 300 | 15 | rare |
+| `advanced_flux_agent` | 300 | 15 | rare |
 
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cmd_keycard` | 125 | 30 |
-| `crypto_module_cmd` | 350 | 20 |
-| `stun_gun` | 250 | 15 |
-| `glock_receiver` | 200 | 10 |
-| `smg` | 280 | 10 |
-| `shotgun` | 310 | 5 |
-| `current_converter` | 300 | 10 |
+**CMD T2**（rolls 6；common EV 172.75、rare EV 259.00）
 
-**CMD T2（common EV 104.39 / rare EV 374.00）**
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `flashbang_grenade` | 85 | 10 | common |
+| `smoke_grenade` | 60 | 10 | common |
+| `stun_baton` | 165 | 15 | common |
+| `combat_knife` | 75 | 10 | common |
+| `glock_receiver` | 200 | 10 | common |
+| `stun_gun` | 250 | 15 | common |
+| `smg` | 280 | 10 | common |
+| `shotgun` | 310 | 5 | common |
+| `current_converter` | 300 | 5 | common |
+| `tazer` | 100 | 10 | common |
+| `cf_cmd_keycard_t2` | 200 | 30 | rare |
+| `stun_gun` | 250 | 20 | rare |
+| `smg` | 280 | 20 | rare |
+| `shotgun` | 310 | 30 | rare |
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `heavy_pistol_ammo` | 30 | 22 |
-| `heavy_pistol_ammo_p` | 36 | 12 |
-| `flashbang_grenade` | 85 | 10 |
-| `smoke_grenade` | 60 | 10 |
-| `bandage_item` | 8 | 4 |
-| `common_electronic` | 33 | 5 |
-| `stun_baton` | 165 | 8 |
-| `combat_knife` | 75 | 8 |
-| `stun_gun` | 250 | 9 |
-| `smg` | 280 | 5 |
-| `shotgun` | 310 | 3 |
-| `current_converter` | 300 | 4 |
+#### T3
 
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_cmd_keycard_t2` | 200 | 20 |
-| `cf_crypto_module_cmd_t2` | 600 | 35 |
-| `stun_gun` | 250 | 10 |
-| `smg` | 280 | 10 |
-| `shotgun` | 310 | 10 |
-| `current_converter` | 300 | 10 |
-| `glock_receiver` | 200 | 5 |
+**SEC T3**（rolls 4；common EV 238.50、rare EV 266.50）
 
-### T3 loot（P4 新增，以 T2 池為底）
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `stun_baton` | 165 | 20 | common |
+| `glock_receiver` | 200 | 20 | common |
+| `stun_gun` | 250 | 25 | common |
+| `smg` | 280 | 15 | common |
+| `shotgun` | 310 | 10 | common |
+| `current_converter` | 300 | 10 | common |
+| `cf_sec_keycard_t3` | 225 | 30 | rare |
+| `stun_gun` | 250 | 20 | rare |
+| `smg` | 280 | 20 | rare |
+| `shotgun` | 310 | 30 | rare |
 
-五箱的 common 池沿用同家族 T2 的 common 池（只調權重），rare 池在原 T2 rare
-之上加 T3 卡／核與最高價稀有物（`current_converter`、`module_extractor_advanced`、
-`black_injector`、`blue_blood_bag`、`shotgun` 等）。每表權重合計 100。
+**MED T3**（rolls 4；common EV 249.50、rare EV 239.50）
 
-**SEC T3（common EV 74.90 / rare EV 475.70）**
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `large_purple_injector` | 160 | 20 | common |
+| `surgery_tool` | 200 | 25 | common |
+| `blue_blood_bag` | 250 | 25 | common |
+| `black_injector` | 350 | 30 | common |
+| `cf_med_keycard_t3` | 165 | 30 | rare |
+| `surgery_tool` | 200 | 20 | rare |
+| `blue_blood_bag` | 250 | 25 | rare |
+| `black_injector` | 350 | 25 | rare |
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `heavy_pistol_ammo` | 30 | 15 |
-| `heavy_pistol_ammo_p` | 36 | 10 |
-| `bandage_item` | 8 | 10 |
-| `flashbang_grenade` | 85 | 15 |
-| `smoke_grenade` | 60 | 15 |
-| `stun_baton` | 165 | 20 |
-| `combat_knife` | 75 | 15 |
+**ENG T3**（rolls 4；common EV 250.00、rare EV 281.25）
 
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_sec_keycard_t3` | 225 | 15 |
-| `cf_crypto_module_sec_t3` | 750 | 45 |
-| `cf_sec_keycard_t2` | 150 | 5 |
-| `cf_crypto_module_sec_t2` | 500 | 5 |
-| `current_converter` | 300 | 10 |
-| `stun_gun` | 250 | 10 |
-| `glock_receiver` | 200 | 5 |
-| `stun_baton` | 165 | 3 |
-| `tazer` | 100 | 2 |
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `module_bay_expansion_kit` | 150 | 30 | common |
+| `system_capped_neural_core` | 250 | 20 | common |
+| `current_converter` | 300 | 20 | common |
+| `module_extractor_advanced` | 350 | 10 | common |
+| `turbo_booster_adv` | 300 | 10 | common |
+| `advanced_flux_agent` | 300 | 10 | common |
+| `cf_eng_keycard_t3` | 165 | 25 | rare |
+| `current_converter` | 300 | 20 | rare |
+| `module_extractor_advanced` | 350 | 30 | rare |
+| `turbo_booster_adv` | 300 | 15 | rare |
+| `advanced_flux_agent` | 300 | 10 | rare |
 
-**MED T3（common EV 76.08 / rare EV 454.56）**
+**SER T3**（rolls 4；common EV 262.50、rare EV 226.50）
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `bandage_item` | 8 | 4 |
-| `hemostatic_bandage_item` | 16 | 4 |
-| `blood_bag` | 33 | 4 |
-| `salve` | 80 | 15 |
-| `rubbing_alcohol` | 35 | 8 |
-| `common_medical` | 40 | 10 |
-| `common_chemical` | 50 | 10 |
-| `pink_injector` | 50 | 15 |
-| `surgery_tool` | 200 | 20 |
-| `galaxy_blend` | 25 | 10 |
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `module_bay_expansion_kit` | 150 | 25 | common |
+| `current_converter` | 300 | 25 | common |
+| `turbo_booster_adv` | 300 | 25 | common |
+| `advanced_flux_agent` | 300 | 25 | common |
+| `cf_ser_keycard_t3` | 90 | 35 | rare |
+| `current_converter` | 300 | 25 | rare |
+| `turbo_booster_adv` | 300 | 20 | rare |
+| `advanced_flux_agent` | 300 | 20 | rare |
 
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_med_keycard_t3` | 165 | 10 |
-| `cf_crypto_module_med_t3` | 600 | 60 |
-| `cf_med_keycard_t2` | 110 | 4 |
-| `cf_crypto_module_med_t2` | 400 | 4 |
-| `black_injector` | 350 | 8 |
-| `blue_blood_bag` | 250 | 5 |
-| `current_converter` | 300 | 3 |
-| `surgery_tool` | 200 | 4 |
-| `bandage_item` | 8 | 2 |
+**CMD T3**（rolls 7；common EV 252.75、rare EV 289.00）
 
-**ENG T3（common EV 143.61 / rare EV 445.25）**
+| itemId | value | weight | 池 |
+|---|---:|---:|---|
+| `stun_baton` | 165 | 15 | common |
+| `glock_receiver` | 200 | 15 | common |
+| `stun_gun` | 250 | 20 | common |
+| `smg` | 280 | 20 | common |
+| `shotgun` | 310 | 20 | common |
+| `current_converter` | 300 | 10 | common |
+| `cf_cmd_keycard_t3` | 300 | 30 | rare |
+| `stun_gun` | 250 | 20 | rare |
+| `smg` | 280 | 20 | rare |
+| `shotgun` | 310 | 30 | rare |
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `common_electronic` | 33 | 15 |
-| `nuts_metal` | 14 | 2 |
-| `flux_agent` | 4 | 2 |
-| `screwdriver` | 25 | 5 |
-| `wire_cutter` | 40 | 7 |
-| `crowbar` | 75 | 8 |
-| `welder` | 80 | 10 |
-| `turbo_booster` | 35 | 5 |
-| `module_extractor` | 100 | 10 |
-| `current_converter` | 300 | 15 |
-| `system_capped_neural_core` | 250 | 10 |
-| `module_extractor_advanced` | 350 | 11 |
+### 模型 EV / 200 樣本 / 目標
 
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_eng_keycard_t3` | 165 | 15 |
-| `cf_crypto_module_eng_t3` | 600 | 55 |
-| `cf_eng_keycard_t2` | 110 | 5 |
-| `cf_crypto_module_eng_t2` | 400 | 5 |
-| `module_extractor_advanced` | 350 | 10 |
-| `turbo_booster_adv` | 300 | 3 |
-| `advanced_flux_agent` | 300 | 3 |
-| `current_converter` | 300 | 4 |
+| 箱 | 價 | common EV | rare EV | rolls | 件數 | model EV | EV/價 | measured 200 | error | 目標 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| SEC T2 | 225 | 109.75 | 208.50 | 6 | 7 | 867.00 | **3.853** | 874.48 | +0.86% | 3.6–3.9 |
+| MED T2 | 225 | 152.50 | 235.00 | 4 | 5 | 845.00 | **3.756** | 818.60 | -3.12% | 3.6–3.9 |
+| ENG T2 | 225 | 190.75 | 255.00 | 3 | 4 | 827.25 | **3.677** | 805.62 | -2.61% | 3.6–3.9 |
+| SER T2 | 225 | 225.00 | 180.00 | 3 | 4 | 855.00 | **3.800** | 838.20 | -1.96% | 3.6–3.9 |
+| CMD T1 | 200 | 55.50 | 238.50 | 8 | 9 | 682.50 | **3.413** | 674.13 | -1.23% | 不變 |
+| CMD T2 | 350 | 172.75 | 259.00 | 6 | 7 | 1295.50 | **3.701** | 1274.25 | -1.64% | 3.6–3.9 |
+| SEC T3 | 300 | 238.50 | 266.50 | 4 | 5 | 1220.50 | **4.068** | 1209.35 | -0.91% | 3.9–4.5 |
+| MED T3 | 300 | 249.50 | 239.50 | 4 | 5 | 1237.50 | **4.125** | 1214.38 | -1.87% | 3.9–4.5 |
+| ENG T3 | 300 | 250.00 | 281.25 | 4 | 5 | 1281.25 | **4.271** | 1274.08 | -0.56% | 3.9–4.5 |
+| SER T3 | 300 | 262.50 | 226.50 | 4 | 5 | 1276.50 | **4.255** | 1261.35 | -1.19% | 3.9–4.5 |
+| CMD T3 | 500 | 252.75 | 289.00 | 7 | 8 | 2058.25 | **4.117** | 2046.30 | -0.58% | 3.9–4.5 |
 
-**SER T3（common EV 131.44 / rare EV 329.43）**
+T2 ≥ 同家族 T1 + 0.2：
 
-| common itemId | value | weight |
-|---|---:|---:|
-| `processed_cheese` | 20 | 5 |
-| `box_cutter` | 28 | 8 |
-| `kitchen_knife` | 45 | 10 |
-| `hatchet` | 55 | 10 |
-| `caffeine_pill` | 10 | 5 |
-| `kotton_seed` | 20 | 6 |
-| `hydroreed_seed` | 20 | 5 |
-| `module_bay_expansion_kit` | 150 | 25 |
-| `current_converter` | 300 | 26 |
-
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_ser_keycard_t3` | 90 | 10 |
-| `cf_crypto_module_ser_t3` | 450 | 55 |
-| `cf_ser_keycard_t2` | 60 | 4 |
-| `cf_crypto_module_ser_t2` | 300 | 10 |
-| `current_converter` | 300 | 10 |
-| `module_bay_expansion_kit` | 150 | 5 |
-| `hatchet` | 55 | 5 |
-| `box_cutter` | 28 | 1 |
-
-**CMD T3（common EV 130.60 / rare EV 638.50）**
-
-| common itemId | value | weight |
-|---|---:|---:|
-| `heavy_pistol_ammo` | 30 | 16 |
-| `heavy_pistol_ammo_p` | 36 | 12 |
-| `flashbang_grenade` | 85 | 10 |
-| `smoke_grenade` | 60 | 10 |
-| `bandage_item` | 8 | 3 |
-| `common_electronic` | 33 | 3 |
-| `stun_baton` | 165 | 8 |
-| `combat_knife` | 75 | 7 |
-| `stun_gun` | 250 | 10 |
-| `smg` | 280 | 8 |
-| `shotgun` | 310 | 9 |
-| `current_converter` | 300 | 4 |
-
-| rare itemId | value | weight |
-|---|---:|---:|
-| `cf_cmd_keycard_t3` | 300 | 3 |
-| `cf_crypto_module_cmd_t3` | 900 | 55 |
-| `cf_cmd_keycard_t2` | 200 | 2 |
-| `glock_receiver` | 200 | 2 |
-| `cf_crypto_module_cmd_t2` | 600 | 5 |
-| `shotgun` | 310 | 10 |
-| `smg` | 280 | 10 |
-| `current_converter` | 300 | 10 |
-| `stun_gun` | 250 | 3 |
-
-### 校準後 EV
-
-`EV = rolls × EV_common + 1 × EV_rare`；所有表權重合計 100。
-
-| 箱 | 價 | common EV | rare EV | rolls | 件數 | EV | EV/價 | 目標帶 |
-|---|---:|---:|---:|---:|---:|---:|---:|---|
-| SEC T2 | 225 | 58.35 | 252.50 | 10 | 11 | 836.00 | **3.716** | 3.6–3.9 |
-| MED T2 | 225 | 59.70 | 272.90 | 10 | 11 | 869.90 | **3.866** | 3.6–3.9 |
-| ENG T2 | 225 | 89.34 | 307.00 | 5 | 6 | 753.70 | **3.350** | 3.2–3.5 |
-| SER T2 | 225 | 80.95 | 198.90 | 6 | 7 | 684.60 | **3.043** | 2.9–3.2 |
-| CMD T1 | 200 | 55.50 | 238.50 | 8 | 9 | 682.50 | **3.413** | 3.2–3.5 |
-| CMD T2 | 350 | 104.39 | 374.00 | 10 | 11 | 1417.90 | **4.051** | 4.0–4.5 |
-| SEC T3 | 300 | 74.90 | 475.70 | 11 | 12 | 1299.60 | **4.332** | 3.9–4.5 |
-| MED T3 | 300 | 76.08 | 454.56 | 11 | 12 | 1291.44 | **4.305** | 3.9–4.5 |
-| ENG T3 | 300 | 143.61 | 445.25 | 6 | 7 | 1306.91 | **4.356** | 3.9–4.5 |
-| SER T3 | 300 | 131.44 | 329.43 | 7 | 8 | 1249.51 | **4.165** | 3.9–4.5 |
-| CMD T3 | 500 | 130.60 | 638.50 | 11 | 12 | 2075.10 | **4.150** | 3.9–4.5 |
-
-軟目標檢查（T2 ≥ 同家族 T1 且至少 +5%）：
-
-- SEC T2 3.716 vs T1 3.49 = **+6.5%**（達標；不再抬權重）
-- MED T2 3.866 vs T1 3.53 = **+9.5%**
-- ENG T2 3.350 vs T1 3.02 = **+10.9%**
-- SER T2 3.043 vs T1 2.62 = **+16.1%**
-- CMD T2 4.051 vs CMD T1 3.413 = **+18.7%**
-
-以上為模型 EV；實測見下（`CfLootProbe` 已移除，clean build 不含 probe）。
-
-### 模型 vs 實測（最終，probe 已移除）
-
-`CfLootProbe` 對六種 cf 箱各生成 200 個，統計直接子物品 `unitValue` 平均；
-`CloseContentWindow(true)` 後 `Destroy()`，不存檔。
-
-| 箱 | model EV | measured mean（最終輪） | error | 判定 |
+| 箱 | T2 EV/價 | T1 EV/價 | 差 | 判定 |
 |---|---:|---:|---:|---|
-| SEC T2 | 836.00 | 828.50 | -0.90% | PASS |
-| MED T2 | 869.90 | 876.97 | +0.81% | PASS |
-| ENG T2 | 753.70 | 754.60 | +0.12% | PASS |
-| SER T2 | 684.60 | 716.22 | +4.62% | PASS |
-| CMD T1 | 682.50 | 674.13 | -1.23% | PASS |
-| CMD T2 | 1417.90 | 1313.39 | -7.37% | 接受例外（使用者裁定「差一點沒事」） |
+| SEC T2 | 3.853 | 3.49 | +0.363 | PASS |
+| MED T2 | 3.756 | 3.53 | +0.226 | PASS |
+| ENG T2 | 3.677 | 3.02 | +0.657 | PASS |
+| SER T2 | 3.800 | 2.62 | +1.180 | PASS |
+| CMD T2 | 3.701 | 3.413 | +0.288 | PASS |
 
-### T3 模型 vs 200 樣本（離線模擬）
+> 200 樣本是用 scratch-only 的離線模擬器（`.scratch/p5loot/parse_code.py`），
+> 直接解析本檔的權重、seed 20261116、抽取演算法同 `LootRegistry.Pick`；
+> 不是 in-game `CfLootProbe`。in-game `[CF-EV]` 仍待人類補跑。
 
-> **這不是 in-game `CfLootProbe`**：本輪依硬規則不啟動遊戲，改用 scratch-only 的
-> 離線模擬器（`.scratch/p4t3loot`），逐箱跑 200 次「11+1」抽取；抽取演算法與
-> `LootRegistry.Pick` 相同（均勻 `r * totalWeight`，累積到第一筆），權重直接從
-> `CardCraftAndFence.cs` 的 T3 表解析，逐項比對後才寫進本表。seed = 20261116。
-> in-game `[CF-EV]` 仍需人類之後補跑。
+### T3 容量
 
-| 箱 | model EV | measured mean（200） | error | EV/價 | 判定 |
-|---|---:|---:|---:|---:|---|
-| SEC T3 | 1299.60 | 1302.51 | +0.22% | 4.332 | PASS |
-| MED T3 | 1291.44 | 1272.59 | -1.46% | 4.305 | PASS |
-| ENG T3 | 1306.91 | 1297.45 | -0.72% | 4.356 | PASS |
-| SER T3 | 1249.51 | 1225.72 | -1.90% | 4.165 | PASS |
-| CMD T3 | 2075.10 | 2097.55 | +1.08% | 4.150 | PASS |
-
-T3 容量 9×8（CMD 10×8）只保證 12 件「理論上」放得下；實際 fit 尚未在 runtime
-量過（見 STATUS 未核實）。
-
-前幾輪的 fit 問題：MED 7×7 → 8×8、CMD T1 7×5 → 7×7、CMD T2 8×8 → 9×8；
-CMD T2 另有 rolls 11→10、common EV 104.39。最終五箱在 ±5% 內；CMD T2
--7.37% 超過 5%，但 9×8 已是最後一次調整，依使用者裁定接受，不再加容量或改價。
+T3 箱仍 9×8（CMD 10×8），但新池只要 **5 件（CMD 8 件）**，容量充裕；不需要再放大。
+T2 箱也維持原容量（7/5/4/4/7 件）。
 
 ## 箱子貼圖決策（asset 字串掃描，2026-11-16）
 
@@ -487,8 +341,12 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - T3 沿用同家族 T2 的 sprite，`CF_CARD_FAMILY` / `CF_CARD_TIER=3`；
   開鎖規則 `cardTier >= crateTier` 自然成立。
 - **T3 箱已是本輪新增**（§3.3：9×8、CMD 10×8、300／500、`CF_CRATE_TIER=3`），
-  所以 T3 卡可以直接開 T3 箱；T3 卡也是製卡匠／博士的高價庫存與交易品。
+  所以 T3 卡可以直接開 T3 箱；T3 卡只從箱子 rare（與小偷箱）來，
+  卡匠／博士不再賣卡。
 - T3 核的 `DESEQUENCER_TARGET_ID_TAG` 指向同家族 T3 卡，專業解序器可直接做。
+- **0.5.7 起核心不再從任何 T2/T3 箱掉落**：T2/T3 loot 表已移除全部
+  `crypto_module_*`／`cf_crypto_module_*`。核心唯一穩定來源是卡匠
+  （每個已解鎖等級、五家族各 1 個，§3.8.4）。
 - **0.5.6 id errata**：0.5.4 的 `CryptoModuleId(family,3)` 回
   `cf_<family>_crypto_module_t3`（家族在前），但 T2、loot 表與本表都是
   `cf_crypto_module_<family>_t3`（crypto_module 在前）。MED T3 rare 因此
@@ -687,9 +545,9 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 ### §3.8.4 製卡匠庫存（售價 = 物品 `unitValue`，不標 stolen、不賣箱子）
 
-**每次到訪重新抽一批，總數上限 10 件**；不保存庫存，也不做翻頁。理由：交易
-面板是整批購買（「购买 N 物品」），18 件會強迫玩家一次付 5000+；原版退休商人
-一次只帶 5–8 件。**同一天不重複**：一天最多一位製卡匠，`maker_last_day` 已擋。
+**每次到訪固定供貨，不保存庫存，不做翻頁**。核心已從所有 T2/T3 loot 表移除，
+所以卡匠是核心唯一穩定來源：**每個已解鎖等級，五家族的核心各固定 1 個**，
+不隨機抽掉。**同一天不重複**：一天最多一位製卡匠，`maker_last_day` 已擋。
 
 | 類別 | 物品 | 數量 | 單價 |
 |---|---|---:|---:|
@@ -698,13 +556,12 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 | 固定 | `printer_module_cnc` **或** `printer_module_metal` | 1（50/50） | 400／300 |
 | 材料 | `common_electronic` | 2 | 33 |
 | 材料 | `printer_plastic` | 2 | 12 |
-| 卡／核 | 已解鎖等級隨機 3 件：卡 2＋核 1 或 卡 1＋核 2 | 3 | 依 id |
+| 核心 | 每個已解鎖等級 × 5 家族（T1／T2／T3） | 5／10／15 | 依 id |
 
-- **卡／核池**：T1 永遠在池；解鎖 `CF_FENCE_T2` 加 T2；解鎖 `CF_FENCE_T3`
-  加 T3。池 = 5 家族 × 已解鎖等級（卡池與核池分開），抽 3 件不重複。
-- 3 件的分配是 `cards = RNG(1..2)`、`cores = 3 - cards`，所以每次一定
-  卡核都有、但不會每個家族都給。
-- 固定＋材料＝7 件，加 3 件卡核＝**10 件**；程式仍保留 `>10` 的 trim。
+- 核心池：T1 永遠有；解鎖 `CF_FENCE_T2` 加 T2；解鎖 `CF_FENCE_T3` 加 T3。
+  所以 T1 到訪 12 件、T2 17 件、T3 22 件；**不再有所謂 10 件上限**，
+  這是 0.5.7 為了核心穩定供貨刻意覆蓋 0.5.5 的規則。
+- 卡匠不再賣卡；卡只從箱子 rare／小偷箱來。博士也不賣卡／核。
 - **不賣箱子**（任何 T1／T2／T3 箱都不在工匠庫存）。
 - **製卡週邊是補給，不是解鎖**：`CF_FENCE_PRO` 仍一次性發第一套工具包，但卡匠
   每次到訪都重新上架印表機、晶片、CNC／金屬模組、電子×2、耗材×2。
@@ -722,18 +579,15 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - Postfix 包住 `CreateInventor` 最後一句對話的 `endAction`，先跑原版 `endAction`
   （若有），再上架：
   - `CF_FENCE_PRO`：`cf_pro_desequencer`（800）、`cf_batch_card_module`（250）。
-  - `CF_FENCE_T2`：3 張 T2 卡 + 3 個 T2 核（各自獨立抽 3 個不同家族）。
-  - `CF_FENCE_T3`：1 張 T3 卡 + 同家族 1 個 T3 核。
-- 博士的 T2／T3 是**加賣**，不是取代製卡匠；兩邊同一天都可能有貨。
-  博士全開時 2＋6＋2 = 10 件，和卡匠同一上限。
-- 全部 `isOwend: false`，售價 = `unitValue`。
+- **每次來訪固定這兩件**，不再抽 T2／T3 卡或核；博士不是核心來源。
+- 兩件都 `isOwend: false`，售價 = `unitValue`；PRO 未解鎖時不賣。
 
 ### §3.8.6 診斷 log
 
-- `[CF-MAKER] visit day=… gate=weekly|catchup stock=fixed,materials,cards,t2,t3`
+- `[CF-MAKER] visit day=… gate=weekly|catchup stock=fixed,materials,cores,t2,t3`
 - `[CF-MAKER] skip: already visited today day=…`
 - `[CF-MAKER] skip: CF_FENCE_PRO not unlocked`
-- `[CF-INVENTOR] stock desequencer+batch tier2=… tier3=…`
+- `[CF-INVENTOR] stock desequencer+batch`
 - `[CF-STOCK] counter full, moved <id> to back inventory`（工匠／博士共用）
 
 ## §3.10 黑市與小偷（P4 只做第 2 項）
@@ -866,7 +720,7 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
 - `[CF-NET] registered N/4 CardFence upgrades tab=CardFence width=792/1060`
 - `[CF-NET] hide CF_SAWYER_* until the exchange is unlocked`
 - `[CF-NET] PRO kit granted printer+chip+cnc+2 electronic+2 plastic+battery`
-- `[CF-INVENTOR] stock desequencer+batch tier2=… tier3=…`
+- `[CF-INVENTOR] stock desequencer+batch`
 
 ### §3.11.6 註冊時序（0.5.2 修正）
 
