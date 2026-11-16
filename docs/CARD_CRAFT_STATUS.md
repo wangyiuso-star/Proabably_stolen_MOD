@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-17（0.7.0：P5 索耶換卡／芯片／常駐服務／換卡目錄紙本）
+更新時間：2026-11-17（0.7.1：P5 索耶修訂——紙本 runtime sprites、降冪分組、SEC T2 rare fit）
 
 ## 階段
 
@@ -38,27 +38,30 @@
   `[CF-INVENTOR] client=… pro=…`；小偷改成先放 CF 箱、再跑原版庫存。
   實機驗證（到訪、買賣、分頁、T3 fit、染色外觀、啟動、滿台 skip、
   住所庫存）尚未跑。
-- **P5：完成（離線），0.7.0。** 索耶（`OnHandlingNightlyServicesEarly` hook，
-  在 `EndNight` 的 `HandleJanitorial` 之前）：垃圾桶同家族鑰匙卡按 SEC 3／
-  MED 4／ENG 4／SER 4／CMD 3 換已填 loot＋已上鎖的物資箱；同家族卡低→高等級
-  分組、箱子取該組最低等級；未解鎖批量每晚最多 1 箱（固定家族順序）；
-  `CF_SAWYER_CHIP` 開芯片（3 同家族同級→下一級，T3 不升，每晚每家族 1 次）；
-  `CF_SAWYER_PERMANENT` 解鎖後接管原版三個 crate barter（同時清
-  `promotionalBarter` 與 `activePromotionalBarterIds`），並發一本
-  `cf_sawyer_card_catalog` 換卡目錄紙本。Wild Network 由 4 個升級變 **7 個**。
-  **未實機**（見 P5 未核實）。
+- **P5：0.7.0 完成並已實機跑起來；0.7.1 修三個實機 bug。** 索耶
+  （`OnHandlingNightlyServicesEarly` hook，在 `EndNight` 的
+  `HandleJanitorial` 之前）：垃圾桶同家族鑰匙卡按 SEC 3／MED 4／ENG 4／
+  SER 4／CMD 3 換已填 loot＋已上鎖的物資箱；0.7.1 起同家族卡**高→低**排序、
+  箱子取組內最低等級（3 T3 + 1 T1 → T3、2 T1 + 3 T2 → T2）；未解鎖批量
+  每晚最多 1 箱、**優先最高等級**。`CF_SAWYER_CHIP` 開芯片（3 同家族同級→
+  下一級，T3 不升，每晚每家族 1 次）；`CF_SAWYER_PERMANENT` 解鎖後接管原版
+  三個 crate barter（同時清 `promotionalBarter` 與
+  `activePromotionalBarterIds`），並發一本 `cf_sawyer_card_catalog` 換卡目錄
+  紙本。0.7.1 紙本改用 `CfPaperSprites` 執行期產圖（紙底＋X／放大鏡／左右
+  箭頭）註冊進 `LoadedMod.PaperSprites`，修掉藍方塊。Wild Network 由 4 個
+  升級變 **7 個**。0.7.0 實機已通過的部分與 0.7.1 待重測項見「P5 實機驗證」。
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.7.0 |
+| ModVersion | 0.7.1 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 69,120 bytes |
-| SHA256 | `CA6F1325AB90E019D701B27644D985E2555A3AF54D7F042F927DBD2760F14DF7` |
+| 大小 | 74,752 bytes |
+| SHA256 | `4881FAEC4FA91715797522C744D201CEFF88087A1ACE1DA35975134855F94E9F` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 0.6.2 的 58,880 bytes／`84FF14E6…`，P5 未覆蓋） |
-| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）；**0.7.1 未提交**；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 ## P3 實機驗證（2026-11-16，Player.log 逐行）
 
@@ -151,7 +154,7 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
   `NetworkUpgrade.RegisterModUpgrade`），有無 prerequisites 都一樣，
   證明不是 prerequisites。
 
-## P5 實作與離線驗收（2026-11-17，0.7.0）
+## P5 0.7.0 實作與離線驗收（分組／紙本／T2 fit 已被 0.7.1 取代）
 
 **本機沒有 PowerShell 7／`pwsh` 不在 PATH，四條指令實際都用
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools\…` 執行**（同一腳本、
@@ -243,7 +246,7 @@ exit 0
   `SawyerChipCost 900`；`Tab = "CardFence"`；三個 `Add(...)` 的 subtitle 都是
   `索耶`；PERMANENT 無 prerequisites、BATCH／CHIP 都是
   `new[] { SawyerPermanent }`。
-- 分組演算法（照原始碼邏輯重寫）：
+- 分組演算法（照原始碼邏輯重寫；**這是 0.7.0 的升冪版，0.7.1 已改成降冪**）：
   - 6 T1 SEC：cap → 1 箱、無 cap → 2 箱；
   - 3 T1 + 3 T2 → T1 + T2；1 T1 + 2 T2 → T1；4 T1 + 2 T2 → 2×T1；
   - 上述兩組把輸入順序反轉，結果相同；
@@ -269,7 +272,8 @@ exit 0
   `OnNewGameStarted` 補紙本註冊與促銷移除、PERMANENT `onUnlock` 包 try/catch；
   `OnEnable`／`OnDisable` 掛／卸 `OnHandlingNightlyServicesEarly`；
   `ModVersion = 0.7.0`。
-- `src/CardCraftAndFence/manifest.xml`：0.7.0＋描述補索耶。- `docs/CARD_CRAFT_SPEC.md`：新增 §3.9（含 §3.9.9 P5 未核實），§3.10.1／
+- `src/CardCraftAndFence/manifest.xml`：0.7.0＋描述補索耶。
+- `docs/CARD_CRAFT_SPEC.md`：新增 §3.9（含 §3.9.9 P5 未核實），§3.10.1／
   §3.11 更新成 7 個升級與 `N/7` log。
 - `docs/CARD_CRAFT_STATUS.md`：本檔。
 
@@ -277,6 +281,125 @@ exit 0
 `PaperBookRegistry`／`ModItemDirectory`）；`CfNetwork.EnsureRegistered` 與
 `CfCmdBoxSprite.EnsureRegistered` 仍然不在 OnEnable，所以 0.5.2 的啟動 NRE
 修正不受影響。
+
+## P5 0.7.1 修訂（實機退回單：紙本 sprites／降冪分組／SEC T2 rare）
+
+0.7.0 實機已跑起來（`registered 7/7`、`Harmony: 8`、無 dummy；換卡、上鎖、
+T3 箱、存檔都正常），但退回三項，0.7.1 修如下。
+
+### 1) 紙本右上角藍方塊
+
+- 根因：遊戲 build 沒有 `Resources/PaperUI/PaperAssetCatalog`，
+  `notebook_manual`／`paper_buttons_close1`／`paper_buttons_screen_0`／
+  `paper_buttons_l_1`／`paper_buttons1` 五次 `No sprite found`；`PaperUI`
+  對缺圖的 chrome 按鈕畫成 `0.3/0.5/0.8` 藍方塊。
+- 修法：新增 `CfPaperSprites`，用 `Texture2D` 執行期產生 5 張 sprite——
+  628×804 紙底（纖維＋顆粒＋邊緣壓暗）與 64×64 的 X／放大鏡／左／右箭頭，
+  寫進 `LoadedMod.PaperSprites`（`PaperAssets.FromMod` 會查這個字典）。
+  `OnModAssetsLoaded`、`OnGameLoadedLate`／`OnNewGameStarted` 的
+  `CfSawyerPaper.EnsureRegistered()`、`Grant()` 前都會補；零美術檔。
+- 沒有用「關掉 chrome 按鈕」的方案：`PaperUI` 沒有 Esc 關書，少了 close
+  會把玩家卡在書裡。
+
+### 2) 3 高 + 1 低 → 低級箱
+
+- 根因：0.7.0 升冪排序後切組，`[T1,T2,T3,T3,T3]` 被切成 `[T1,T2,T3]`，
+  取第一張（最低）→ T1；三張 T3 被拆散。
+- 修法：同家族改成**降冪**排序，箱子等級取**組內最後一張（最低）**；
+  所有組再按箱子等級高→低產出，所以未解鎖批量時 cap 先保留最高級箱。
+- 新語意：3 T3 + 1 T1 → T3（T1 留下）；2 T1 + 3 T2 → T2（T1 留下）；
+  1 T1 + 2 T2 → T1；3 T1 + 3 T2 → T1 + T2；4 T1 + 2 T2 → 2×T1。
+
+### 3) SEC T2 rare 放不進（P4 遺留，P5 量產放大）
+
+- 實機：`[CF-LOOT] spawn table=cf_sec_t2_rare item=stun_gun remaining=1`，
+  箱子少一件 rare，EV 約 −24%。
+- 修法：`LootTables.Fill` 改成 **rare 先放、common 後放**（rare 是保底且通常
+  最大，先佔位）；SEC T2 容量由 7×7 放大到 8×8（MED T2 本來就是 8×8），
+  件數／權重／EV 不變。另加 `[CF-LOOT] overflow … remaining=…` 警告，
+  下次若再放不下會直接看到，而不是只有 `spawn` 的那一行。
+
+### 4) 0.7.1 驗收（實際輸出）
+
+**Build**
+```text
+Compiling AppraisalAssistant...
+  -> ...\dist\AppraisalAssistant\AppraisalAssistant.dll (15872 bytes)
+Compiling AugSpotter...
+  -> ...\dist\AugSpotter\AugSpotter.dll (9216 bytes)
+Compiling CardCraftAndFence...
+  -> ...\dist\CardCraftAndFence\CardCraftAndFence.dll (74752 bytes)
+Build OK: C:\Users\wangy\Desktop\Probably_Stolen_MOD\dist
+EXIT=0
+```
+
+**Verify-Mods（CardCraft 段）**
+```text
+PASS CardCraftAndFence: ID deepspace.card_craft_and_fence
+PASS CardCraftAndFence: capabilities empty
+PASS CardCraftAndFence.dll: IMod implemented by DeepSpaceQoL.CardCraftAndFenceMod
+PASS CardCraftAndFence.dll: no banned IL APIs
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfTryOpenLockPatch -> LockHelper.TryOpenLock
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfCrateTooltipPatch -> LockHelper.CreateLockerContainerTooltip
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfCrateFillPatch -> DirectoryMaster.Item
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfPrinterBatchPatch -> MachinePrinter.FinishPrinting
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfSawyerHidePatch -> NetworkUpgrade.IsHiddenForRun
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfThiefPatch -> StoreClientList.CreateThief
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfInventorPatch -> StoreClientList.CreateInventor
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfInventorStoragePatch -> StoreClientList.CreateInventorStorage
+PASS CardCraftAndFence.dll: HarmonyPatch attributes checked (8)
+RESULT: PASS
+EXIT=0
+```
+
+**Probe-Patches**
+```text
+patched 8 method(s)   ← Appraisal
+patched 4 method(s)   ← Aug
+patched 8 method(s)   ← CardCraft
+  DirectoryMaster.Item
+  LockHelper.CreateLockerContainerTooltip
+  LockHelper.TryOpenLock
+  MachinePrinter.FinishPrinting
+  NetworkUpgrade.IsHiddenForRun
+  StoreClientList.CreateInventor
+  StoreClientList.CreateInventorStorage
+  StoreClientList.CreateThief
+RESULT: PASS
+EXIT=0
+```
+（Mono `internal call`／out-of-sync 警告是既有環境問題。）
+
+**Probe-Logic**
+```text
+[Scan] CardCraftAndFence.dll refused=False capabilities=[] findings=0 error=null
+PASS scan CardCraftAndFence.dll
+RESULT: PASS
+EXIT=0
+```
+
+**Scratch**
+```text
+python .scratch\p5sawyer\check.py
+P5 SAWYER CHECK (0.7.1)
+  source: src\CardCraftAndFence\CardCraftAndFence.cs
+  dll   : dist\CardCraftAndFence\CardCraftAndFence.dll (74752 bytes)
+  passed: 94  failed: 0
+
+P5 SAWYER CHECK: PASS
+EXIT=0
+```
+`check.py` 新增：降冪分組 14 個案例（含 3 T3+1 T1、2 T1+3 T2、cap 只留 T3、
+順序反轉）、5 個 paper key／`PaperSprites`／`OnModAssetsLoaded`、rare-first
+順序、SEC T2 8×8、overflow 警告、版本 0.7.1。
+
+### 5) 0.7.1 待實機
+
+- 開書：log 不再有上述五條 `No sprite found`；右上 X／放大鏡在紙面內；
+  背景有紙紋；close 可關書。
+- 分組：3 T3 + 1 T1 → 1 個 T3 箱（T1 留下）；2 T1 + 3 T2 → 1 個 T2 箱；
+  未買 BATCH 時優先做最高級箱。
+- SEC T2：開箱確認 7 件齊全，log 沒有 `[CF-LOOT] overflow`。
 
 ## 0.5.2 啟動 NRE 修正（實機回報）
 
@@ -584,31 +707,29 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 - P3 的 #5／#6／#7 仍未補 log 證據（沿用上一輪結論）。
 - `unitValue`（晶片 250／解序器 800／T3 卡核新價）是定案值但未經遊戲平衡驗證。
 - `long_module2` 是否真的是 1×4：由 sprite 切片決定，未在 runtime 量過。
-- **P5 索耶全部未實機**（只有離線核對，`Player.log` 沒有任何 `[CF-SAWYER]`）：
-  - 每晚 handler 是否真的在 `HandleJanitorial` 之前、`PlayerStore.EndNight`
-    內被呼叫；`janitorial off`／`exchange locked`／`PERMANENT not unlocked`
-    三條 skip 都只有程式路徑。
-  - 換卡：T1 走 `PreBuiltItemHelper.LootCrate*`、T2/T3/CMD T1 走
-    `CfCrateFillPatch`，兩條路都沿用既有機制；但「箱子從 `itemsBuffer` 進到
-    垃圾桶後是**已上鎖＋內容齊全**」沒有實機看過（尤其垃圾桶滿時原版
-    `exchange delivery, trashcan full` 會直接丟棄）。
-  - 批次上限：未解鎖時只做 1 箱、剩下卡留給原版 barter／清潔；固定家族順序
-    （SEC→MED→ENG→SER→CMD）只有離線重現。
+- **P5 0.7.0 已實機通過一部分**：載入、`[CF-NET] registered 7/7`、
+  `Harmony: 8`、無 `Init failed`、無 `cf_` dummy；`removed promotional
+  barters`／`paper book granted` 有出現；`skip: janitorial off` 正常；夜間
+  handler 有跑，T1／T2／T3 箱都建得出來、上鎖，T1 鑰匙開 T3 箱
+  `canOpen=False`；存檔 T3 SEC 箱 5 件、`CF_CRATE_FILLED=true`。
+- **P5 0.7.1 待實機重測**（0.7.0 退回的三項）：
+  - 紙本：開書 log 不再有 `notebook_manual`／`paper_buttons_*` 五條
+    `No sprite found`；右上 X／放大鏡在紙面內、背景有紙紋、close 可關書。
+  - 分組：3 T3 + 1 T1 → 1 個 T3 箱（T1 留下）；2 T1 + 3 T2 → 1 個 T2 箱；
+    未買 BATCH 時優先做最高級箱。
+  - SEC T2：開箱確認 7 件齊全，log 沒有 `[CF-LOOT] overflow`。
+- **P5 其餘仍未實機**：
   - 芯片：3 個同家族同級→下一級、T3 不升、每晚每家族 1 次（3 T1＋3 T2 只做
-    T1→T2），以及 0.5.4 舊 alias `cf_<slug>_crypto_module_t3` 的讀取，全部
-    只有離線核對。
+    T1→T2），以及 0.5.4 舊 alias `cf_<slug>_crypto_module_t3` 的讀取。
   - 常駐接管：`promotionalBarter`／`activePromotionalBarterIds` 移除後，
-    `ExchangeUIManager` 的促銷條目是否立刻消失、重開 UI 後會不會復活，
-    未實機看。
-  - 紙本：`cf_sawyer_card_catalog` 的中文渲染與版面（314×402、266×336 的 body
-    文字會不會溢出／換行位置）完全沒在遊戲裡看過；`EnsureRegistered` 在
-    `ModItemDirectory` 未 live 時第一輪會靜默失敗，依賴
-    `OnGameLoadedLate`／`OnNewGameStarted`／`Grant` 前補註冊，這個時序也沒有
-    實機 log 證明。
+    `ExchangeUIManager` 的促銷條目是否立刻消失、重開 UI 後會不會復活。
+  - 紙本 `EnsureRegistered` 在 `ModItemDirectory` 未 live 時第一輪會靜默失敗，
+    依賴 `OnGameLoadedLate`／`OnNewGameStarted`／`Grant` 前補註冊的時序。
   - `_removalLogged` 是 process 內 static：同一行程切換存檔時第二個存檔的移除
     不會再印 log（行為正確、只是少一條 log）。
-  - P5 也把 CMD T1 箱納入換卡產出（`cf_cmd_box_t1`，200）；這條之前只有 F9
-    能拿到，換卡是它第一個正常來源，未實機驗。
+  - 垃圾桶滿時原版 `exchange delivery, trashcan full` 會丟棄換卡產出。
+  - P5 也把 CMD T1 箱納入換卡產出（`cf_cmd_box_t1`，200）；換卡是它第一個
+    正常來源，未實機驗。
 - **完整 §3.1–3.12 規格**：仍未補齊；目前只有 P1/P2 定案段、§3.3 loot 表、
   §3.4 errata、§3.4b T3 定價、§3.5 P3、§3.8／§3.10(2)／§3.11 P4、§3.12 貼圖，
   以及 P5 的 §3.9。
@@ -619,12 +740,13 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 ## 下一步
 
 1. 0.6.2（博士住所 hook／小偷順序）已提交（`75d227f`，本機 commit、未 push）。
-2. **P5（0.7.0，索耶換卡／芯片／常駐服務／紙本目錄）本輪完成離線驗收，
-   已提交 `66266cf`、未 push**；工作區只剩本輪開始前就存在的
+2. **P5 0.7.0 已提交 `66266cf`；0.7.1 修訂（紙本 runtime sprites／降冪分組／
+   SEC T2 rare）本輪未提交、未 push**；工作區只剩本輪開始前就存在的
    `ACCEPTANCE_REVIEW.md`／`DEVELOPER_DIAGNOSTIC.md` 修改（非本輪）。
-3. 人類實機跑 P4 修訂、CMD 貼圖與 **P5 索耶**驗收卡，收集 `[CF-NET]`／
-   `[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`／`[CF-SAWYER]`，
-   並補 T3 in-game `[CF-EV]`；紙本打開看中文版面。
+3. 人類實機重測 **0.7.1 三項**（開書看右上角、3 T3 + 1 T1、2 T1 + 3 T2、
+   SEC T2 開箱 7 件），再跑 P4 修訂、CMD 貼圖與 P5 其餘驗收卡，收集
+   `[CF-NET]`／`[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`／
+   `[CF-SAWYER]`／`[CF-PAPER]`，並補 T3 in-game `[CF-EV]`。
 4. **江洋大盜（P6）**：補 CMD 箱的正常來源（P5 的換卡已先給 CMD T1 一個來源）。
 5. 其餘黑市內容；補 §3.1–3.11 全文與 `Resources.LoadAll` 實機清單。
 
@@ -641,9 +763,10 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 - `src/CardCraftAndFence/CardCraftAndFence.cs`（P4 修訂新增 `CfCardStock`、
   `CfInventorStock`、`CfInventorPatch`；0.5.1 新增 `CfCmdBoxSprite`；
   **0.7.0（P5）新增 `CfSawyerExchange`（換卡／芯片／促銷 barter 移除）與
-  `CfSawyerPaper`（換卡目錄紙本）**；`CfNetwork` 由 4 個升級變 7 個；
-  `CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables` 擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.7.0）
+  `CfSawyerPaper`（換卡目錄紙本）；0.7.1 新增 `CfPaperSprites`（紙本 runtime
+  貼圖）並改降冪分組、rare-first、SEC T2 8×8**；`CfNetwork` 由 4 個升級變
+  7 個；`CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables` 擴到 T3 箱）
+- `src/CardCraftAndFence/manifest.xml`（0.7.1）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、**§3.9 P5**、
   §3.10、§3.11、§3.12）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）

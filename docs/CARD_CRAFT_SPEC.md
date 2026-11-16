@@ -11,7 +11,7 @@
 
 | 家族 | T1 id | T1 容量 | T1 價 | T2 id | T2 容量 | T2 價 | T3 id | T3 容量 | T3 價 | sprite |
 |---|---|---|---:|---|---:|---:|---|---:|---:|---|
-| SEC | `sec_box`（原版） | 7×5 | 200 | `cf_sec_box_t2` | 7×7 | 225 | `cf_sec_box_t3` | 9×8 | 300 | `sec_box` |
+| SEC | `sec_box`（原版） | 7×5 | 200 | `cf_sec_box_t2` | **8×8**（0.7.1 起） | 225 | `cf_sec_box_t3` | 9×8 | 300 | `sec_box` |
 | MED | `med_box`（原版） | 7×5 | 200 | `cf_med_box_t2` | **8×8** | 225 | `cf_med_box_t3` | 9×8 | 300 | `med_box` |
 | ENG | `eng_box`（原版） | 7×5 | 200 | `cf_eng_box_t2` | 7×7 | 225 | `cf_eng_box_t3` | 9×8 | 300 | `eng_box` |
 | SER | `service_box`（原版） | 7×5 | 175 | `cf_ser_box_t2` | 7×7 | 225 | `cf_ser_box_t3` | 9×8 | 300 | `service_box` |
@@ -20,6 +20,10 @@
 - **容量校正（歷史）**：MED T2 用 8×8、CMD T1 用 7×7、CMD T2 用 9×8，
   是舊版 10／11 rolls 的 fit 結果。0.5.7 新池件數變少（T2 4–7、T3 5–8），
   容量維持不動；容量只影響「放不放得下」，不改 EV／價與件數。
+- **0.7.1 SEC T2 由 7×7 放大成 8×8**：實機 `cf_sec_t2_rare` 的 `stun_gun`
+  曾在 6 件 common 之後 `remaining=1` 被銷毀（箱子少一件 rare，EV 少約 24%）。
+  `LootTables.Fill` 同時改成 **rare 先放**，common 再放；8×8 只是 fit 保險，
+  不改 7 件的件數、權重與 EV。MED T2 本來就是 8×8。
 - T1 SEC／MED／ENG／SER 沿用原版 id，不重新註冊、不加 `CF_CRATE_*`，
   走原版 `LockHelper.TryOpenLock`；原版價格就是 200／200／200／175。
 - **§3.3 T1 價格 errata**：spec 表寫 T1 一般箱 150，與「T1 沿用原版 id」衝突；
@@ -658,7 +662,7 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - `[CF-INVENTOR] counter full, skipped <id>`（住所 hook 放不下）
 - `[CF-STOCK] counter full, skipped <id>`（僅卡匠貨架）
 
-## §3.9 索耶換卡（P5，0.7.0 實作）
+## §3.9 索耶換卡（P5，0.7.0 實作／0.7.1 修訂）
 
 > 本節只寫「已寫進代碼、且已用離線核對過」的規則。實機（每晚換卡、芯片升級、
 > 紙本渲染）尚未驗，見 §3.9.9 與 `CARD_CRAFT_STATUS.md`。
@@ -686,10 +690,12 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 ### §3.9.2 換卡（垃圾桶裡的同家族鑰匙卡 → 物資箱）
 
 - 比例（一張卡換 1 箱的張數）：**SEC 3、MED 4、ENG 4、SER 4、CMD 3**。
-- 同家族的卡按等級**低→高**排序，每滿一組切一組；**箱子等級 = 該組最低等級**：
-  - 3 T1 + 3 T2（比例 3）→ 1 個 T1 箱 + 1 個 T2 箱；
-  - 1 T1 + 2 T2 → 只夠 1 個 T1 箱（零散的高級卡不會自己湊成箱）；
-  - 4 T1 + 2 T2 → 2 個 T1 箱。
+- 同家族的卡按等級**高→低**排序，每滿一組切一組；**箱子等級 = 該組最低等級**
+  （降序後是組內最後一張）：
+  - 3 T3 + 1 T1（比例 3）→ 1 個 T3 箱（T1 留下）；
+  - 2 T1 + 3 T2 → 1 個 T2 箱（2 張 T1 留下）；
+  - 1 T1 + 2 T2 → 1 個 T1 箱（混組仍取最低，防止低卡升箱）；
+  - 3 T1 + 3 T2 → 1 個 T1 + 1 個 T2；4 T1 + 2 T2 → 2 個 T1 箱。
   - 結果與垃圾桶的擺放順序無關（先按等級排序再切組）。
 - 卡識別：`ItemFactory.TryGetCardInfo`（既有）——只認有 `CF_CARD_FAMILY` /
   `CF_CARD_TIER` 的卡，或原版 T1 id（`sec_keycard`／`med_keycard`／
@@ -701,7 +707,8 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
   - 其餘（T2／T3 五家族、CMD T1）：`DirectoryMaster.Item(ItemFactory.ContainerId(family,tier))`，
     由既有 `CfCrateFillPatch` 自動填 loot 並上鎖。
 - 建立失敗（`null`，或拿回的東西沒有 `contentWindow`＝`DirectoryMaster.Item`
-  對未知 id 的 dummy fallback）→ **該組卡不銷毀**，跳過這個家族剩下的組。
+  對未知 id 的 dummy fallback）→ **該組卡不銷毀**，跳過該組（其他組照常；
+  正常註冊下不應發生）。
 - 每組**成功後**才 `Destroy()` 該組的卡（避免同一晚再被原版 barter 用）。
 - 箱加進 `exchangeManager.itemsBuffer`。
 - **批次上限**：`CF_SAWYER_BATCH` 未解鎖 → 全夜總產出上限 **1 箱（跨家族）**；
@@ -709,8 +716,10 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 ### §3.9.3 換卡的實作裁定
 
-- **固定處理順序**（可重現）：家族 `SEC → MED → ENG → SER → CMD`，
-  同家族內等級低→高；同級卡彼此等價，先銷毀哪一張不影響結果。
+- **固定處理順序**（可重現）：先按家族 `SEC → MED → ENG → SER → CMD` 收集
+  每家族的完整組（同家族內等級高→低切組），再把所有組按**箱子等級高→低**
+  產出；等級相同才用上面的家族順序。未解鎖批量時 cap 就是靠這個順序先保留
+  最高級的箱（例：3 T3 + 3 T1 只做 T3）。
 - 未解鎖批量時，達到 1 箱就**立刻停止整個換卡流程**，剩下的卡不消耗、
   留給原版 barter／`ClearTrash`。只有「垃圾桶裡還有其他湊得滿的組」時才印
   `[CF-SAWYER] cap: 1 box/night until CF_SAWYER_BATCH`（真的是被上限扣下一個
@@ -772,9 +781,17 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - 書籍內容：title「索耶的换卡目录」、background `notebook_manual`、
   designWidth 314／designHeight 402、`chrome = PaperStarters.DefaultChrome(new Vector2(314f,402f), 2f)`；
   一頁 name「换卡比例」，頁面用一個 text element 直接寫（x=24、y=34、w=266、h=336、
-  style `body`、wrap），**不用 template**。文字至少列出：五家族比例、
-  箱子取該組最低等級、零散卡由低到高湊滿＋「1 T1 + 2 T2 → 1 個 T1 箱」例子、
-  未解鎖批量每晚 1 箱、芯片 3 同家族同級→下一級、每晚每家族 1 次、T3 不升。
+  style `body`、wrap），**不用 template**。文字列出：五家族比例、同家族高→低排序、
+  箱子取組內最低等級、`3 T3 + 1 T1 → T3`／`2 T1 + 3 T2 → T2`／`1 T1 + 2 T2 → T1`
+  的例子、未解鎖批量每晚 1 箱且優先最高等級、芯片 3 同家族同級→下一級、
+  每晚每家族 1 次、T3 不升。
+- **遊戲 build 缺 PaperUI 資源**：`Resources/PaperUI/PaperAssetCatalog` 不存在，
+  `notebook_manual` 與 `paper_buttons_*` 不會從原版解析（實機 log 是五次
+  `No sprite found`，chrome 按鈕變成藍方塊）。`CfPaperSprites` 以 `Texture2D`
+  執行期產生 5 張 sprite：628×804 紙底（纖維＋顆粒＋邊緣壓暗）與 64×64 的
+  X／放大鏡／左箭頭／右箭頭，註冊進 `LoadedMod.PaperSprites`
+  （`PaperAssets.FromMod` 會先查這個字典）。`OnModAssetsLoaded` 與
+  `EnsureRegistered()` 都會補註冊，`Grant()` 前也再確保一次；零美術檔。
 - `item`：`PaperItemData { id=ItemId, name="索耶的换卡目录",
   description="记录旧城交易所的换卡比例与凑单规则。",
   sprite="items_misc/manual1", value=50, important=false }`。
@@ -822,29 +839,50 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - `[CF-SAWYER] chip family=SEC 1->2 id=cf_crypto_module_sec_t2`
 - `[CF-SAWYER] removed promotional barters sec_crate_barter,med_crate_barter,eng_crate_barter`
 - `[CF-SAWYER] paper book granted id=cf_sawyer_card_catalog`
+- `[CF-PAPER] registered runtime paper sprites notebook_manual + 4 chrome buttons`
+- `[CF-LOOT] overflow table=… item=… remaining=…; item destroyed, crate is short one roll`
 - `[CF-NET] registered N/7 CardFence upgrades tab=CardFence width=792/1060`
 
-### §3.9.9 P5 未核實（截至本輪）
+### §3.9.9 實機驗證與未核實
 
-- 每晚 handler 的**實際觸發時機**（janitorial 開著、交換所已解鎖、PERMANENT
-  已買）只在反編譯源對過行號，沒有 `Player.log` 樣本。
-- `CF_SAWYER_PERMANENT` 未解鎖時「原版三個 crate barter 仍正常」只有程式路徑
-  證明（handler 直接 return、`EnsurePromotionalRemoved` 直接 return），未實機測。
-- 箱子填 loot／上鎖的**觀感**：T1 走原版 helper、T2/T3/CMD T1 走 `CfCrateFillPatch`，
-  兩條路都沿用既有已驗證的機制，但「從 itemsBuffer 進垃圾桶後箱子是上鎖的、
-  內容物齊全」沒有實機看過。
-- 紙本的中文渲染與版面（314×402 design、266×336 body 文字會不會溢出、
-  換行位置）完全沒在遊戲裡看過；`PaperStarters.DefaultChrome` 是純數學，
-  但也只離線核對呼叫簽名。
-- 芯片升級「每晚每家族最多 1 次」與舊 alias 讀取（`cf_<slug>_crypto_module_t3`）
-  只有離線邏輯核對，沒有實機把 3 T1＋3 T2 放進垃圾桶跑過。
-- `activePromotionalBarterIds` 移除後，`ExchangeUIManager` 的促銷條目是否
-  立即消失、重開 UI 後是否復活，未實機看。
-- `_removalLogged` 是 process 內 static：同一行程切換存檔時，第二個存檔
-  的移除不會再印 log（行為正確、只是沒有第二條 log），未實機驗。
+**0.7.0 實機已通過（2026-11-17，`Player.log`）**：
+
+- 載入、`[CF-NET] registered 7/7`、`Harmony: 8`、無 `Init failed`、無 `cf_` dummy。
+- `[CF-SAWYER] removed promotional barters …` 與 `[CF-SAWYER] paper book granted …`
+  都出現；`[CF-SAWYER] skip: janitorial off` 正常。
+- 夜間 handler 有跑；T1／T2／T3 箱都建得出來；T2／T3 有
+  `[CF-LOOT] postfix fill`＋`fill rolls`；箱子有上鎖；T1 鑰匙開 T3 箱得到
+  `canOpen=False`（正確）。
+- 存檔裡的 T3 SEC 箱 5 件、已上鎖、`CF_CRATE_FILLED=true`。
+- T1 `sec_box` 沒有 `[CF-LOOT]` 是正常的（走 `PreBuiltItemHelper`，不經 fill patch）。
+
+**0.7.0 實機發現、0.7.1 已修（待實機重測）**：
+
+- **紙本藍方塊**：遊戲 build 沒有 `PaperAssetCatalog`，`notebook_manual`／
+  `paper_buttons_*` 五次 `No sprite found`。0.7.1 用 `CfPaperSprites` 執行期產圖
+  註冊到 `LoadedMod.PaperSprites`；待確認：開書 log 不再有這五條、右上有 X／
+  放大鏡且落在紙面、背景有紙紋。
+- **3 高 + 1 低 → 低級箱**：0.7.0 升冪排序取第一張，`[T1,T2,T3,T3,T3]` 被切成
+  `[T1,T2,T3]` → T1。0.7.1 改降冪、組內取最後一張（最低）；新語意見 §3.9.2。
+  待實機：3 T3 + 1 T1 → 1 個 T3 箱；2 T1 + 3 T2 → 1 個 T2 箱。
+- **SEC T2 rare 放不進**：`[CF-LOOT] spawn table=cf_sec_t2_rare item=stun_gun
+  remaining=1`，箱子少一件 rare（EV −24%）。0.7.1 改成 rare 先放＋SEC T2
+  7×7→8×8，並加 overflow 警告。待實機：開箱確認 7 件齊全、log 沒有
+  `[CF-LOOT] overflow`。
+
+**仍未實機（0.7.1）**：
+
 - 紙本 item 註冊在 `ModItemDirectory` 尚未 live 時的第一輪會靜默失敗，
   依賴 `OnGameLoadedLate`／`OnNewGameStarted`（與 `Grant` 前）補註冊；
   這個時序沒有實機 log 證明。
+- `activePromotionalBarterIds` 移除後，`ExchangeUIManager` 的促銷條目是否
+  立即消失、重開 UI 後是否復活。
+- `_removalLogged` 是 process 內 static：同一行程切換存檔時，第二個存檔
+  的移除不會再印 log（行為正確、只是沒有第二條 log）。
+- 芯片升級「每晚每家族最多 1 次」與舊 alias 讀取（`cf_<slug>_crypto_module_t3`）
+  只有離線邏輯核對，沒有實機把 3 T1＋3 T2 放進垃圾桶跑過。
+- 紙本中文渲染與版面：0.7.0 已看到內文沒有溢出，但 0.7.1 改了文字與加入
+  runtime sprite，仍需再看一次換行與按鈕位置。
 
 ## §3.10 黑市與小偷（P4 只做第 2 項）
 

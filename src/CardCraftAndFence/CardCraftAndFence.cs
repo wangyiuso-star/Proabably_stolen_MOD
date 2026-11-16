@@ -18,7 +18,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.7.0";
+        internal const string ModVersion = "0.7.1";
 
         public void Init(ModManifest manifest)
         {
@@ -61,6 +61,8 @@ namespace DeepSpaceQoL
             // us the real LoadedMod later in startup, still before gameplay.
             ModHook.OnModAssetsLoaded -= CfCmdBoxSprite.OnModAssetsLoaded;
             ModHook.OnModAssetsLoaded += CfCmdBoxSprite.OnModAssetsLoaded;
+            ModHook.OnModAssetsLoaded -= CfPaperSprites.OnModAssetsLoaded;
+            ModHook.OnModAssetsLoaded += CfPaperSprites.OnModAssetsLoaded;
             Log.Info("enabled v" + ModVersion);
         }
 
@@ -73,6 +75,7 @@ namespace DeepSpaceQoL
             ModHook.OnNewGameStarted -= CfNetwork.OnNewGameStarted;
             ModHook.OnGameLoadedLate -= CfCmdBoxSprite.OnGameLoadedLate;
             ModHook.OnModAssetsLoaded -= CfCmdBoxSprite.OnModAssetsLoaded;
+            ModHook.OnModAssetsLoaded -= CfPaperSprites.OnModAssetsLoaded;
             // Directory<GameItem> is a DontDestroyOnLoad singleton. Owned items may
             // still need its factories after the mod is disabled, so never destroy it.
             Log.Info("disabled; CfItemDirectory kept alive");
@@ -495,8 +498,11 @@ namespace DeepSpaceQoL
                 height = 8;
                 return;
             }
-            if (family == CardFamily.MED)
+            if (family == CardFamily.MED || family == CardFamily.SEC)
             {
+                // SEC T2 has 6 commons + 1 rare and was 7x7; the rare occasionally
+                // could not fit after six commons fragmented the grid (observed:
+                // stun_gun remaining=1). Both SEC and MED T2 are 8x8 now.
                 width = 8;
                 height = 8;
                 return;
@@ -1902,6 +1908,16 @@ namespace DeepSpaceQoL
             public int Tier;
         }
 
+        // A complete card group waiting to become a crate. Groups are collected
+        // per family first, then produced highest tier first so the one-crate cap
+        // keeps the best box.
+        private sealed class PendingGroup
+        {
+            public CardFamily Family;
+            public int Tier;
+            public List<GameItem> Cards;
+        }
+
         internal static int CardRatio(CardFamily family)
         {
             switch (family)
@@ -1986,33 +2002,12 @@ namespace DeepSpaceQoL
         }
 
         // Card -> crate. Returns the number of crates produced; when capped it
-        // stops after the first crate and leaves the remaining cards untouched.
+        // stops after the first crate (highest tier first) and leaves the
+        // remaining cards untouched.
         private static int ExchangeCards(List<GameItem> trash, bool capped)
         {
-            // How many crates the whole trash could make, per family. This is what
-            // the cap is compared against: cards that cannot fill a group are not
-            // "withheld" by the cap, so they must not produce the cap log.
-            int totalGroups = 0;
-            foreach (CardFamily family in Order)
-            {
-                int count = 0;
-                foreach (GameItem item in trash)
-                {
-                    CardFamily cardFamily;
-                    int tier;
-                    if (ItemFactory.TryGetCardInfo(item, out cardFamily, out tier) && cardFamily == family)
-                    {
-                        count++;
-                    }
-                }
-                totalGroups += count / CardRatio(family);
-            }
-            if (totalGroups <= 0)
-            {
-                return 0;
-            }
             ExchangeManager exchange = PlayerStore.Instance.exchangeManager;
-            int boxes = 0;
+            List<PendingGroup> groups = new List<PendingGroup>();
             foreach (CardFamily family in Order)
             {
                 List<TrashCard> cards = new List<TrashCard>();
@@ -2029,49 +2024,92 @@ namespace DeepSpaceQoL
                     card.Tier = ClampTier(tier);
                     cards.Add(card);
                 }
-                if (cards.Count < CardRatio(family))
+                int ratio = CardRatio(family);
+                if (cards.Count < ratio)
                 {
                     continue;
                 }
+                // High -> low. Full groups are cut from the top; the last card of
+                // a group is therefore its lowest tier (the crate's tier). This
+                // keeps 3 T3 + 1 T1 as a T3 crate and 2 T1 + 3 T2 as a T2 crate,
+                // instead of letting low cards drag the whole group down.
                 cards.Sort(delegate(TrashCard a, TrashCard b)
                 {
-                    return a.Tier.CompareTo(b.Tier);
+                    return b.Tier.CompareTo(a.Tier);
                 });
-                int ratio = CardRatio(family);
-                int groups = cards.Count / ratio;
-                for (int g = 0; g < groups; g++)
+                int groupCount = cards.Count / ratio;
+                for (int g = 0; g < groupCount; g++)
                 {
                     int start = g * ratio;
-                    // Sorted ascending, so the group's lowest tier is its first card.
-                    int tier = cards[start].Tier;
-                    GameItem box = BuildBox(family, tier);
-                    if (box == null)
-                    {
-                        // Do not consume a group whose crate could not be created.
-                        WarnOnce("box:" + family + ":" + tier,
-                            "[CF-SAWYER] cannot build box family=" + family + " tier=" + tier
-                            + "; cards kept");
-                        break;
-                    }
+                    PendingGroup group = new PendingGroup();
+                    group.Family = family;
+                    group.Tier = cards[start + ratio - 1].Tier;
+                    group.Cards = new List<GameItem>();
                     for (int i = 0; i < ratio; i++)
                     {
-                        cards[start + i].Item.Destroy();
+                        group.Cards.Add(cards[start + i].Item);
                     }
-                    exchange.itemsBuffer.Add(box);
-                    boxes++;
-                    Log.Info("[CF-SAWYER] box family=" + family + " tier=" + tier
-                        + " id=" + box.identifier + " cards=" + ratio);
-                    if (capped)
+                    groups.Add(group);
+                }
+            }
+            if (groups.Count == 0)
+            {
+                return 0;
+            }
+            // Highest tier first across families; ties keep the fixed family
+            // order. The one-crate cap therefore keeps the highest-tier box.
+            groups.Sort(delegate(PendingGroup a, PendingGroup b)
+            {
+                int byTier = b.Tier.CompareTo(a.Tier);
+                if (byTier != 0)
+                {
+                    return byTier;
+                }
+                return FamilyRank(a.Family).CompareTo(FamilyRank(b.Family));
+            });
+            int boxes = 0;
+            foreach (PendingGroup group in groups)
+            {
+                int ratio = CardRatio(group.Family);
+                GameItem box = BuildBox(group.Family, group.Tier);
+                if (box == null)
+                {
+                    // Do not consume a group whose crate could not be created.
+                    WarnOnce("box:" + group.Family + ":" + group.Tier,
+                        "[CF-SAWYER] cannot build box family=" + group.Family
+                        + " tier=" + group.Tier + "; cards kept");
+                    continue;
+                }
+                foreach (GameItem card in group.Cards)
+                {
+                    card.Destroy();
+                }
+                exchange.itemsBuffer.Add(box);
+                boxes++;
+                Log.Info("[CF-SAWYER] box family=" + group.Family + " tier=" + group.Tier
+                    + " id=" + box.identifier + " cards=" + ratio);
+                if (capped)
+                {
+                    if (groups.Count > boxes)
                     {
-                        if (totalGroups > boxes)
-                        {
-                            Log.Info("[CF-SAWYER] cap: 1 box/night until CF_SAWYER_BATCH");
-                        }
-                        return boxes;
+                        Log.Info("[CF-SAWYER] cap: 1 box/night until CF_SAWYER_BATCH");
                     }
+                    break;
                 }
             }
             return boxes;
+        }
+
+        private static int FamilyRank(CardFamily family)
+        {
+            for (int i = 0; i < Order.Length; i++)
+            {
+                if (Order[i] == family)
+                {
+                    return i;
+                }
+            }
+            return Order.Length;
         }
 
         private static GameItem BuildBox(CardFamily family, int tier)
@@ -2304,6 +2342,306 @@ namespace DeepSpaceQoL
     }
 
     /// <summary>
+    /// Runtime paper sprites for the first mod book. The shipped game build has no
+    /// PaperAssetCatalog in Resources/PaperUI, so PaperAssets.Resolve cannot find
+    /// the vanilla paper names and falls through to LoadedMod.PaperSprites /
+    /// Sprites. Without these, DefaultChrome's close/zoom/flip buttons render as
+    /// blue squares and the book has no paper background. Generate the textures at
+    /// runtime (no art files), same approach as CfCmdBoxSprite.
+    /// </summary>
+    internal static class CfPaperSprites
+    {
+        internal const string BackgroundKey = "notebook_manual";
+        internal const string CloseKey = "paper_buttons_close1";
+        internal const string ZoomKey = "paper_buttons_screen_0";
+        internal const string FlipLeftKey = "paper_buttons_l_1";
+        internal const string FlipRightKey = "paper_buttons1";
+
+        private static readonly string[] Keys =
+        {
+            BackgroundKey, CloseKey, ZoomKey, FlipLeftKey, FlipRightKey
+        };
+
+        private static readonly Color Ink = new Color(0.29f, 0.24f, 0.17f, 1f);
+        private static readonly HashSet<string> _warned = new HashSet<string>();
+
+        internal static void OnModAssetsLoaded(LoadedMod mod)
+        {
+            if (mod == null || mod.Manifest == null
+                || !string.Equals(mod.Manifest.ID, CardCraftAndFenceMod.ModId, StringComparison.Ordinal))
+            {
+                return;
+            }
+            try
+            {
+                Ensure(mod);
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-PAPER] sprite registration failed: "
+                    + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        internal static bool Ensure(LoadedMod knownMod = null)
+        {
+            LoadedMod mod = knownMod ?? FindMod();
+            if (mod == null)
+            {
+                return false;
+            }
+            if (mod.PaperSprites == null)
+            {
+                mod.PaperSprites = new Dictionary<string, Sprite>();
+            }
+            bool added = false;
+            if (!mod.PaperSprites.ContainsKey(BackgroundKey))
+            {
+                added |= Add(mod, BackgroundKey, BuildBackground());
+            }
+            if (!mod.PaperSprites.ContainsKey(CloseKey))
+            {
+                added |= Add(mod, CloseKey, BuildClose());
+            }
+            if (!mod.PaperSprites.ContainsKey(ZoomKey))
+            {
+                added |= Add(mod, ZoomKey, BuildZoom());
+            }
+            if (!mod.PaperSprites.ContainsKey(FlipLeftKey))
+            {
+                added |= Add(mod, FlipLeftKey, BuildFlip(false));
+            }
+            if (!mod.PaperSprites.ContainsKey(FlipRightKey))
+            {
+                added |= Add(mod, FlipRightKey, BuildFlip(true));
+            }
+            if (added)
+            {
+                Log.Info("[CF-PAPER] registered runtime paper sprites "
+                    + "notebook_manual + 4 chrome buttons");
+            }
+            return AllPresent(mod);
+        }
+
+        private static bool Add(LoadedMod mod, string key, Sprite sprite)
+        {
+            if (sprite == null)
+            {
+                WarnOnce("build:" + key, "[CF-PAPER] cannot build sprite " + key);
+                return false;
+            }
+            mod.PaperSprites[key] = sprite;
+            return true;
+        }
+
+        private static bool AllPresent(LoadedMod mod)
+        {
+            foreach (string key in Keys)
+            {
+                if (!mod.PaperSprites.ContainsKey(key))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static LoadedMod FindMod()
+        {
+            foreach (LoadedMod mod in ModLoader.Mods)
+            {
+                if (mod != null && mod.Manifest != null
+                    && string.Equals(mod.Manifest.ID, CardCraftAndFenceMod.ModId, StringComparison.Ordinal))
+                {
+                    return mod;
+                }
+            }
+            return null;
+        }
+
+        // 628x804 matches the display size PaperUI falls back to (design 314x402
+        // at scale 2), so the texture is 1:1 on screen.
+        private static Sprite BuildBackground()
+        {
+            const int width = 628;
+            const int height = 804;
+            Color[] pixels = new Color[width * height];
+            Color paper = new Color(0.945f, 0.906f, 0.812f, 1f);
+            System.Random rng = new System.Random(20261117);
+            for (int y = 0; y < height; y++)
+            {
+                float fy = y / (height - 1f);
+                for (int x = 0; x < width; x++)
+                {
+                    float fx = x / (width - 1f);
+                    // Low-frequency fibres plus a little grain; no flat fill.
+                    float fibre = Mathf.Sin((x + Mathf.Sin(y * 0.07f) * 6f) * 0.11f) * 0.5f + 0.5f;
+                    float grain = (float)rng.NextDouble();
+                    float shade = 0.962f + 0.025f * fibre + 0.014f * (grain - 0.5f);
+                    float edge = Mathf.Min(Mathf.Min(fx, 1f - fx), Mathf.Min(fy, 1f - fy));
+                    if (edge < 0.04f)
+                    {
+                        shade -= (0.04f - edge) / 0.04f * 0.06f;
+                    }
+                    pixels[y * width + x] = new Color(
+                        paper.r * shade, paper.g * shade, paper.b * shade, 1f);
+                }
+            }
+            return Finish("cf_paper_notebook", width, height, pixels, FilterMode.Bilinear);
+        }
+
+        private static Sprite BuildClose()
+        {
+            const int size = 64;
+            Color[] pixels = NewPixels(size);
+            Stroke(pixels, size, 20f, 20f, 44f, 44f, 2.4f, Ink);
+            Stroke(pixels, size, 44f, 20f, 20f, 44f, 2.4f, Ink);
+            return Finish("cf_paper_close", size, size, pixels, FilterMode.Bilinear);
+        }
+
+        private static Sprite BuildZoom()
+        {
+            const int size = 64;
+            Color[] pixels = NewPixels(size);
+            Ring(pixels, size, 26f, 38f, 11f, 3.2f, Ink);
+            Stroke(pixels, size, 34f, 30f, 45f, 19f, 3.2f, Ink);
+            return Finish("cf_paper_zoom", size, size, pixels, FilterMode.Bilinear);
+        }
+
+        private static Sprite BuildFlip(bool right)
+        {
+            const int size = 64;
+            Color[] pixels = NewPixels(size);
+            if (right)
+            {
+                Stroke(pixels, size, 22f, 16f, 44f, 32f, 3.4f, Ink);
+                Stroke(pixels, size, 44f, 32f, 22f, 48f, 3.4f, Ink);
+            }
+            else
+            {
+                Stroke(pixels, size, 42f, 16f, 20f, 32f, 3.4f, Ink);
+                Stroke(pixels, size, 20f, 32f, 42f, 48f, 3.4f, Ink);
+            }
+            return Finish("cf_paper_flip_" + (right ? "right" : "left"),
+                size, size, pixels, FilterMode.Bilinear);
+        }
+
+        private static Color[] NewPixels(int size)
+        {
+            // All-zero Color is transparent, which is what the chrome buttons need.
+            return new Color[size * size];
+        }
+
+        private static void Stroke(
+            Color[] pixels, int size,
+            float ax, float ay, float bx, float by,
+            float radius, Color color)
+        {
+            float minX = Mathf.Min(ax, bx) - radius - 1f;
+            float maxX = Mathf.Max(ax, bx) + radius + 1f;
+            float minY = Mathf.Min(ay, by) - radius - 1f;
+            float maxY = Mathf.Max(ay, by) + radius + 1f;
+            int x0 = Mathf.Max(0, Mathf.FloorToInt(minX));
+            int x1 = Mathf.Min(size - 1, Mathf.CeilToInt(maxX));
+            int y0 = Mathf.Max(0, Mathf.FloorToInt(minY));
+            int y1 = Mathf.Min(size - 1, Mathf.CeilToInt(maxY));
+            for (int y = y0; y <= y1; y++)
+            {
+                for (int x = x0; x <= x1; x++)
+                {
+                    float d = SegmentDistance(x + 0.5f, y + 0.5f, ax, ay, bx, by);
+                    float a = Mathf.Clamp01(radius + 0.75f - d);
+                    if (a > 0f)
+                    {
+                        Blend(pixels, y * size + x, color, a);
+                    }
+                }
+            }
+        }
+
+        private static void Ring(
+            Color[] pixels, int size,
+            float cx, float cy, float radius, float thickness, Color color)
+        {
+            float max = radius + thickness + 1f;
+            int x0 = Mathf.Max(0, Mathf.FloorToInt(cx - max));
+            int x1 = Mathf.Min(size - 1, Mathf.CeilToInt(cx + max));
+            int y0 = Mathf.Max(0, Mathf.FloorToInt(cy - max));
+            int y1 = Mathf.Min(size - 1, Mathf.CeilToInt(cy + max));
+            for (int y = y0; y <= y1; y++)
+            {
+                for (int x = x0; x <= x1; x++)
+                {
+                    float dx = x + 0.5f - cx;
+                    float dy = y + 0.5f - cy;
+                    float d = Mathf.Abs(Mathf.Sqrt(dx * dx + dy * dy) - radius);
+                    float a = Mathf.Clamp01(thickness * 0.5f + 0.75f - d);
+                    if (a > 0f)
+                    {
+                        Blend(pixels, y * size + x, color, a);
+                    }
+                }
+            }
+        }
+
+        private static float SegmentDistance(
+            float px, float py, float ax, float ay, float bx, float by)
+        {
+            float dx = bx - ax;
+            float dy = by - ay;
+            float lengthSq = dx * dx + dy * dy;
+            float t = lengthSq <= 0f
+                ? 0f
+                : Mathf.Clamp01(((px - ax) * dx + (py - ay) * dy) / lengthSq);
+            float ex = ax + t * dx;
+            float ey = ay + t * dy;
+            float ox = px - ex;
+            float oy = py - ey;
+            return Mathf.Sqrt(ox * ox + oy * oy);
+        }
+
+        private static void Blend(Color[] pixels, int index, Color color, float alpha)
+        {
+            Color dst = pixels[index];
+            float sa = color.a * alpha;
+            float outA = sa + dst.a * (1f - sa);
+            if (outA <= 0f)
+            {
+                return;
+            }
+            float inv = dst.a * (1f - sa);
+            pixels[index] = new Color(
+                (color.r * sa + dst.r * inv) / outA,
+                (color.g * sa + dst.g * inv) / outA,
+                (color.b * sa + dst.b * inv) / outA,
+                outA);
+        }
+
+        private static Sprite Finish(
+            string name, int width, int height, Color[] pixels, FilterMode filter)
+        {
+            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            texture.filterMode = filter;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.SetPixels(pixels);
+            texture.Apply();
+            Sprite sprite = Sprite.Create(
+                texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+            sprite.name = name;
+            texture.name = "cf_" + name;
+            return sprite;
+        }
+
+        private static void WarnOnce(string key, string message)
+        {
+            if (_warned.Add(key))
+            {
+                Log.Warn(message);
+            }
+        }
+    }
+
+    /// <summary>
     /// P5 paper catalogue ("索耶的换卡目录"). Registered through
     /// ModHelper.RegisterPaperBook, which stores the book in PaperBookRegistry and
     /// registers data.item.id in the live ModItemDirectory. That directory may not
@@ -2323,6 +2661,10 @@ namespace DeepSpaceQoL
             try
             {
                 ModHelper.RegisterPaperBook(CardCraftAndFenceMod.ModId, Build());
+                // The game build ships without the PaperUI asset catalog, so the
+                // vanilla chrome/background names only resolve through this mod's
+                // LoadedMod.PaperSprites. Ensure them before the book can be opened.
+                CfPaperSprites.Ensure();
             }
             catch (Exception e)
             {
@@ -2357,14 +2699,14 @@ namespace DeepSpaceQoL
                 + "同家族的钥匙卡攒够一组，换 1 个同家族物资箱：\n"
                 + "SEC 3 张／MED 4 张／ENG 4 张／SER 4 张／CMD 3 张。\n\n"
                 + "二、箱子等级\n"
-                + "同家族的卡按等级从低到高排序，每满一组切一组；\n"
-                + "箱子取这一组里最低的等级。\n"
-                + "例：3 T1 + 3 T2 → 1 个 T1 箱 + 1 个 T2 箱；\n"
-                + "1 T1 + 2 T2 → 只够 1 个 T1 箱（零散卡由低到高凑满）；\n"
-                + "4 T1 + 2 T2 → 2 个 T1 箱。\n"
+                + "同家族的卡按等级从高到低排序，每满一组切一组；\n"
+                + "箱子取组内最低等级（降序后是最后一张）。\n"
+                + "例：3 T3 + 1 T1 → 1 个 T3 箱（T1 留下）；\n"
+                + "2 T1 + 3 T2 → 1 个 T2 箱（T1 留下）；\n"
+                + "1 T1 + 2 T2 → 1 个 T1 箱；3 T1 + 3 T2 → T1 + T2。\n"
                 + "箱子已装好物资并上锁，等级越高锁越硬。\n\n"
                 + "三、批量\n"
-                + "未解锁「批量换卡」前，每晚最多换 1 个箱子（跨家族）；\n"
+                + "未解锁「批量换卡」前，每晚最多 1 箱（优先最高等级）；\n"
                 + "解锁后当晚把能凑满的全部换完。\n\n"
                 + "四、芯片\n"
                 + "3 个同家族同级的加密模块 → 1 个同家族下一级：\n"
@@ -3382,11 +3724,15 @@ namespace DeepSpaceQoL
             int rolls = Rolls(family, tier);
             Diag("fill:" + common, "[CF-LOOT] fill table=" + common + " rolls=" + rolls
                 + " rare=" + rare);
+            // Rare first: it is the guaranteed high-value roll and the largest
+            // sprite in most tables. Filling it last let six commons fragment a
+            // tight grid and the rare was destroyed with remaining=1 (observed on
+            // SEC T2 stun_gun). Commons can be smaller and pack around it.
+            SpawnOne(box, rare);
             for (int i = 0; i < rolls; i++)
             {
                 SpawnOne(box, common);
             }
-            SpawnOne(box, rare);
         }
 
         internal static string CommonId(CardFamily family, int tier)
@@ -3463,6 +3809,12 @@ namespace DeepSpaceQoL
                 + " item=" + itemId + " remaining=" + remaining);
             if (remaining > 0)
             {
+                if (_diag.Add("overflow:" + tableId))
+                {
+                    Log.Warn("[CF-LOOT] overflow table=" + tableId
+                        + " item=" + itemId + " remaining=" + remaining
+                        + "; item destroyed, crate is short one roll");
+                }
                 // The returned amount is the remainder; the accepted part is
                 // already in the crate. Destroy only the leftover object.
                 item.Destroy();
