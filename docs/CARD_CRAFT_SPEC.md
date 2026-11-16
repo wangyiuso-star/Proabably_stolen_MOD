@@ -668,7 +668,10 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 | `printer_module_cnc` | 1 | 400 |
 | `common_electronic` | 2 | 33 |
 | `printer_plastic` | 2 | 12 |
+| `energy_credit` | 1 | 10（100 電／bandwidth 10） |
 
+- **電池**：`energy_credit` 就是原版 `PowerHelper.InitPowerSourceItem(item, 100, 10)`；
+  沒有它印表機無法開機，所以 PRO 工具包必帶一顆。不另外改 50 電版本。
 - 全部 `GeneralHelper.SetItemOwned(item, true)` 後
   `GraphUtils.EmporiumTryAdd(EmporiumEntry.Instance.backInvinvElement, item)`；
   後台滿了會自動落到其他店內庫存，不會憑空消失。
@@ -828,10 +831,44 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
 
 ### §3.11.5 診斷 log
 
-- `[CF-NET] registered 4 CardFence upgrades tab=CardFence width=792/1060`
+- `[CF-NET] register start id=… prereq=…`
+- `[CF-NET] register ok id=…`
+- `[CF-NET] register failed id=… stage=ModHelper.AddNetworkUpgrade …`
+- `[CF-NET] registered N/4 CardFence upgrades tab=CardFence width=792/1060`
 - `[CF-NET] hide CF_SAWYER_* until the exchange is unlocked`
-- `[CF-NET] PRO kit granted printer+chip+cnc+2 electronic+2 plastic`
+- `[CF-NET] PRO kit granted printer+chip+cnc+2 electronic+2 plastic+battery`
 - `[CF-INVENTOR] stock desequencer+batch tier2=… tier3=…`
+
+### §3.11.6 註冊時序（0.5.2 修正）
+
+0.5.1 在 `OnEnable` 直接呼叫 `CfNetwork.EnsureRegistered()`，實機啟動拿到：
+
+```text
+[CF-LOOT] registered 22 tables
+Error: NullReferenceException ... at CardCraftAndFenceMod.OnEnable () [0x000a]
+[ModLoader] Init failed: CardCraftAndFence v0.5.1
+```
+
+根因**不是 prerequisites**，而是：
+
+- `ModHelper.AddNetworkUpgrade` → `NetworkUpgrade.RegisterModUpgrade` 會讀
+  `PlayerStore.Instance`；這個 getter 在沒有存檔時**會自己 `new PlayerStore()`**。
+- 主選單階段 `NewGameData.Instance` 尚未準備好，`PlayerStore` 建構子就會 NRE。
+- `RegisterModUpgrade` 是**先把 definition 放進 `modDefinitions`、再去碰
+  `PlayerStore.Instance`**，所以 PRO 被加進去後才炸；T2／T3／THIEF_T2 完全沒跑到。
+  UI 因此只看到一張 Cardmaker 卡、3 格中 1 格有內容（其餘是 layout 的空格），
+  Thief 卡不存在。
+
+修正：
+
+- `OnEnable` **只做** `CfNetwork.EnsureTabLabel()`（純 static 字典，不碰 PlayerStore）。
+- 4 個升級改在 `ModHook.OnGameLoadedLate`（讀檔）與 `ModHook.OnNewGameStarted`
+  （新遊戲）註冊；这时 `PlayerStore.Instance` 已存在且 `networkUpgrade` 可用。
+- 每個 `Add` 各自 `try/catch`，印 `register start/ok/failed id=…`，
+  最後一定印 `registered N/4`；任何一個失敗都不會讓後面三個消失。
+- 每個讀檔／新遊戲都重跑一次（`RegisterModUpgrade` 對同 id 是 remove+add，
+  `PlayerStore.networkUpgrade` 只在缺 id 時補），所以第二輪新遊戲也會有 4 個定義。
+- 這條也讓 `CF_FENCE_*` 在製卡匠／小偷第一次生成前就存在，gate 不會讀到缺 id。
 
 ## §3.12 CMD 箱貼圖＝執行期染色（0.5.1）
 
@@ -844,11 +881,10 @@ CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期去色
 - 目標字典：`ModLoader.Mods` 裡本 MOD 的 `LoadedMod.Sprites`；
   key `cmd_box`／`cmd_box_u`，已存在就跳過。
 - **時序陷阱**：`ModLoader.LoadModDll` 是先呼叫 `mod.OnEnable()`、之後才
-  `Mods.Add(loadedMod)`（`ModLoader.cs:1167/1195`），所以 OnEnable 第一次
-  `Mods.Find(...)` 一定找不到自己。實作因此是三段式：
-  1. `OnEnable` 先嘗試（找不到就靜默返回，不記 warning）；
-  2. `ModHook.OnModAssetsLoaded` 拿到真正的 `LoadedMod` 後註冊（正常路徑）；
-  3. `BuildContainer`／`OnGameLoadedLate` 再懶註冊一次（保險）。
+  `Mods.Add(loadedMod)`（`ModLoader.cs:1167/1195`），所以 OnEnable 的
+  `Mods.Find(...)` 一定找不到自己。實作因此是兩段式（0.5.2 起 OnEnable 完全不呼叫）：
+  1. `ModHook.OnModAssetsLoaded` 拿到真正的 `LoadedMod` 後註冊（正常路徑）；
+  2. `BuildContainer`／`OnGameLoadedLate` 再懶註冊一次（保險）。
 - 註冊成功 log：`[CF-SPRITE] registered cmd_box/cmd_box_u (runtime tint 0.24,0.35,0.62)`。
 
 ### §3.12.2 Colorize

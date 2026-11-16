@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-16（P4 修訂＋CMD 箱執行期染色貼圖；程式＋離線驗證，**實機未跑**）
+更新時間：2026-11-16（0.5.2 啟動失敗修正：升級註冊移到讀檔／新遊戲；PRO 工具包加電池）
 
 ## 階段
 
@@ -18,17 +18,21 @@
   （`tab="CardFence"`）、`CF_SAWYER_*` 只在交換所未解鎖時隱藏。新增 5 家族
   T3 卡／核與 **5 個 T3 箱**（9×8／CMD 10×8、300／500、rolls 11/11/6/7/11）。
   **CMD 箱貼圖**改為執行期染色：`sec_box`／`sec_box_u` → 深藍 `cmd_box`／
-  `cmd_box_u`，註冊進 `LoadedMod.Sprites`，零美術檔。實機驗證（到訪、買賣、
-  分頁、T3 fit、染色外觀）尚未跑。**P5（索耶）依指示未開。**
+  `cmd_box_u`，註冊進 `LoadedMod.Sprites`，零美術檔。
+  **0.5.2 修啟動 NRE**：`ModHelper.AddNetworkUpgrade` 會碰
+  `PlayerStore.Instance`，主選單階段這個 getter 會 new PlayerStore 並在 ctor NRE；
+  4 個升級改在 `OnGameLoadedLate`／`OnNewGameStarted` 註冊，OnEnable 只設分頁標籤。
+  PRO 工具包另加 `energy_credit`（100 電）。實機驗證（到訪、買賣、分頁、T3 fit、
+  染色外觀、啟動）尚未跑。**P5（索耶）依指示未開。**
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.5.1 |
+| ModVersion | 0.5.2 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 58,880 bytes |
-| SHA256 | `71C82595794B6596DAA2F35CA281AC7D0E67596C6F48414A97A806028DA0F2CA` |
+| 大小 | 59,904 bytes |
+| SHA256 | `7BD2FDE8277337603603606015CC2199B1EC1F452B2DDAB5233C1A5A015FB557` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
 | git | P1–P4 已提交：`9aab571`、`0f62dfc`、本輪 0.5.1（見 git log）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
@@ -71,7 +75,7 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 
 ## P4 修訂已驗收（本輪實際輸出，2026-11-16）
 
-- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／58,880 bytes）。
+- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／59,904 bytes）。
 - `tools/Verify-Mods.ps1`：`RESULT: PASS`；CardCraft **7 個 patch**：
   `CfTryOpenLockPatch -> LockHelper.TryOpenLock`、
   `CfCrateTooltipPatch -> LockHelper.CreateLockerContainerTooltip`、
@@ -107,6 +111,53 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
     `RemoveGameItemType` → `UnlockContainer` → `ApplyUnlocked`；
   - `ItemFactory.BuildContainer` 有 `ApplyLocked`；
   - `OnEnable` 訂閱、`OnDisable` 取消訂閱 `OnModAssetsLoaded`／`OnGameLoadedLate`。
+- `.scratch/regcheck`（scratch-only，`REG CHECK: PASS`）：
+  - OnEnable 只呼叫 `CfNetwork.EnsureTabLabel`，**沒有**呼叫
+    `CfNetwork.EnsureRegistered` 或 `CfCmdBoxSprite.EnsureRegistered`；
+  - OnEnable 訂閱 `OnGameLoadedLate`／`OnNewGameStarted`／`OnModAssetsLoaded`；
+  - `EnsureRegistered` 有 4 次 `Add`、`Add` 有 exception handler，
+    `[CF-NET] registered`／`register failed id=` 字串都在；
+  - PRO kit 的 `energy_credit` 在 IL。
+- `.scratch/upgradecheck`（scratch-only）：離線重現 0.5.1 的 NRE stack
+  （`PlayerStore..ctor` → `PlayerStore.get_Instance` →
+  `NetworkUpgrade.RegisterModUpgrade`），有無 prerequisites 都一樣，
+  證明不是 prerequisites。
+
+## 0.5.2 啟動 NRE 修正（實機回報）
+
+實機 0.5.1 的 log：
+
+```text
+[CF-LOOT] registered 22 tables
+Error: NullReferenceException ... at CardCraftAndFenceMod.OnEnable () [0x000a]
+[ModLoader] Init failed: CardCraftAndFence v0.5.1
+```
+
+症狀是 CardFence 分頁只有一張 CARDMAKER 卡、3 格中 1 格有內容，THIEF 卡不存在；
+PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequisites**：
+
+- `ModHelper.AddNetworkUpgrade` → `NetworkUpgrade.RegisterModUpgrade` 會讀
+  `PlayerStore.Instance`；這個 getter 在沒有存檔時會自己 `new PlayerStore()`。
+- 主選單階段 `NewGameData.Instance` 還沒好，`PlayerStore` 建構子就 NRE。
+- `RegisterModUpgrade` 是**先把 definition 加進 `modDefinitions`、再碰
+  `PlayerStore.Instance`**，所以 PRO 先進去、然後才炸；T2／T3／THIEF_T2 沒跑到。
+- `.scratch/upgradecheck` 已離線重現同一條 stack：
+  `PlayerStore..ctor` → `PlayerStore.get_Instance` → `NetworkUpgrade.RegisterModUpgrade`
+  → `ModHelper.AddNetworkUpgrade`；有無 prerequisites 都一樣炸。
+
+修正：
+
+- `OnEnable` 只呼叫 `CfNetwork.EnsureTabLabel()`（純 static label，不碰 PlayerStore）；
+  不再呼叫 `CfNetwork.EnsureRegistered()`、也不呼叫 `CfCmdBoxSprite.EnsureRegistered()`。
+- 4 個升級改在 `ModHook.OnGameLoadedLate`（讀檔）與 `ModHook.OnNewGameStarted`
+  （新遊戲）註冊；每個 `Add` 獨立 `try/catch`，印
+  `register start/ok/failed id=…`，最後一定印 `registered N/4`。
+- 每次讀檔／新遊戲都重跑；`RegisterModUpgrade` 對同 id 是 remove+add，
+  `PlayerStore.networkUpgrade` 只在缺 id 時補，不會清掉已買狀態。
+- `.scratch/regcheck`（`REG CHECK: PASS`）確認 OnEnable 只呼叫 `EnsureTabLabel`、
+  `EnsureRegistered` 有 4 次 `Add`、`Add` 有 exception handler、PRO kit 有
+  `energy_credit`。
+- **PRO 工具包加電池**：`energy_credit`（原版 `PowerHelper.InitPowerSourceItem(100,10)`）。
 
 ## P4 修訂實作要點（詳見 spec §3.8／§3.10／§3.11）
 
@@ -139,7 +190,7 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 
 | # | 項目 | 預期 |
 |---|---|---|
-| 1 | 買 `CF_FENCE_PRO` | 後台多印表機／晶片／CNC／電子×2／耗材×2（`[CF-NET] PRO kit granted`）；製卡匠下次 `GenerateClient` 到訪（`gate=catchup`） |
+| 1 | 買 `CF_FENCE_PRO` | 後台多印表機／晶片／CNC／電子×2／耗材×2／`energy_credit` 電池×1（`[CF-NET] PRO kit granted …+battery`）；製卡匠下次 `GenerateClient` 到訪（`gate=catchup`） |
 | 2 | 每週第 6 天 | 製卡匠再訪（`gate=weekly`）；同一天不重複 |
 | 3 | 製卡匠買賣 | T1 全卡／核常備；T2 後加 3 卡＋3 核；T3 後加 1 卡＋1 核；價格 = `unitValue` |
 | 4 | 遇博士 | `[CF-INVENTOR] stock …`；前台有專業解序器與批量模組；T2／T3 後加卡核 |
@@ -206,6 +257,12 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 - **P4 修訂全部未實機**：PRO 工具包、製卡匠／博士到訪與買賣、小偷 T2/T3 箱、
   Wild Network 4 個升級、T3 箱開鎖，都只有離線驗證；`Player.log` 沒有任何
   `[CF-NET]`／`[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`。
+- **0.5.2 啟動修正未實機**：OnEnable 已不再碰 `PlayerStore.Instance`，但
+  `OnGameLoadedLate`／`OnNewGameStarted` 註冊是否一定在第一次 Wild Network／
+  製卡匠之前，還要看新的 `Player.log` 是否有
+  `[CF-NET] registered 4/4`，且沒有 `Init failed`。
+- **PRO 電池**：`energy_credit` 是原版 100 電／10 bandwidth；放進後台是否足夠
+  印表機開機，未實機試。
 - **CMD 箱染色未實機**：深藍 `0.24/0.35/0.62` 的觀感、6×4 輪廓、`SetNativeSize`
   大小、解鎖 `cmd_box_u`、存讀檔重貼，全部只有 IL／字串核對。
 - **`ModLoader.Mods` 時序**：`OnEnable` 在 `Mods.Add` 之前，本輪用
@@ -263,10 +320,11 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
   `CfInventorStock`、`CfInventorPatch`；0.5.1 新增 `CfCmdBoxSprite`；
   `CfNetwork` 縮成 4 個升級；`CfThiefBoxes` 只賣 T2/T3；
   `ItemFactory`／`LootTables` 擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.5.1）
+- `src/CardCraftAndFence/manifest.xml`（0.5.2）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、§3.10、§3.11、§3.12）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、
   `tools/Probe-Logic.ps1`（本輪未改）
 - `.scratch/p3check/`、`.scratch/p4check/`、`.scratch/p4bcheck/`、
-  `.scratch/p4t3loot/`、`.scratch/p5spritecheck/`（scratch-only 離線核對，不進 MOD）
+  `.scratch/p4t3loot/`、`.scratch/p5spritecheck/`、`.scratch/regcheck/`、
+  `.scratch/upgradecheck/`（scratch-only 離線核對，不進 MOD）

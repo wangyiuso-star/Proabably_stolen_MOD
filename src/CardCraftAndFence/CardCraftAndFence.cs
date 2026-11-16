@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.1";
+        internal const string ModVersion = "0.5.2";
 
         public void Init(ModManifest manifest)
         {
@@ -28,18 +28,24 @@ namespace DeepSpaceQoL
         {
             CfItemDirectory.EnsureCreated();
             LootTables.EnsureRegistered();
-            CfNetwork.EnsureRegistered();
-            // Must run before any crate is built: cmd_box / cmd_box_u are
-            // generated from sec_box / sec_box_u at runtime (no art files).
-            CfCmdBoxSprite.EnsureRegistered();
+            // Only the label is safe here: ModHelper.AddNetworkUpgrade touches
+            // PlayerStore.Instance, whose getter *creates* a PlayerStore when the
+            // game is still at the main menu, and that constructor NREs. The four
+            // upgrades are registered from OnGameLoadedLate / OnNewGameStarted,
+            // where a real PlayerStore exists.
+            CfNetwork.EnsureTabLabel();
             // -= before += so a mod reload cannot subscribe the handler twice.
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
             ModHook.OnGenerateCustomerVeryLate += CfRetiredCardmaker.OnGenerateCustomerVeryLate;
+            ModHook.OnGameLoadedLate -= CfNetwork.OnGameLoadedLate;
+            ModHook.OnGameLoadedLate += CfNetwork.OnGameLoadedLate;
+            ModHook.OnNewGameStarted -= CfNetwork.OnNewGameStarted;
+            ModHook.OnNewGameStarted += CfNetwork.OnNewGameStarted;
             ModHook.OnGameLoadedLate -= CfCmdBoxSprite.OnGameLoadedLate;
             ModHook.OnGameLoadedLate += CfCmdBoxSprite.OnGameLoadedLate;
             // ModLoader adds the LoadedMod to ModLoader.Mods *after* OnEnable, so
-            // the first registration attempt above cannot see it. OnModAssetsLoaded
-            // hands us the real LoadedMod later in startup, still before gameplay.
+            // a registration attempt here cannot see it. OnModAssetsLoaded hands
+            // us the real LoadedMod later in startup, still before gameplay.
             ModHook.OnModAssetsLoaded -= CfCmdBoxSprite.OnModAssetsLoaded;
             ModHook.OnModAssetsLoaded += CfCmdBoxSprite.OnModAssetsLoaded;
             Log.Info("enabled v" + ModVersion);
@@ -48,6 +54,8 @@ namespace DeepSpaceQoL
         public void OnDisable()
         {
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
+            ModHook.OnGameLoadedLate -= CfNetwork.OnGameLoadedLate;
+            ModHook.OnNewGameStarted -= CfNetwork.OnNewGameStarted;
             ModHook.OnGameLoadedLate -= CfCmdBoxSprite.OnGameLoadedLate;
             ModHook.OnModAssetsLoaded -= CfCmdBoxSprite.OnModAssetsLoaded;
             // Directory<GameItem> is a DontDestroyOnLoad singleton. Owned items may
@@ -1625,38 +1633,53 @@ namespace DeepSpaceQoL
         internal const int Tier3Cost = 3000;
         internal const int ThiefTier2Cost = 2200;
 
-        private static bool _registered;
+        internal static void EnsureTabLabel()
+        {
+            // Safe before a run: this only fills a static label dictionary and
+            // never touches PlayerStore.Instance.
+            ModHelper.SetNetworkTabLabel(Tab, () => "制卡");
+        }
 
+        internal static void OnGameLoadedLate()
+        {
+            EnsureRegistered();
+        }
+
+        internal static void OnNewGameStarted(string scenarioId)
+        {
+            EnsureRegistered();
+        }
+
+        // Must run with a real PlayerStore loaded. ModHelper.AddNetworkUpgrade ->
+        // NetworkUpgrade.RegisterModUpgrade reads PlayerStore.Instance, and that
+        // getter *constructs* a PlayerStore when the game is still in the main
+        // menu; the constructor NREs (NewGameData is not ready). Each upgrade is
+        // isolated so one failure can never hide the other three.
         internal static void EnsureRegistered()
         {
-            // Must be re-applied on every enable: the label lives in a static
-            // dictionary, not in the save, and the player can reload the mod.
-            ModHelper.SetNetworkTabLabel(Tab, () => "制卡");
-            if (_registered)
-            {
-                return;
-            }
-            _registered = true;
-
-            Add(Pro, ProCost, "Cardmaker", "制卡门路",
-                "引荐一位退休的制卡匠，并让杰克逊博士开始卖专业解序器与批量制卡模块。一次性附赠一套制卡工具：印表机、空白卡芯片、CNC 模块、电子件 ×2、耗材 ×2。",
+            int ok = 0;
+            ok += Add(Pro, ProCost, "Cardmaker", "制卡门路",
+                "引荐一位退休的制卡匠，并让杰克逊博士开始卖专业解序器与批量制卡模块。一次性附赠一套制卡工具：印表机、空白卡芯片、CNC 模块、电子件 ×2、耗材 ×2、电池 ×1。",
                 null,
-                GrantProKit);
-            Add(Tier2, Tier2Cost, "Cardmaker", "中级制卡门路",
+                GrantProKit) ? 1 : 0;
+            ok += Add(Tier2, Tier2Cost, "Cardmaker", "中级制卡门路",
                 "制卡匠与杰克逊博士开始卖中级的五家族钥匙卡与加密模块。",
                 new[] { Pro },
-                null);
-            Add(Tier3, Tier3Cost, "Cardmaker", "高级制卡门路",
+                null) ? 1 : 0;
+            ok += Add(Tier3, Tier3Cost, "Cardmaker", "高级制卡门路",
                 "制卡匠与杰克逊博士开始卖高级钥匙卡与同家族的加密模块。",
                 new[] { Tier2 },
-                null);
-            Add(ThiefTier2, ThiefTier2Cost, "Thief", "高级箱源",
+                null) ? 1 : 0;
+            ok += Add(ThiefTier2, ThiefTier2Cost, "Thief", "高级箱源",
                 "黑市声望 30 以上就能从小偷手里拿到中级箱（原本要 60）；解锁高级制卡门路后，声望 85 以上能拿到高级箱。",
                 null,
-                null);
+                null) ? 1 : 0;
 
-            Log.Info("[CF-NET] registered 4 CardFence upgrades tab=CardFence width=792/1060");
-            Log.Info("[CF-NET] hide CF_SAWYER_* until the exchange is unlocked");
+            Log.Info("[CF-NET] registered " + ok + "/4 CardFence upgrades tab=CardFence width=792/1060");
+            if (ok == 4)
+            {
+                Log.Info("[CF-NET] hide CF_SAWYER_* until the exchange is unlocked");
+            }
         }
 
         internal static bool Unlocked(string id)
@@ -1692,7 +1715,10 @@ namespace DeepSpaceQoL
                 Grant(back, "common_electronic");
                 Grant(back, "printer_plastic");
                 Grant(back, "printer_plastic");
-                Log.Info("[CF-NET] PRO kit granted printer+chip+cnc+2 electronic+2 plastic");
+                // The printer needs a charged battery to run. energy_credit is
+                // already 100 energy / bandwidth 10 (MiscItemDirectory.EnergyCredit).
+                Grant(back, "energy_credit");
+                Log.Info("[CF-NET] PRO kit granted printer+chip+cnc+2 electronic+2 plastic+battery");
             }
             catch (Exception e)
             {
@@ -1712,7 +1738,7 @@ namespace DeepSpaceQoL
             GraphUtils.EmporiumTryAdd(back, item);
         }
 
-        private static void Add(
+        private static bool Add(
             string id,
             int cost,
             string subtitle,
@@ -1721,17 +1747,31 @@ namespace DeepSpaceQoL
             string[] prerequisites,
             Action onUnlock)
         {
-            ModHelper.AddNetworkUpgrade(
-                CardCraftAndFenceMod.ModId,
-                id,
-                cost,
-                subtitle,
-                () => title,
-                () => description,
-                onUnlock,
-                Tab,
-                null,
-                prerequisites);
+            try
+            {
+                Log.Info("[CF-NET] register start id=" + id
+                    + " prereq=" + (prerequisites == null ? "-" : string.Join(",", prerequisites)));
+                ModHelper.AddNetworkUpgrade(
+                    CardCraftAndFenceMod.ModId,
+                    id,
+                    cost,
+                    subtitle,
+                    () => title,
+                    () => description,
+                    onUnlock,
+                    Tab,
+                    null,
+                    prerequisites);
+                Log.Info("[CF-NET] register ok id=" + id);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-NET] register failed id=" + id
+                    + " stage=ModHelper.AddNetworkUpgrade "
+                    + e.GetType().Name + ": " + e.Message);
+                return false;
+            }
         }
     }
 
