@@ -29,7 +29,7 @@
 | SHA256 | `72FE61D565B515156A1DC1107C461DE30CB0D465128108C87EDAC86F5D1B8AE2` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
-| git | P1–P3＋P4 第一版已提交（本機 commit，**未 push**）；本輪 P4 修訂尚未提交；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| git | P1–P3＋P4 已提交：`9aab571`（P4 第一版）、`0f62dfc`（本輪修訂）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 ## P3 實機驗證（2026-11-16，Player.log 逐行）
 
@@ -201,7 +201,7 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 
 ## 下一步
 
-1. **本輪 P4 修訂 commit**（程式、manifest、spec、STATUS）。
+1. 本輪 P4 修訂已提交（`0f62dfc`，本機 commit、未 push）。
 2. 人類實機跑 P4 修訂驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／`[CF-INVENTOR]`／
    `[CF-THIEF]`，並補 T3 in-game `[CF-EV]` 200 樣本。
 3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
