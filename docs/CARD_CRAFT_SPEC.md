@@ -1108,9 +1108,9 @@ CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期把來
   `src.texture.GetPixels((int)r.x, (int)r.y, (int)r.width, (int)r.height)`；
   不要拿整張 atlas。
 - 逐像素：轉 HSV；`s<0.15`（白標籤）或綠色指示燈（`h` 0.25–0.45）保留原色；
-  其餘 `out = HSVToRGB(0.60, s, min(1, v*1.18))`——把紅／橙底換成藍，
-  保留原陰影與飽和，不再對亮部加白（0.7.6 起）。
-- `BlueHue = 0.60`、`BlueValueGain = 1.18`；**只調這兩個常數**再實機看。
+  其餘 `out = HSVToRGB(0.62, s, min(1, v*1.00))`——把紅／橙底換成指揮卡的
+  深藍（卡片取樣 H 0.62），保留原陰影與飽和，不再對亮部加白（0.7.7 起）。
+- `BlueHue = 0.62`、`BlueValueGain = 1.00`；**只調這兩個常數**再實機看。
 - `new Texture2D(w, h, TextureFormat.RGBA32, false)`、`filterMode = Point`、
   `wrapMode = Clamp`、`SetPixels` + `Apply`；
   `Sprite.Create(tex, new Rect(0,0,w,h), new Vector2(0.5f,0.5f), 100f)`。

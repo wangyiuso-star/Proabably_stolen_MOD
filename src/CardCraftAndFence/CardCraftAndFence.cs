@@ -18,7 +18,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.7.6";
+        internal const string ModVersion = "0.7.7";
 
         public void Init(ModManifest manifest)
         {
@@ -2837,11 +2837,10 @@ namespace DeepSpaceQoL
         internal const string LockedKey = "cmd_box";
         internal const string UnlockedKey = "cmd_box_u";
 
-        // 0.7.6: recolour, do not light-paint. Shift the source hue to blue and
-        // lift value; keep saturation and the original shading. Neutral white
-        // (label) and the green indicator are left alone.
-        private const float BlueHue = 0.60f;
-        private const float BlueValueGain = 1.18f;
+        // 0.7.7: match the command card's dark blue (sampled outline 39,52,86
+        // = H 0.62/V 0.34). Keep the source saturation, no value lift.
+        private const float BlueHue = 0.62f;
+        private const float BlueValueGain = 1.00f;
 
         private static readonly HashSet<string> _warned = new HashSet<string>();
         private static readonly HashSet<string> _loggedStats = new HashSet<string>();
