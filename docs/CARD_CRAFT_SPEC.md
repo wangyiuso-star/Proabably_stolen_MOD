@@ -1,8 +1,9 @@
 # 製卡與銷贓（CardCraftAndFence）規格
 
 > §3.1–3.11 全文仍未補齊。本文件目前包含：P1/P2 已定案事實、
-> §3.3 箱體定案表、§3.3 loot 表、貼圖決策與 errata，以及 §3.5 的 P3 實作
-> （空白卡晶片、專業密序器、批量模組）。
+> §3.3 箱體定案表、§3.3 loot 表、貼圖決策與 errata、§3.4b 的 T3 卡／核定價，
+> §3.5 的 P3 實作（空白卡晶片、專業密序器、批量模組），以及 P4 的
+> §3.8（退休製卡匠）、§3.10(2)（小偷分級箱）、§3.11（Wild Network）。
 
 ## §3.3 箱子 — 定案表（P2 已實作，T3 未做）
 
@@ -299,6 +300,27 @@ T1 SEC／MED／ENG／SER 用原版箱，不動貼圖。
   - T1 卡：125／100／75／75／40；T1 核：350／300／250／250／200。
   - T2 卡：200／150／110／110／60；T2 核：600／500／400／400／300。
 
+## §3.4b T3 卡與核（P4 新增，定價／工作量）
+
+P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1 個 T3 核」，
+所以本輪補 5 家族各一張 T3 卡、一個 T3 核。定價規則（沿用 T2 → T3 的
++50% 曲線，四捨五入到整數）：
+
+| 家族 | T3 卡 id | T3 卡價 | T3 核 id | T3 核價 | T3 核工作量 |
+|---|---|---:|---|---:|---:|
+| CMD | `cf_cmd_keycard_t3` | 300 | `cf_crypto_module_cmd_t3` | 900 | 350 |
+| SEC | `cf_sec_keycard_t3` | 225 | `cf_crypto_module_sec_t3` | 750 | 300 |
+| MED | `cf_med_keycard_t3` | 165 | `cf_crypto_module_med_t3` | 600 | 250 |
+| ENG | `cf_eng_keycard_t3` | 165 | `cf_crypto_module_eng_t3` | 600 | 250 |
+| SER | `cf_ser_keycard_t3` | 90 | `cf_crypto_module_ser_t3` | 450 | 250 |
+
+- 卡價 = T2 卡價 ×1.5；核價 = T2 核價 ×1.5；核工作量 = T2 工作量 +100。
+- T3 沿用同家族 T2 的 sprite，`CF_CARD_FAMILY` / `CF_CARD_TIER=3`；
+  開鎖規則 `cardTier >= crateTier` 自然成立。
+- **T3 箱仍未做**（9×7、300／500），所以 T3 卡目前沒有可開的 T3 鎖；
+  它的用途是退休製卡匠的高價庫存、密碼解序器產物與交易品。
+- T3 核的 `DESEQUENCER_TARGET_ID_TAG` 指向同家族 T3 卡，專業解序器可直接做。
+
 ## §3.5 P3 — 空白卡晶片、專業密碼解序器、批量模組（0.3.0 已實作）
 
 > 本節只寫「已寫進代碼、且已用離線驗證核對過」的事實。實機驗收（測試卡 1–7）
@@ -433,3 +455,196 @@ T1 SEC／MED／ENG／SER 用原版箱，不動貼圖。
   `[CF-DESQ] finished target=… produced=… consumed=…`。
 - **修正已在實機驗證**（2026-11-16）：同一份 `Player.log` 有 4 筆
   `[CF-DESQ] start/night/finished`，含 `plan=1` 與 `plan=2`、T1 與 T2 目標。
+
+## §3.8 退休製卡匠（P4）
+
+> 本節只寫「已寫進代碼、且已用離線驗證核對過」的定案。實機（製卡匠到訪、
+> 買賣流程）仍需人類開遊戲驗，見 `CARD_CRAFT_STATUS.md`。
+
+### §3.8.1 出現規則
+
+- 解鎖條件：Wild Network 升級 `CF_FENCE_CONTACT`。
+- 到訪日：`StoreStation.Instance.dayCounter % 7 == 6`（每週第 6 天），
+  在 `ModHook.OnGenerateCustomerVeryLate` 掛 handler 後 `manager.AddClient(...)`。
+  `dayCounter == 0` 不生成。
+- **首次解鎖補訪**：`CF_FENCE_CONTACT` 買下後第一次
+  `GenerateClient`（通常就是當天，不限星期）補一次到訪，避免玩家買完還要等
+  最多 6 天。用 `ModHelper` 的存檔內 modData key `maker_last_day` 記錄最後到訪日；
+  `maker_last_day < 0` 代表從未到訪。
+- 一天最多一位：`maker_last_day == dayCounter` 時不再加。
+- 每週到訪不消耗原版 `clientTracker`／cooldown，避免和其他客戶互相擋。
+
+### §3.8.2 客戶欄位
+
+| 欄位 | 值 | 說明 |
+|---|---|---|
+| `identifier` | `cf_retired_cardmaker` | 供 log／排除重複 |
+| `displayName` | `退休制卡匠` | 在地化 key `name_retired_cardmaker`，缺 key 用中文 fallback |
+| 立繪 | `SpriteDict.GetRandomLowerLevelSpriteName()` | 下層市民 |
+| `clientFaction` | `FACTION_LOWER_LEVEL` | 與原版退休匠一致 |
+| `clientIntent` | `SELL` | 客戶賣、玩家買 |
+| `nonShootable` | `true` | 同原版退休匠 |
+| `clientItemFeatureBuying` | `premiumBuy15` | 同原版退休匠 |
+| `acceptRetailMarkup` | `false` | 固定售價，不套零售加成 |
+| 對話 | `dialog_retired_cardmaker_1`（缺 key 用中文 fallback）+ `AddBasicDialog()` / `CompleteClientCreation()` | 與原版退休匠相同流程 |
+
+### §3.8.3 庫存（售價 = 物品 `unitValue`，工匠不加價、不標 stolen）
+
+每次到訪重新生成，不保存庫存。下列「解鎖升級」全部是 Wild Network §3.11 的 id。
+
+| 解鎖升級 | 物品 id | 數量 | 單價 |
+|---|---|---|---:|
+| `CF_FENCE_CONTACT` | `printer` | 1 | 350 |
+| `CF_FENCE_CONTACT` | `printer_module_cnc` | 1 | 400 |
+| `CF_FENCE_CONTACT` | `cf_pro_desequencer` | 1 | 800 |
+| `CF_FENCE_BATCH` | `cf_batch_card_module` | 1 | 250 |
+| `CF_FENCE_SUPPLY` | `cf_printer_chip_blank_keycard` | 1 | 250 |
+| `CF_FENCE_SUPPLY` | `common_electronic` | 5 | 33 |
+| `CF_FENCE_SUPPLY` | `printer_plastic` | 5 | 12 |
+| `CF_FENCE_T1` | 5 家族 T1 卡（`cmd/sec/med/eng/ser_keycard`） | 各 1 | 125／100／75／75／40 |
+| `CF_FENCE_T1` | 5 家族 T1 核（`crypto_module_cmd/sec/med/eng/ser`） | 各 1 | 350／300／250／250／200 |
+| `CF_FENCE_T2` | 隨機 3 個**不同家族**的 T2 卡 | 3 | 200／150／110／110／60 |
+| `CF_FENCE_T2` | 隨機 3 個**不同家族**的 T2 核 | 3 | 600／500／400／400／300 |
+| `CF_FENCE_T3` | 1 個隨機家族的 T3 卡 | 1 | 300／225／165／165／90 |
+| `CF_FENCE_T3` | 同家族的 T3 核 | 1 | 900／750／600／600／450 |
+
+- **不賣箱子**（任何 T1／T2／T3 箱都不在工匠庫存）。
+- T2／T3 的隨機抽選用遊戲 `RNG`；T3 卡與核同家族，方便直接拿去解序。
+- 全部 `isOwend: false`：玩家要付 `unitValue` 買；箱子以外的物品沒有額外 markup。
+- 電力／彈藥等消耗品只給電子與列印耗材各 5，其他材料不賣。
+
+### §3.8.4 診斷 log
+
+- `[CF-MAKER] visit day=… gate=weekly|catchup stock=tools,supply,t1,t2,t3`
+- `[CF-MAKER] skip: already visited today day=…`
+- `[CF-MAKER] skip: CF_FENCE_CONTACT not unlocked`
+
+## §3.10 黑市與小偷（P4 只做第 2 項）
+
+> 第 2 項「小偷賣分級箱」本輪實作；其餘黑市內容（紙本、索耶）不做。
+
+### §3.10.1 觸發
+
+- 解鎖條件：Wild Network 升級 `CF_FENCE_THIEF`。
+- 掛在 `StoreClientList.CreateThief` 的 postfix：走完原版 thief 對話的
+  `endAction` 後，**最多再給 1 個 CF 分級箱**（原版 thief 的雜物／原版箱照舊）。
+- 每次 thief 到訪只給 1 箱；不因 `GetBMRepStockMult()` 增加數量。
+- 同時把 thief 的 `acceptRetailMarkup` 設為 `false`。
+
+### §3.10.2 箱等級（黑市聲望 → 等級）
+
+`bm = StoreReputation.GetBMReputation()`（原版範圍 −200～200）。
+
+| 條件 | 箱等級 |
+|---|---|
+| `bm >= 60` | T2 |
+| `bm >= 30` 且已解鎖 `CF_FENCE_THIEF_T2` | T2 |
+| 其餘 | T1 |
+
+- `CF_FENCE_THIEF_T2` 把門檻從 60 降到 30，不改箱的內容與價格。
+- **T3 箱不做**：目前最高只到 T2（T3 箱仍是 9×7、300／500 的未來項）。
+
+### §3.10.3 家族權重（合計 100）
+
+| 家族 | 權重 | T1 id／價 | T2 id／價 |
+|---|---:|---|---|
+| SEC | 30 | `sec_box`／200 | `cf_sec_box_t2`／225 |
+| MED | 25 | `med_box`／200 | `cf_med_box_t2`／225 |
+| ENG | 20 | `eng_box`／200 | `cf_eng_box_t2`／225 |
+| SER | 15 | `service_box`／175 | `cf_ser_box_t2`／225 |
+| CMD | 10 | `cf_cmd_box_t1`／200 | `cf_cmd_box_t2`／350 |
+
+- 用累積權重 + `RNG.GetRandomInt(0, 99)` 抽家族，再依上表取該家族對應等級的 id。
+- **卡／核等級 ≤ 箱等級**：T2 箱的 loot 表只放 T2 卡／核（§3.3 表），
+  T1 CMD 只放 T1（`cmd_keycard`／`crypto_module_cmd`）；T1 SEC／MED／ENG／SER
+  是原版箱、用原版 `Fill*`，不含 CF 卡。故規則由表的內容保證，不需要 runtime 過濾。
+- 箱子生成路徑：
+  - **T1 SEC／MED／ENG／SER**：`ContainerItemDirectory` 建的是**空箱**，
+    必須走 `PreBuiltItemHelper.LootCrateSecurity/Medical/Engineering/Service()`，
+    由原版 `crateFillers` 填內容再上鎖。
+  - **T1 CMD**（`cf_cmd_box_t1`）與 **T2 五箱**：`DirectoryMaster.Item` →
+    §3.3 的 postfix 自動填 loot + 上鎖。
+  - 用錯路徑會賣出空箱，所以 `CfThiefBoxes.NewBox` 必須照這張表分流。
+
+### §3.10.4 販售標記
+
+- 非 CMD 家族：`isStolen: true`（小偷貨，會被 `StolenHelper` 標 stolen；
+  若該存檔尚未解鎖 stolen 系統則只當一般貨）。
+- CMD 家族：`isStolen: false`（固定價、不標 stolen，沿用 §3.10 的 CMD 例外）。
+- 售價 = 箱子的 `unitValue`（T1 200／175、T2 225／350），不加零售 markup。
+
+### §3.10.5 診斷 log
+
+- `[CF-THIEF] box family=… tier=… id=… bm=… stolen=… added=…`
+
+## §3.11 Wild Network「CardFence」分頁（P4）
+
+### §3.11.1 分頁寬度先量 tabBar
+
+`WildNetworkStyle` 的實測常數（不是猜的）：
+
+- 視窗寬 `WINDOW_W = 1664`；分頁條位置 `TABS_X = 536`、寬 `TABS_W = 1060`。
+- 單一分頁 `TAB_W = 256`、`TAB_GAP = 12`；`WildNetworkUI.BuildTabs` 的步進是
+  `num += 268f`（= 256 + 12），所以 n 個分頁實際佔 `n * 268 - 12`。
+
+現有分頁（原版）：`""`（Basic）與 `"Advanced"` 共 2 個。
+
+| 分頁數 | 佔用寬度 | 對 1060 |
+|---:|---:|---|
+| 2（現況） | 524 | 剩 536 |
+| 3（＋CardFence） | **792** | **剩 268，夠** |
+| 4（＋第 4 個分頁） | 1060 | 剛好貼齊、無餘量 |
+
+結論：**CardFence 用第 3 個分頁，`tab = "CardFence"`，不需要塞進 Advanced。**
+但**不准再加第 4 個分頁**（例：P5 索耶若想要獨立分頁，會剛好 1060、沒有邊距）；
+P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新增分頁。
+若未來真的需要第 4 個分頁，必須先重做 `tabBar` 寬度（改 prefab），不是改這段算術。
+
+### §3.11.2 標籤與註冊
+
+- `OnEnable` 呼叫 `ModHelper.SetNetworkTabLabel("CardFence", () => "制卡")`；
+  `GetTabLabel` 會先找 `UI` 表的 `network_ui_tab_CardFence`，沒有才用這個 provider。
+- 8 個升級全部用 `ModHelper.AddNetworkUpgrade(...)`，`tab: "CardFence"`，
+  `subtitle` 只有 `Cardmaker` 與 `Thief` 兩種（分成兩張卡）。
+- title／description 用 `Func<string>` provider 直接回中文（本 MOD 沒有自己的
+  在地化檔）；`GetLocalizedTitle` 會先找 `NetworkUpgrade` 表的 `network_<id>_title`
+  key，找不到才用 provider，所以之後補在地化不用改代碼。
+
+### §3.11.3 8 個升級（價格定案）
+
+| id | 價格 | 前置 | subtitle | 效果 |
+|---|---:|---|---|---|
+| `CF_FENCE_CONTACT` | 300 | — | Cardmaker | 解鎖退休製卡匠到訪；賣 3D 印表機、CNC 模組、專業密碼解序器 |
+| `CF_FENCE_BATCH` | 800 | `CF_FENCE_CONTACT` | Cardmaker | 工匠加賣批量制卡模組 `cf_batch_card_module` |
+| `CF_FENCE_SUPPLY` | 500 | `CF_FENCE_CONTACT` | Cardmaker | 工匠加賣空白卡晶片、電子 ×5、列印耗材 ×5 |
+| `CF_FENCE_T1` | 1200 | `CF_FENCE_CONTACT` | Cardmaker | 工匠加賣 5 家族 T1 卡與 T1 核 |
+| `CF_FENCE_T2` | 3000 | `CF_FENCE_T1` | Cardmaker | 工匠加賣隨機 3 張 T2 卡 + 3 個 T2 核 |
+| `CF_FENCE_T3` | 9000 | `CF_FENCE_T2` | Cardmaker | 工匠加賣 1 張 T3 卡 + 同家族 1 個 T3 核 |
+| `CF_FENCE_THIEF` | 1500 | `CF_FENCE_CONTACT` | Thief | 小偷每次到訪加賣 1 個 CF 分級箱（§3.10） |
+| `CF_FENCE_THIEF_T2` | 4500 | `CF_FENCE_THIEF` | Thief | 箱等級門檻由黑市聲望 60 降到 30 |
+
+- 8 個升級都是**取得管道**的開關，不直接給物品；玩家仍要付 `unitValue` 向工匠／小偷買。
+- `state = 1`（未買）、不可重複、無 cooldown；`recommended` 不設，避免佔用
+  recommended 卡位（該卡位是 10 欄、1118 寬，會把 CardFence 的分頁排版吃滿）。
+- 圖示 `iconKey` 不指定：`WildNetworkUI.ResolveIcon` 會 fallback 到 `BUY_REFERAL`，
+  不會出現空圖；P5 有專屬 icon 再補。
+
+### §3.11.4 CF_SAWYER_* 隱藏
+
+- Postfix `NetworkUpgrade.IsHiddenForRun(string id)`：`id` 以 `CF_SAWYER_` 開頭
+  一律回 `true`。
+- 本輪**不註冊**任何 `CF_SAWYER_*` 升級（P5 才做），只先把隱藏規則掛好；
+  否則 P5 註冊後會直接出現在 CardFence 分頁裡。
+- 注意原版 `IsHiddenForRun` 另有 `Advanced` 分頁要在 `IsPropertyPaid` 後才顯示的規則；
+  postfix 只覆寫 `CF_SAWYER_*`，不動其他 id。
+
+### §3.11.5 診斷 log
+
+- `[CF-NET] registered 8 CardFence upgrades tab=CardFence width=792/1060`
+- `[CF-NET] hide CF_SAWYER_* via IsHiddenForRun postfix`
+
+## P4 未核實（截至本輪）
+
+- 工匠、thief 的實際 UI／對話流程（需人類開遊戲）。
+- T3 卡／核沒有對應的 T3 鎖，實際只能交易與收藏。
+- 工匠庫存 40+ 件是否會把 18×4 的前台塞滿（每次到訪重新生成，理論上放得下）。

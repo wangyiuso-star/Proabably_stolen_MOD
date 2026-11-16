@@ -3,8 +3,8 @@
   <ID>deepspace.card_craft_and_fence</ID>
   <Name>CardCraftAndFence</Name>
   <Author>DeepSeek Harness</Author>
-  <ModVersion>0.3.0</ModVersion>
-  <Description>制卡与销赃：为销赃人玩法加入可自产的钥匙卡、加密模块，以及后续的箱子、索耶与黑市内容。</Description>
+  <ModVersion>0.4.0</ModVersion>
+  <Description>制卡与销赃：可自产的钥匙卡、加密模块、箱子，以及退休制卡匠、小偷分级箱与 Wild Network 制卡分页。</Description>
   <GameVersions>
     <Version>1.0</Version>
     <Version>VERSION 100-Rev6</Version>

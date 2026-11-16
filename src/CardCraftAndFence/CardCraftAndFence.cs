@@ -9,12 +9,13 @@ namespace DeepSpaceQoL
     /// CardCraftAndFence. P1: item directory + ten T2 items (five keycards, five
     /// crypto modules). P2: crates, tiered lock prefix, loot tables. P3: blank
     /// keycard printer chip, professional desequencer and the batch card module.
-    /// Fencing / black market are later phases and are not present.
+    /// P4: the retired cardmaker client, the thief's graded-box offer and the
+    /// eight Wild Network "CardFence" upgrades that gate both channels.
     /// </summary>
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.3.0";
+        internal const string ModVersion = "0.4.0";
 
         public void Init(ModManifest manifest)
         {
@@ -26,11 +27,16 @@ namespace DeepSpaceQoL
         {
             CfItemDirectory.EnsureCreated();
             LootTables.EnsureRegistered();
+            CfNetwork.EnsureRegistered();
+            // -= before += so a mod reload cannot subscribe the handler twice.
+            ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
+            ModHook.OnGenerateCustomerVeryLate += CfRetiredCardmaker.OnGenerateCustomerVeryLate;
             Log.Info("enabled v" + ModVersion);
         }
 
         public void OnDisable()
         {
+            ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
             // Directory<GameItem> is a DontDestroyOnLoad singleton. Owned items may
             // still need its factories after the mod is disabled, so never destroy it.
             Log.Info("disabled; CfItemDirectory kept alive");
@@ -211,6 +217,12 @@ namespace DeepSpaceQoL
                 Add(cardId, () => ItemFactory.BuildKeycard(captured, 2));
                 Add(coreId, () => ItemFactory.BuildCryptoModule(captured, 2));
                 Add(boxId, () => ItemFactory.BuildContainer(captured, 2));
+                // P4: T3 cards and cores. There is no T3 crate yet; these are the
+                // retired cardmaker's premium stock and desequencer targets.
+                Add(ItemFactory.KeycardId(captured, 3),
+                    () => ItemFactory.BuildKeycard(captured, 3));
+                Add(ItemFactory.CryptoModuleId(captured, 3),
+                    () => ItemFactory.BuildCryptoModule(captured, 3));
             }
             // CMD has no vanilla T1 crate, so this one is new as well.
             Add(ItemFactory.ContainerId(CardFamily.CMD, 1),
@@ -244,7 +256,11 @@ namespace DeepSpaceQoL
 
         public static string KeycardId(CardFamily family, int tier)
         {
-            RequireTier(tier);
+            RequireCardTier(tier);
+            if (tier == 3)
+            {
+                return "cf_" + Slug(family) + "_keycard_t3";
+            }
             switch (family)
             {
                 case CardFamily.SEC:
@@ -264,7 +280,11 @@ namespace DeepSpaceQoL
 
         public static string CryptoModuleId(CardFamily family, int tier)
         {
-            RequireTier(tier);
+            RequireCardTier(tier);
+            if (tier == 3)
+            {
+                return "cf_" + Slug(family) + "_crypto_module_t3";
+            }
             switch (family)
             {
                 case CardFamily.SEC:
@@ -294,19 +314,19 @@ namespace DeepSpaceQoL
 
         public static int CardPrice(CardFamily family, int tier)
         {
-            RequireTier(tier);
+            RequireCardTier(tier);
             switch (family)
             {
                 case CardFamily.SEC:
-                    return tier == 1 ? 100 : 150;
+                    return tier == 1 ? 100 : (tier == 2 ? 150 : 225);
                 case CardFamily.MED:
-                    return tier == 1 ? 75 : 110;
+                    return tier == 1 ? 75 : (tier == 2 ? 110 : 165);
                 case CardFamily.ENG:
-                    return tier == 1 ? 75 : 110;
+                    return tier == 1 ? 75 : (tier == 2 ? 110 : 165);
                 case CardFamily.SER:
-                    return tier == 1 ? 40 : 60;
+                    return tier == 1 ? 40 : (tier == 2 ? 60 : 90);
                 case CardFamily.CMD:
-                    return tier == 1 ? 125 : 200;
+                    return tier == 1 ? 125 : (tier == 2 ? 200 : 300);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown card family.");
             }
@@ -314,19 +334,19 @@ namespace DeepSpaceQoL
 
         public static int CorePrice(CardFamily family, int tier)
         {
-            RequireTier(tier);
+            RequireCardTier(tier);
             switch (family)
             {
                 case CardFamily.SEC:
-                    return tier == 1 ? 300 : 500;
+                    return tier == 1 ? 300 : (tier == 2 ? 500 : 750);
                 case CardFamily.MED:
-                    return tier == 1 ? 250 : 400;
+                    return tier == 1 ? 250 : (tier == 2 ? 400 : 600);
                 case CardFamily.ENG:
-                    return tier == 1 ? 250 : 400;
+                    return tier == 1 ? 250 : (tier == 2 ? 400 : 600);
                 case CardFamily.SER:
-                    return tier == 1 ? 200 : 300;
+                    return tier == 1 ? 200 : (tier == 2 ? 300 : 450);
                 case CardFamily.CMD:
-                    return tier == 1 ? 350 : 600;
+                    return tier == 1 ? 350 : (tier == 2 ? 600 : 900);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown card family.");
             }
@@ -334,20 +354,20 @@ namespace DeepSpaceQoL
 
         public static int CoreWork(CardFamily family, int tier)
         {
-            RequireTier(tier);
+            RequireCardTier(tier);
             switch (family)
             {
                 case CardFamily.SEC:
-                    return tier == 1 ? 125 : 200;
+                    return tier == 1 ? 125 : (tier == 2 ? 200 : 300);
                 case CardFamily.MED:
-                    return tier == 1 ? 100 : 150;
+                    return tier == 1 ? 100 : (tier == 2 ? 150 : 250);
                 case CardFamily.ENG:
-                    return tier == 1 ? 100 : 150;
+                    return tier == 1 ? 100 : (tier == 2 ? 150 : 250);
                 case CardFamily.SER:
                     // Vanilla crypto_module_ser is 75 (ModuleDirectory.cs:441), not 100.
-                    return tier == 1 ? 75 : 150;
+                    return tier == 1 ? 75 : (tier == 2 ? 150 : 250);
                 case CardFamily.CMD:
-                    return tier == 1 ? 150 : 250;
+                    return tier == 1 ? 150 : (tier == 2 ? 250 : 350);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown card family.");
             }
@@ -514,19 +534,23 @@ namespace DeepSpaceQoL
 
         public static GameItem BuildKeycard(CardFamily family, int tier)
         {
-            RequireTier2(tier);
+            RequireCardTier(tier);
+            if (tier < 2)
+            {
+                throw new ArgumentOutOfRangeException(nameof(tier), tier, "T1 cards are vanilla items.");
+            }
             string code = Code(family);
             string slug = Slug(family);
             GameItem item = ItemDirectory.CreateEmptyItem();
             item.SetSpriteAndShape("Items/items_misc", CardSprite(family));
             item.name = LocHelper.GetLocalizedOrDefault(
                 "Item",
-                "item_cf_" + slug + "_keycard_t2_name",
-                KeycardNameFallback(family));
+                "item_cf_" + slug + "_keycard_t" + tier + "_name",
+                KeycardNameFallback(family, tier));
             item.shortDescription = LocHelper.GetLocalizedOrDefault(
                 "Item",
-                "item_cf_" + slug + "_keycard_t2_desc",
-                KeycardDescFallback(family));
+                "item_cf_" + slug + "_keycard_t" + tier + "_desc",
+                KeycardDescFallback(family, tier));
             ContrabandHelper.InitContrabandItem(item, CardContraband(family));
             item.SetGameItemType("ACCESS_CARD");
             AudioHelper.InitPlasticCard(item);
@@ -559,22 +583,26 @@ namespace DeepSpaceQoL
 
         public static GameItem BuildCryptoModule(CardFamily family, int tier)
         {
-            RequireTier2(tier);
+            RequireCardTier(tier);
+            if (tier < 2)
+            {
+                throw new ArgumentOutOfRangeException(nameof(tier), tier, "T1 crypto modules are vanilla items.");
+            }
             string slug = Slug(family);
-            string cardId = KeycardId(family, 2);
+            string cardId = KeycardId(family, tier);
             string cardName = LocHelper.GetLocalizedOrDefault(
                 "Item",
-                "item_cf_" + slug + "_keycard_t2_name",
-                KeycardNameFallback(family));
+                "item_cf_" + slug + "_keycard_t" + tier + "_name",
+                KeycardNameFallback(family, tier));
             GameItem item = ItemDirectory.CreateEmptyItem();
             item.SetSpriteAndShape("Items/items_tool", CoreSprite(family));
             item.name = LocHelper.GetLocalizedOrDefault(
                 "Item",
-                "item_cf_" + slug + "_crypto_module_t2_name",
-                CryptoModuleNameFallback(family));
+                "item_cf_" + slug + "_crypto_module_t" + tier + "_name",
+                CryptoModuleNameFallback(family, tier));
             item.shortDescription = LocHelper.GetLocalizedOrDefault(
                 "Item",
-                "item_cf_" + slug + "_crypto_module_t2_desc",
+                "item_cf_" + slug + "_crypto_module_t" + tier + "_desc",
                 "可在密码解序器中制作" + cardName + "。");
             item.unitValue = CorePrice(family, tier);
             ContrabandHelper.InitContrabandItem(item, CoreContraband(family));
@@ -688,12 +716,13 @@ namespace DeepSpaceQoL
             }
         }
 
-        private static void RequireTier2(int tier)
+        // Cards and cores exist at tier 1 (vanilla), 2 and 3 (P1/P4). Containers
+        // stay on RequireTier: there is no T3 crate yet.
+        private static void RequireCardTier(int tier)
         {
-            RequireTier(tier);
-            if (tier != 2)
+            if (tier != 1 && tier != 2 && tier != 3)
             {
-                throw new ArgumentOutOfRangeException(nameof(tier), tier, "This builder only creates tier 2 items.");
+                throw new ArgumentOutOfRangeException(nameof(tier), tier, "CardCraftAndFence supports card/core tiers 1, 2 and 3.");
             }
         }
 
@@ -728,23 +757,24 @@ namespace DeepSpaceQoL
             }
         }
 
-        private static string KeycardNameFallback(CardFamily family)
+        private static string KeycardNameFallback(CardFamily family, int tier)
         {
-            return "中级" + Chinese(family) + "钥匙卡";
+            return TierName(tier) + Chinese(family) + "钥匙卡";
         }
 
-        private static string CryptoModuleNameFallback(CardFamily family)
+        private static string CryptoModuleNameFallback(CardFamily family, int tier)
         {
-            return "中级" + Chinese(family) + "加密模块";
+            return TierName(tier) + Chinese(family) + "加密模块";
         }
 
-        private static string KeycardDescFallback(CardFamily family)
+        private static string KeycardDescFallback(CardFamily family, int tier)
         {
+            string tierName = TierName(tier);
             if (family == CardFamily.CMD)
             {
-                return "可开启任何家族的中级或更低等级锁。";
+                return "可开启任何家族的" + tierName + "或更低等级锁。";
             }
-            return "可开启中级" + Chinese(family) + "锁。指挥卡可通用于任何家族，但等级不能低于锁。";
+            return "可开启" + tierName + Chinese(family) + "锁。指挥卡可通用于任何家族，但等级不能低于锁。";
         }
 
         private static string CardSprite(CardFamily family)
@@ -1522,6 +1552,491 @@ namespace DeepSpaceQoL
                 }
             }
             return cards;
+        }
+    }
+
+    /// <summary>
+    /// P4 Wild Network "CardFence" tab. All eight upgrades are acquisition gates,
+    /// not stat buffs: each one only widens what the retired cardmaker or the
+    /// thief is allowed to sell. The tab arithmetic is fixed by the prefab:
+    /// TABS_W = 1060, TAB_W = 256, step = 268 (TAB_W + TAB_GAP). Three tabs use
+    /// 792 px, so CardFence fits with 268 px to spare; a fourth tab would be
+    /// exactly 1060 px with no margin, which is why this mod never adds one.
+    /// </summary>
+    internal static class CfNetwork
+    {
+        internal const string Tab = "CardFence";
+
+        internal const string Contact = "CF_FENCE_CONTACT";
+        internal const string Batch = "CF_FENCE_BATCH";
+        internal const string Supply = "CF_FENCE_SUPPLY";
+        internal const string Tier1 = "CF_FENCE_T1";
+        internal const string Tier2 = "CF_FENCE_T2";
+        internal const string Tier3 = "CF_FENCE_T3";
+        internal const string Thief = "CF_FENCE_THIEF";
+        internal const string ThiefTier2 = "CF_FENCE_THIEF_T2";
+
+        internal const int ContactCost = 300;
+        internal const int BatchCost = 800;
+        internal const int SupplyCost = 500;
+        internal const int Tier1Cost = 1200;
+        internal const int Tier2Cost = 3000;
+        internal const int Tier3Cost = 9000;
+        internal const int ThiefCost = 1500;
+        internal const int ThiefTier2Cost = 4500;
+
+        private static bool _registered;
+
+        internal static void EnsureRegistered()
+        {
+            // Must be re-applied on every enable: the label lives in a static
+            // dictionary, not in the save, and the player can reload the mod.
+            ModHelper.SetNetworkTabLabel(Tab, () => "制卡");
+            if (_registered)
+            {
+                return;
+            }
+            _registered = true;
+
+            Add(Contact, ContactCost, "Cardmaker", "退休制卡匠",
+                "引荐一位退休的制卡匠。他会每周上门一次，卖 3D 印表机、CNC 模组与专业密码解序器。",
+                null);
+            Add(Batch, BatchCost, "Cardmaker", "批量制卡",
+                "工匠开始出售批量制卡模组；装在印表机或解序器上，每轮多产出一张卡。",
+                new[] { Contact });
+            Add(Supply, SupplyCost, "Cardmaker", "制卡耗材",
+                "工匠开始出售空白卡晶片、电子件 ×5 与列印耗材 ×5。",
+                new[] { Contact });
+            Add(Tier1, Tier1Cost, "Cardmaker", "初级门路",
+                "工匠开始出售五个家族的初级钥匙卡与初级加密模块。",
+                new[] { Contact });
+            Add(Tier2, Tier2Cost, "Cardmaker", "中级门路",
+                "工匠每次带 3 张随机的五家族中级钥匙卡与 3 个中级加密模块。",
+                new[] { Tier1 });
+            Add(Tier3, Tier3Cost, "Cardmaker", "高级门路",
+                "工匠每次带 1 张高级钥匙卡与同家族的 1 个高级加密模块。",
+                new[] { Tier2 });
+            Add(Thief, ThiefCost, "Thief", "小偷的箱子",
+                "小偷每次上门时，会多带 1 个分级的制卡补给箱；箱子等级取决于黑市声望。",
+                new[] { Contact });
+            Add(ThiefTier2, ThiefTier2Cost, "Thief", "高级箱源",
+                "黑市声望 30 以上就能拿到中级箱（原本要 60）。",
+                new[] { Thief });
+
+            Log.Info("[CF-NET] registered 8 CardFence upgrades tab=CardFence width=792/1060");
+            Log.Info("[CF-NET] hide CF_SAWYER_* via IsHiddenForRun postfix");
+        }
+
+        internal static bool Unlocked(string id)
+        {
+            try
+            {
+                return ModHelper.IsNetworkUpgradeUnlocked(id);
+            }
+            catch (Exception e)
+            {
+                Log.Warn("[CF-NET] cannot read upgrade " + id + ": " + e.GetType().Name + ": " + e.Message);
+                return false;
+            }
+        }
+
+        private static void Add(
+            string id,
+            int cost,
+            string subtitle,
+            string title,
+            string description,
+            string[] prerequisites)
+        {
+            ModHelper.AddNetworkUpgrade(
+                CardCraftAndFenceMod.ModId,
+                id,
+                cost,
+                subtitle,
+                () => title,
+                () => description,
+                null,
+                Tab,
+                null,
+                prerequisites);
+        }
+    }
+
+    // P5 boundary: Sawyer upgrades are registered later but must never show up in
+    // the CardFence tab before that phase exists. The vanilla body also hides the
+    // whole Advanced tab until the property is paid; this postfix only adds the
+    // CF_SAWYER_ prefix rule and leaves every other id alone.
+    [HarmonyPatch(typeof(NetworkUpgrade), nameof(NetworkUpgrade.IsHiddenForRun))]
+    internal static class CfSawyerHidePatch
+    {
+        private static void Postfix(string id, ref bool __result)
+        {
+            if (!__result && id != null && id.StartsWith("CF_SAWYER_", StringComparison.Ordinal))
+            {
+                __result = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// P4 retired cardmaker. The client is a normal SELL client that puts its
+    /// stock on the front counter in the dialogue's end action, exactly like the
+    /// vanilla retired gunsmith/farmer. Visit bookkeeping uses the save-backed
+    /// ModHelper modData key "maker_last_day" so a reload cannot double-visit and
+    /// a first unlock gets an immediate catch-up visit.
+    /// </summary>
+    internal static class CfRetiredCardmaker
+    {
+        internal const string ClientId = "cf_retired_cardmaker";
+        private const string LastDayKey = "maker_last_day";
+
+        private static readonly CardFamily[] AllFamilies =
+        {
+            CardFamily.SEC,
+            CardFamily.MED,
+            CardFamily.ENG,
+            CardFamily.SER,
+            CardFamily.CMD
+        };
+
+        private static readonly HashSet<string> _diag = new HashSet<string>();
+
+        internal static void OnGenerateCustomerVeryLate(StoreClientManager manager)
+        {
+            // This runs inside StoreClientManager.GenerateClient for every customer.
+            // An exception would abort the rest of the generation pass, so it never
+            // escapes into the game.
+            try
+            {
+                TryAdd(manager);
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-MAKER] visit hook failed: " + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        private static void TryAdd(StoreClientManager manager)
+        {
+            if (manager == null || StoreStation.Instance == null || PlayerStore.Instance == null)
+            {
+                // No run loaded (or the store singleton is between scenes): the
+                // visit bookkeeping lives in PlayerStore modData, so adding a
+                // client here would repeat on every generation pass.
+                return;
+            }
+            if (!CfNetwork.Unlocked(CfNetwork.Contact))
+            {
+                Diag("locked", "[CF-MAKER] skip: CF_FENCE_CONTACT not unlocked");
+                return;
+            }
+            int day = StoreStation.Instance.dayCounter;
+            if (day <= 0)
+            {
+                return;
+            }
+            int last = ModHelper.GetModDataInt(CardCraftAndFenceMod.ModId, LastDayKey, -1);
+            if (last == day)
+            {
+                Diag("today", "[CF-MAKER] skip: already visited today day=" + day);
+                return;
+            }
+            bool weekly = day % 7 == 6;
+            bool catchUp = last < 0;
+            if (!weekly && !catchUp)
+            {
+                return;
+            }
+            manager.AddClient(BuildClient());
+            ModHelper.SetModDataInt(CardCraftAndFenceMod.ModId, LastDayKey, day);
+            Log.Info("[CF-MAKER] visit day=" + day
+                + " gate=" + (weekly ? "weekly" : "catchup")
+                + " stock=" + StockSummary());
+        }
+
+        private static StoreClient BuildClient()
+        {
+            StoreClient client = new StoreClient();
+            client.identifier = ClientId;
+            client.displayName = LocHelper.GetLocalizedOrDefault(
+                "Client", "name_retired_cardmaker", "退休制卡匠");
+            client.spriteName = SpriteDict.GetRandomLowerLevelSpriteName();
+            client.clientFaction = "FACTION_LOWER_LEVEL";
+            StoreClientFactionSetup.InitLowerLevelCitizen(client);
+            client.clientIntent = StoreClient.ClientIntent.SELL;
+            client.nonShootable = true;
+            client.clientItemFeatureBuying.Add("premiumBuy15");
+            client.acceptRetailMarkup = false;
+            client.mainDialogue
+                .SetText(client.displayName, LocHelper.GetLocalizedOrDefault(
+                    "Dialogue",
+                    "dialog_retired_cardmaker_1",
+                    "老匠人把工具箱放在柜台上：「印表机、芯片、卡胚……你出得起价，我就有货。」"))
+                .SetEndAction(delegate
+                {
+                    StockUp();
+                });
+            client.AddBasicDialog();
+            client.CompleteClientCreation();
+            ModHelper.SetClientSource(client, CardCraftAndFenceMod.ModId);
+            return client;
+        }
+
+        // Stock order follows the spec table: machines, batch module, chip and
+        // materials, then T1/T2/T3 cards and cores. Every row is an ordinary
+        // unowned front-counter offer; the player pays the item's unitValue.
+        private static void StockUp()
+        {
+            AddStock("printer");
+            AddStock("printer_module_cnc");
+            AddStock("cf_pro_desequencer");
+
+            if (CfNetwork.Unlocked(CfNetwork.Batch))
+            {
+                AddStock("cf_batch_card_module");
+            }
+            if (CfNetwork.Unlocked(CfNetwork.Supply))
+            {
+                AddStock(ItemFactory.BlankKeycardChipId);
+                for (int i = 0; i < 5; i++)
+                {
+                    AddStock("common_electronic");
+                    AddStock("printer_plastic");
+                }
+            }
+            if (CfNetwork.Unlocked(CfNetwork.Tier1))
+            {
+                foreach (CardFamily family in AllFamilies)
+                {
+                    AddStock(ItemFactory.KeycardId(family, 1));
+                    AddStock(ItemFactory.CryptoModuleId(family, 1));
+                }
+            }
+            if (CfNetwork.Unlocked(CfNetwork.Tier2))
+            {
+                foreach (CardFamily family in PickFamilies(3))
+                {
+                    AddStock(ItemFactory.KeycardId(family, 2));
+                }
+                foreach (CardFamily family in PickFamilies(3))
+                {
+                    AddStock(ItemFactory.CryptoModuleId(family, 2));
+                }
+            }
+            if (CfNetwork.Unlocked(CfNetwork.Tier3))
+            {
+                CardFamily family = PickFamilies(1)[0];
+                AddStock(ItemFactory.KeycardId(family, 3));
+                AddStock(ItemFactory.CryptoModuleId(family, 3));
+            }
+        }
+
+        private static void AddStock(string id)
+        {
+            try
+            {
+                if (!PlayerStore.Instance.TryAddDirectSellingItemToTable(id))
+                {
+                    Log.Warn("[CF-MAKER] counter full, skipped " + id);
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Warn("[CF-MAKER] cannot offer " + id + ": " + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        // Distinct random families: a Fisher-Yates shuffle over the five-family
+        // pool driven by the game's RNG, not System.Random.
+        private static List<CardFamily> PickFamilies(int count)
+        {
+            List<CardFamily> pool = new List<CardFamily>(AllFamilies);
+            for (int i = pool.Count - 1; i > 0; i--)
+            {
+                int j = RNG.GetRandomInt(0, i);
+                CardFamily swap = pool[i];
+                pool[i] = pool[j];
+                pool[j] = swap;
+            }
+            if (count < pool.Count)
+            {
+                pool.RemoveRange(count, pool.Count - count);
+            }
+            return pool;
+        }
+
+        private static string StockSummary()
+        {
+            List<string> parts = new List<string>();
+            parts.Add("tools");
+            if (CfNetwork.Unlocked(CfNetwork.Batch))
+            {
+                parts.Add("batch");
+            }
+            if (CfNetwork.Unlocked(CfNetwork.Supply))
+            {
+                parts.Add("supply");
+            }
+            if (CfNetwork.Unlocked(CfNetwork.Tier1))
+            {
+                parts.Add("t1");
+            }
+            if (CfNetwork.Unlocked(CfNetwork.Tier2))
+            {
+                parts.Add("t2");
+            }
+            if (CfNetwork.Unlocked(CfNetwork.Tier3))
+            {
+                parts.Add("t3");
+            }
+            return string.Join(",", parts);
+        }
+
+        private static void Diag(string key, string message)
+        {
+            if (_diag.Add(key))
+            {
+                Log.Info(message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// P4 thief graded box. The postfix wraps the last line of the vanilla thief
+    /// dialogue: vanilla stock runs first, then exactly one CF box is offered.
+    /// Tier comes from black-market reputation, the family from the §3.10 table,
+    /// and CMD keeps its fixed price (not stolen) like the spec exception says.
+    /// </summary>
+    internal static class CfThiefBoxes
+    {
+        private static readonly CardFamily[] Families =
+        {
+            CardFamily.SEC,
+            CardFamily.MED,
+            CardFamily.ENG,
+            CardFamily.SER,
+            CardFamily.CMD
+        };
+
+        // Weight order must match Families: SEC 30, MED 25, ENG 20, SER 15, CMD 10.
+        private static readonly int[] Weights = { 30, 25, 20, 15, 10 };
+
+        private static readonly HashSet<string> _diag = new HashSet<string>();
+
+        internal static void Attach(StoreClient client)
+        {
+            if (client == null)
+            {
+                return;
+            }
+            client.acceptRetailMarkup = false;
+            Dialogue last = client.mainDialogue;
+            int guard = 0;
+            while (last != null && last.nextDialogue != null && guard++ < 32)
+            {
+                last = last.nextDialogue;
+            }
+            if (last == null)
+            {
+                return;
+            }
+            Action original = last.endAction;
+            last.endAction = delegate
+            {
+                try
+                {
+                    if (original != null)
+                    {
+                        original();
+                    }
+                    Offer();
+                }
+                catch (Exception e)
+                {
+                    Log.Error("[CF-THIEF] box offer failed: " + e.GetType().Name + ": " + e.Message);
+                }
+            };
+        }
+
+        private static void Offer()
+        {
+            if (!CfNetwork.Unlocked(CfNetwork.Thief))
+            {
+                Diag("locked", "[CF-THIEF] skip: CF_FENCE_THIEF not unlocked");
+                return;
+            }
+            int bm = StoreReputation.GetBMReputation();
+            bool tier2 = bm >= 60 || (bm >= 30 && CfNetwork.Unlocked(CfNetwork.ThiefTier2));
+            int tier = tier2 ? 2 : 1;
+            CardFamily family = PickFamily();
+            string id = ItemFactory.ContainerId(family, tier);
+            GameItem box = NewBox(family, tier);
+            if (box == null)
+            {
+                Log.Warn("[CF-THIEF] no item for " + id);
+                return;
+            }
+            bool stolen = family != CardFamily.CMD;
+            bool added = PlayerStore.Instance.TryAddDirectSellingItemToTable(
+                box, isOwend: false, isStolen: stolen);
+            if (!added)
+            {
+                box.Destroy();
+            }
+            Log.Info("[CF-THIEF] box family=" + family + " tier=" + tier
+                + " id=" + id + " bm=" + bm + " stolen=" + stolen + " added=" + added);
+        }
+
+        // Vanilla T1 crates are built empty by ContainerItemDirectory; the only
+        // entry point that fills them is PreBuiltItemHelper.LootCrate*. CF T2 and
+        // CF CMD T1 are filled by the DirectoryMaster.Item postfix, so they can be
+        // created directly. Using the wrong path for T1 would sell an empty box.
+        private static GameItem NewBox(CardFamily family, int tier)
+        {
+            if (tier == 1)
+            {
+                switch (family)
+                {
+                    case CardFamily.SEC: return PreBuiltItemHelper.LootCrateSecurity();
+                    case CardFamily.MED: return PreBuiltItemHelper.LootCrateMedical();
+                    case CardFamily.ENG: return PreBuiltItemHelper.LootCrateEngineering();
+                    case CardFamily.SER: return PreBuiltItemHelper.LootCrateService();
+                    default: return DirectoryMaster.Item(ItemFactory.ContainerId(family, 1));
+                }
+            }
+            return DirectoryMaster.Item(ItemFactory.ContainerId(family, tier));
+        }
+
+        private static CardFamily PickFamily()
+        {
+            int roll = RNG.GetRandomInt(0, 99);
+            int accumulated = 0;
+            for (int i = 0; i < Families.Length; i++)
+            {
+                accumulated += Weights[i];
+                if (roll < accumulated)
+                {
+                    return Families[i];
+                }
+            }
+            return CardFamily.SEC;
+        }
+
+        private static void Diag(string key, string message)
+        {
+            if (_diag.Add(key))
+            {
+                Log.Info(message);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(StoreClientList), nameof(StoreClientList.CreateThief))]
+    internal static class CfThiefPatch
+    {
+        private static void Postfix(StoreClient __result)
+        {
+            CfThiefBoxes.Attach(__result);
         }
     }
 
