@@ -1107,11 +1107,11 @@ CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期把暗
 - 取子區域：`Rect r = src.rect;` →
   `src.texture.GetPixels((int)r.x, (int)r.y, (int)r.width, (int)r.height)`；
   不要拿整張 atlas。
-- 逐像素：`lum = 0.299r + 0.587g + 0.114b`、
-  `sat = max(r,g,b) - min(r,g,b)`、`neutral = 1 - clamp01(sat*8)`；
-  `highlight = clamp01((lum-0.62)/0.30) * neutral`、`shade = 0.32 + 0.68*lum`；
-  `out = lerp(tint*shade, white, highlight*0.92)`（暗部藍、亮部中性色轉白；
-  0.7.3 起，保留原版治安箱的白邊）。
+- 逐像素：`lum = 0.299r + 0.587g + 0.114b`；
+  `highlight = clamp01((lum-0.55)/0.25)`、`shade = 0.32 + 0.68*lum`；
+  `out = lerp(tint*shade, white, highlight*0.90)`（暗部藍、亮部按亮度轉白；
+  0.7.4 起不再用 saturation 門檻，因為治安箱亮部本身是飽和淡藍，會被
+  `neutral` 擋掉。首次註冊會印一行 `tint stats` 供調參）。
 - `new Texture2D(w, h, TextureFormat.RGBA32, false)`、`filterMode = Point`、
   `wrapMode = Clamp`、`SetPixels` + `Apply`；
   `Sprite.Create(tex, new Rect(0,0,w,h), new Vector2(0.5f,0.5f), 100f)`。

@@ -18,7 +18,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.7.3";
+        internal const string ModVersion = "0.7.4";
 
         public void Init(ModManifest manifest)
         {
@@ -2841,6 +2841,8 @@ namespace DeepSpaceQoL
         private static readonly Color CmdBlue = new Color(0.24f, 0.35f, 0.62f);
 
         private static readonly HashSet<string> _warned = new HashSet<string>();
+        private static readonly HashSet<string> _loggedStats = new HashSet<string>();
+        private static readonly HashSet<string> _loggedApply = new HashSet<string>();
         private static bool _registered;
 
         internal static void OnGameLoadedLate()
@@ -2951,6 +2953,10 @@ namespace DeepSpaceQoL
                 if (box.useSpriteFromMod
                     && string.Equals(box.spritePath, key, StringComparison.Ordinal))
                 {
+                    if (_loggedApply.Add(key))
+                    {
+                        Log.Info("[CF-SPRITE] applied " + key + " uid=" + box.uniqueId);
+                    }
                     return;
                 }
             }
@@ -3026,18 +3032,40 @@ namespace DeepSpaceQoL
                 WarnOnce("pixels", "[CF-SPRITE] GetPixels failed: " + e.GetType().Name + ": " + e.Message);
                 return null;
             }
+            if (_loggedStats.Add(source.name))
+            {
+                float maxLum = 0f;
+                float sumLum = 0f;
+                int bright = 0;
+                foreach (Color c in pixels)
+                {
+                    float lum = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
+                    if (lum > maxLum)
+                    {
+                        maxLum = lum;
+                    }
+                    if (lum > 0.55f)
+                    {
+                        bright++;
+                    }
+                    sumLum += lum;
+                }
+                Log.Info("[CF-SPRITE] tint stats " + source.name
+                    + " lum avg=" + (sumLum / pixels.Length).ToString("0.00")
+                    + " max=" + maxLum.ToString("0.00")
+                    + " bright=" + (100 * bright / pixels.Length) + "%");
+            }
             for (int i = 0; i < pixels.Length; i++)
             {
                 Color c = pixels[i];
                 float lum = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
-                float max = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
-                float min = Mathf.Min(c.r, Mathf.Min(c.g, c.b));
-                // Saturated pixels are the painted body; neutral bright pixels are
-                // the vanilla crate's white rim. Blend the latter toward white.
-                float neutral = 1f - Mathf.Clamp01((max - min) * 8f);
-                float highlight = Mathf.Clamp01((lum - 0.62f) / 0.30f) * neutral;
+                // The vanilla security crate has no neutral white rim: its
+                // highlights are saturated light blue (screenshot sampling:
+                // brightest pixel ~= CmdBlue * 0.78). Gate on luminance alone so
+                // the bright rim can turn white; the body stays blue.
+                float highlight = Mathf.Clamp01((lum - 0.55f) / 0.25f);
                 float shade = 0.32f + 0.68f * lum;
-                float white = highlight * 0.92f;
+                float white = highlight * 0.90f;
                 pixels[i] = new Color(
                     Mathf.Lerp(tint.r * shade, 1f, white),
                     Mathf.Lerp(tint.g * shade, 1f, white),
