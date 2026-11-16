@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.6.0";
+        internal const string ModVersion = "0.6.1";
 
         public void Init(ModManifest manifest)
         {
@@ -2051,7 +2051,7 @@ namespace DeepSpaceQoL
 
         // Cap 11. The printer is always stocked now (expansion); the chip and CNC
         // are only added while their owned count is below the printer count.
-        // Cores are no longer in any loot table; 3 families rotate on day % 5 and
+        // Cores are no longer in any loot table; 2 families rotate on day % 5 and
         // the tier is the highest unlocked.
         internal static void AddMakerStock(int day)
         {
@@ -2072,7 +2072,7 @@ namespace DeepSpaceQoL
 
             int coreTier = HighestCoreTier();
             int start = ((day % 5) + 5) % 5;
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 2; i++)
             {
                 CardFamily family = AllFamilies[(start + i) % 5];
                 AddStock(ItemFactory.CryptoModuleId(family, coreTier));
