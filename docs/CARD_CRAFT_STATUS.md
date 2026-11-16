@@ -58,7 +58,7 @@
 | SHA256 | `CA6F1325AB90E019D701B27644D985E2555A3AF54D7F042F927DBD2760F14DF7` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 0.6.2 的 58,880 bytes／`84FF14E6…`，P5 未覆蓋） |
-| git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）；**P5（0.7.0）未提交**；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 ## P3 實機驗證（2026-11-16，Player.log 逐行）
 
@@ -620,8 +620,8 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 
 1. 0.6.2（博士住所 hook／小偷順序）已提交（`75d227f`，本機 commit、未 push）。
 2. **P5（0.7.0，索耶換卡／芯片／常駐服務／紙本目錄）本輪完成離線驗收，
-   尚未提交、未 push**；`git status` 應只有本輪的 4 個檔（＋被 ignore 的
-   `.scratch/`）。
+   已提交 `66266cf`、未 push**；工作區只剩本輪開始前就存在的
+   `ACCEPTANCE_REVIEW.md`／`DEVELOPER_DIAGNOSTIC.md` 修改（非本輪）。
 3. 人類實機跑 P4 修訂、CMD 貼圖與 **P5 索耶**驗收卡，收集 `[CF-NET]`／
    `[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`／`[CF-SAWYER]`，
    並補 T3 in-game `[CF-EV]`；紙本打開看中文版面。
