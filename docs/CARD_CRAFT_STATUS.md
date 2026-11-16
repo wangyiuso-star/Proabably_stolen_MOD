@@ -38,7 +38,7 @@
 | SHA256 | `CD8C9E99022BC9A66681C47E6A5B81586E3BE6B75113140F95BE7224CA7A1FC7` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
-| git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1 貼圖）、`50204fb`（0.5.2 啟動修正）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| git | P1–P4 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1 貼圖）、`50204fb`（0.5.2 啟動修正）、`3bfd15c`（0.5.3 補給）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 ## P3 實機驗證（2026-11-16，Player.log 逐行）
 
@@ -309,7 +309,7 @@ PRO 可買、工具包有發，其餘三個升級沒有。**根因不是 prerequ
 
 ## 下一步
 
-1. 本輪 0.5.3（卡匠製卡週邊補給）待提交；0.5.2 啟動修正已在 `50204fb`。
+1. 本輪 0.5.3（卡匠製卡週邊補給）已提交（`3bfd15c`，本機 commit、未 push）。
 2. 人類實機跑 P4 修訂與 CMD 貼圖驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／
    `[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`，並補 T3 in-game `[CF-EV]`。
 3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
