@@ -18,7 +18,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.7.1";
+        internal const string ModVersion = "0.7.2";
 
         public void Init(ModManifest manifest)
         {
@@ -484,35 +484,77 @@ namespace DeepSpaceQoL
 
         private static void ContainerSize(CardFamily family, int tier, out int width, out int height)
         {
+            // Capacities are driven by the sum of the actual itemShape areas in
+            // each loot table (10k-roll simulation, largest observed sum in
+            // parentheses). Leave headroom for grid fragmentation; the fill order
+            // in LootTables.Fill also puts the largest item first.
             if (tier == 1)
             {
-                width = 7;
-                height = 7;
+                if (family == CardFamily.CMD)
+                {
+                    // CMD T1: 8 commons + 1 rare, max observed 62 cells.
+                    width = 10;
+                    height = 8;
+                }
+                else
+                {
+                    // SEC/MED/ENG/SER T1 are vanilla crates; this branch is not
+                    // used by ItemFactory.BuildContainer for them.
+                    width = 7;
+                    height = 7;
+                }
                 return;
             }
             if (tier == 3)
             {
-                // T3 boxes: 12 items per box (11 rolls + 1 rare), so the normal
-                // families get 9x8 and CMD gets 10x8.
-                width = family == CardFamily.CMD ? 10 : 9;
-                height = 8;
-                return;
-            }
-            if (family == CardFamily.MED || family == CardFamily.SEC)
-            {
-                // SEC T2 has 6 commons + 1 rare and was 7x7; the rare occasionally
-                // could not fit after six commons fragmented the grid (observed:
-                // stun_gun remaining=1). Both SEC and MED T2 are 8x8 now.
-                width = 8;
-                height = 8;
+                if (family == CardFamily.SEC)
+                {
+                    // SEC T3: 4 commons + 1 rare. smg/shotgun are rare-only in
+                    // 0.7.2, so max area is 4x3 * 4 + 7x3 = 57.
+                    width = 13;
+                    height = 8;
+                }
+                else if (family == CardFamily.CMD)
+                {
+                    // CMD T3: 7 commons + 1 rare. smg/shotgun (7x3) are rare-only
+                    // in 0.7.2, so the largest common is 4x3; max area 87. Height 9
+                    // is needed to pack 7x 4x3 plus one 7x3 rare (6+1 rows).
+                    width = 15;
+                    height = 9;
+                }
+                else
+                {
+                    // MED/ENG/SER T3: max 40 / 30 / 30.
+                    width = 9;
+                    height = 8;
+                }
                 return;
             }
             if (family == CardFamily.CMD)
             {
-                width = 9;
+                // CMD T2: 6 commons + 1 rare. smg/shotgun are rare-only in 0.7.2,
+                // so the largest common is 4x3; max area 77. Height 9 is needed to
+                // pack 6x 4x3 plus one 7x3 rare (3+1 rows).
+                width = 12;
+                height = 9;
+                return;
+            }
+            if (family == CardFamily.SEC)
+            {
+                // SEC T2: 6 commons + 1 rare. Largest common 4x3, rare 7x3;
+                // max area 77 (was 8x8 after 0.7.1).
+                width = 10;
                 height = 8;
                 return;
             }
+            if (family == CardFamily.MED)
+            {
+                // MED T2: 4 commons + 1 rare, max 40.
+                width = 8;
+                height = 8;
+                return;
+            }
+            // ENG/SER T2: 3 commons + 1 rare, max 24.
             width = 7;
             height = 7;
         }
@@ -3604,16 +3646,14 @@ namespace DeepSpaceQoL
 
             Register(CommonId(CardFamily.CMD, 2), new (string, float)[]
             {
-                ("flashbang_grenade", 10f),
-                ("smoke_grenade", 10f),
-                ("stun_baton", 15f),
+                ("flashbang_grenade", 11f),
+                ("smoke_grenade", 6f),
+                ("stun_baton", 12f),
                 ("combat_knife", 10f),
-                ("glock_receiver", 10f),
-                ("stun_gun", 15f),
-                ("smg", 10f),
-                ("shotgun", 5f),
-                ("current_converter", 5f),
-                ("tazer", 10f)
+                ("glock_receiver", 12f),
+                ("stun_gun", 29f),
+                ("current_converter", 8f),
+                ("tazer", 12f)
             });
             Register(RareId(CardFamily.CMD, 2), new (string, float)[]
             {
@@ -3630,11 +3670,9 @@ namespace DeepSpaceQoL
             Register(CommonId(CardFamily.SEC, 3), new (string, float)[]
             {
                 ("stun_baton", 20f),
-                ("glock_receiver", 20f),
-                ("stun_gun", 25f),
-                ("smg", 15f),
-                ("shotgun", 10f),
-                ("current_converter", 10f)
+                ("glock_receiver", 19f),
+                ("stun_gun", 31f),
+                ("current_converter", 30f)
             });
             Register(RareId(CardFamily.SEC, 3), new (string, float)[]
             {
@@ -3695,11 +3733,9 @@ namespace DeepSpaceQoL
             Register(CommonId(CardFamily.CMD, 3), new (string, float)[]
             {
                 ("stun_baton", 15f),
-                ("glock_receiver", 15f),
-                ("stun_gun", 20f),
-                ("smg", 20f),
-                ("shotgun", 20f),
-                ("current_converter", 10f)
+                ("glock_receiver", 5f),
+                ("stun_gun", 44f),
+                ("current_converter", 36f)
             });
             Register(RareId(CardFamily.CMD, 3), new (string, float)[]
             {
@@ -3724,15 +3760,87 @@ namespace DeepSpaceQoL
             int rolls = Rolls(family, tier);
             Diag("fill:" + common, "[CF-LOOT] fill table=" + common + " rolls=" + rolls
                 + " rare=" + rare);
-            // Rare first: it is the guaranteed high-value roll and the largest
-            // sprite in most tables. Filling it last let six commons fragment a
-            // tight grid and the rare was destroyed with remaining=1 (observed on
-            // SEC T2 stun_gun). Commons can be smaller and pack around it.
-            SpawnOne(box, rare);
+            // Roll every item first, then place the largest shapes first. The grid
+            // placement code already tries all four rotations and both flips, so
+            // sorting by occupied area is what keeps 7x3 guns from arriving last
+            // into a fragmented grid. This does not change the rolled table.
+            List<string> ids = new List<string>();
             for (int i = 0; i < rolls; i++)
             {
-                SpawnOne(box, common);
+                ids.Add(ModHelper.RollLootTable(common));
             }
+            ids.Add(ModHelper.RollLootTable(rare));
+            List<GameItem> items = new List<GameItem>();
+            foreach (string id in ids)
+            {
+                if (string.IsNullOrEmpty(id))
+                {
+                    continue;
+                }
+                GameItem item = DirectoryMaster.Item(id);
+                if (item != null)
+                {
+                    items.Add(item);
+                }
+            }
+            items.Sort(delegate(GameItem a, GameItem b)
+            {
+                int areaA = ShapeArea(a);
+                int areaB = ShapeArea(b);
+                if (areaA != areaB)
+                {
+                    return areaB.CompareTo(areaA);
+                }
+                int spanA = Math.Max(a.shape.width, a.shape.height);
+                int spanB = Math.Max(b.shape.width, b.shape.height);
+                return spanB.CompareTo(spanA);
+            });
+            int dropped = 0;
+            string droppedIds = "";
+            foreach (GameItem item in items)
+            {
+                int remaining = GraphUtils.TryAcceptAll(box, item);
+                if (remaining > 0)
+                {
+                    dropped++;
+                    droppedIds += " " + item.identifier;
+                    item.Destroy();
+                }
+            }
+            if (dropped > 0)
+            {
+                // One line per box: the old once-per-table diagnostic hid every
+                // box after the first. expected/actual make the short count clear.
+                Log.Warn("[CF-LOOT] overflow box=" + box.identifier
+                    + " uid=" + box.uniqueId
+                    + " table=" + common
+                    + " expected=" + (ids.Count)
+                    + " actual=" + (ids.Count - dropped)
+                    + " dropped=" + dropped
+                    + " items=" + droppedIds.Trim()
+                    + "; crate is short " + dropped);
+            }
+        }
+
+        private static int ShapeArea(GameItem item)
+        {
+            GridShape shape = item == null ? null : item.shape;
+            if (shape == null)
+            {
+                return 0;
+            }
+            int area = 0;
+            for (int y = 0; y < shape.height; y++)
+            {
+                for (int x = 0; x < shape.width; x++)
+                {
+                    if (shape.GetLocal(x, y) > 0)
+                    {
+                        area++;
+                    }
+                }
+            }
+            return area;
         }
 
         internal static string CommonId(CardFamily family, int tier)
@@ -3791,35 +3899,6 @@ namespace DeepSpaceQoL
             ModHelper.RegisterLootTable(CardCraftAndFenceMod.ModId, tableId, entries);
         }
 
-        private static void SpawnOne(GameItem box, string tableId)
-        {
-            string itemId = ModHelper.RollLootTable(tableId);
-            if (string.IsNullOrEmpty(itemId))
-            {
-                Log.Warn("[CF-LOOT] no item for table " + tableId);
-                return;
-            }
-            GameItem item = DirectoryMaster.Item(itemId);
-            if (item == null)
-            {
-                return;
-            }
-            int remaining = GraphUtils.TryAcceptAll(box, item);
-            Diag("spawn:" + tableId, "[CF-LOOT] spawn table=" + tableId
-                + " item=" + itemId + " remaining=" + remaining);
-            if (remaining > 0)
-            {
-                if (_diag.Add("overflow:" + tableId))
-                {
-                    Log.Warn("[CF-LOOT] overflow table=" + tableId
-                        + " item=" + itemId + " remaining=" + remaining
-                        + "; item destroyed, crate is short one roll");
-                }
-                // The returned amount is the remainder; the accepted part is
-                // already in the crate. Destroy only the leftover object.
-                item.Destroy();
-            }
-        }
     }
 
     internal static class Log

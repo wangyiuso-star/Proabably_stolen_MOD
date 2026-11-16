@@ -11,19 +11,27 @@
 
 | 家族 | T1 id | T1 容量 | T1 價 | T2 id | T2 容量 | T2 價 | T3 id | T3 容量 | T3 價 | sprite |
 |---|---|---|---:|---|---:|---:|---|---:|---:|---|
-| SEC | `sec_box`（原版） | 7×5 | 200 | `cf_sec_box_t2` | **8×8**（0.7.1 起） | 225 | `cf_sec_box_t3` | 9×8 | 300 | `sec_box` |
+| SEC | `sec_box`（原版） | 7×5 | 200 | `cf_sec_box_t2` | **10×8**（0.7.2 起） | 225 | `cf_sec_box_t3` | **13×8**（0.7.2 起） | 300 | `sec_box` |
 | MED | `med_box`（原版） | 7×5 | 200 | `cf_med_box_t2` | **8×8** | 225 | `cf_med_box_t3` | 9×8 | 300 | `med_box` |
 | ENG | `eng_box`（原版） | 7×5 | 200 | `cf_eng_box_t2` | 7×7 | 225 | `cf_eng_box_t3` | 9×8 | 300 | `eng_box` |
 | SER | `service_box`（原版） | 7×5 | 175 | `cf_ser_box_t2` | 7×7 | 225 | `cf_ser_box_t3` | 9×8 | 300 | `service_box` |
-| CMD | `cf_cmd_box_t1`（新） | **7×7** | 200 | `cf_cmd_box_t2` | **9×8** | 350 | `cf_cmd_box_t3` | **10×8** | 500 | `cmd_box`（執行期染色，§3.12） |
+| CMD | `cf_cmd_box_t1`（新） | **10×8**（0.7.2 起） | 200 | `cf_cmd_box_t2` | **12×9**（0.7.2 起） | 350 | `cf_cmd_box_t3` | **15×9**（0.7.2 起） | 500 | `cmd_box`（執行期染色，§3.12） |
 
 - **容量校正（歷史）**：MED T2 用 8×8、CMD T1 用 7×7、CMD T2 用 9×8，
   是舊版 10／11 rolls 的 fit 結果。0.5.7 新池件數變少（T2 4–7、T3 5–8），
   容量維持不動；容量只影響「放不放得下」，不改 EV／價與件數。
-- **0.7.1 SEC T2 由 7×7 放大成 8×8**：實機 `cf_sec_t2_rare` 的 `stun_gun`
-  曾在 6 件 common 之後 `remaining=1` 被銷毀（箱子少一件 rare，EV 少約 24%）。
-  `LootTables.Fill` 同時改成 **rare 先放**，common 再放；8×8 只是 fit 保險，
-  不改 7 件的件數、權重與 EV。MED T2 本來就是 8×8。
+- **0.7.2 容量重算（fit）**：實機 SEC T3 掉件；用 66 個存檔的實際 `itemShape`
+  面積＋10 萬次 rolls 模擬重算。重點：
+  - `LootTables.Fill` 改成**先 roll 全部、再按 shape 面積大→小放入**（遊戲的
+    grid 放置本身會試 4 種旋轉＋2 種翻轉）；`smg`／`shotgun`（7×3）從
+    SEC T3／CMD T2／CMD T3 的 **common** 池移除，只留在 rare。
+  - 容量：SEC T2 10×8、CMD T1 10×8、CMD T2 12×9、SEC T3 13×8、CMD T3 15×9；
+    MED／ENG／SER 不變。9 高是因為 6–7 個 4×3 common ＋ 1 個 7×3 rare 需要
+    3～4 排。
+  - 三張表權重重配後 **common EV 與整箱 EV 完全不變**（SEC T3 238.50、
+    CMD T2 172.75、CMD T3 252.75；model EV/價仍是 4.068／3.701／4.117）。
+  - overflow 改成**每箱一行**：`[CF-LOOT] overflow box=… expected=… actual=…
+    dropped=… items=…`；不再只在同一張表第一次掉件時印。
 - T1 SEC／MED／ENG／SER 沿用原版 id，不重新註冊、不加 `CF_CRATE_*`，
   走原版 `LockHelper.TryOpenLock`；原版價格就是 200／200／200／175。
 - **§3.3 T1 價格 errata**：spec 表寫 T1 一般箱 150，與「T1 沿用原版 id」衝突；
@@ -31,10 +39,10 @@
   T1 CMD 是新物品，用 200；T2 才用 225／350。
 - 新箱加 `CF_CRATE_FAMILY`、`CF_CRATE_TIER`；`LOCK_ID` 由
   `LockHelper.InitLockedContainerItem` 設定，`LockUpContainer` 上鎖。
-- **T3 箱（P4 新增）**：五家族 id `cf_*_box_t3`，一般 9×8、CMD 10×8、
-  價 300／500；0.5.7 起 rolls 4／4／4／4／7（件數 5／5／5／5／8）。
-  `CF_CRATE_TIER=3`、同一組 `LOCK_ID_*`；T3 卡（`CF_CARD_TIER=3`）可開。
-  T3 loot 見下一節。
+- **T3 箱（P4 新增）**：五家族 id `cf_*_box_t3`，0.7.2 起一般 9×8
+  （SEC 13×8、CMD 15×9）、價 300／500；0.5.7 起 rolls 4／4／4／4／7
+  （件數 5／5／5／5／8）。`CF_CRATE_TIER=3`、同一組 `LOCK_ID_*`；
+  T3 卡（`CF_CARD_TIER=3`）可開。T3 loot 見下一節。
 - **CMD 箱來源**：`cf_cmd_box_t1/t2/t3` 在「江洋大盜」（P6）之前**沒有正常
   來源**（小偷只賣 SEC／MED／ENG／SER），先留著給 P6 與 F9 測試用。
 
@@ -81,6 +89,9 @@ T2／T3 不再把 T1 的低價雜物（繃帶、止痛藥、廢金屬、種子�
 T3 只從上表取 `>=120` 的項目（所以 SEC 不用 smoke／combat_knife／tazer，
 MED 不用 salve，ENG 不用 crowbar／welder／module_extractor，CMD 不用
 smoke／combat_knife／tazer）。
+
+0.7.2 起 `smg`／`shotgun`（7×3）只出現在 rare：SEC T3／CMD T2／CMD T3 的
+common 池已移除它們（容量與幾何原因，見 §3.3 容量段），權重已重配且 EV 不變。
 
 ### 生效表（T2 五箱 + CMD T1 + T3 五箱）
 
@@ -176,16 +187,14 @@ rare 保底 1。
 
 | itemId | value | weight | 池 |
 |---|---:|---:|---|
-| `flashbang_grenade` | 85 | 10 | common |
-| `smoke_grenade` | 60 | 10 | common |
-| `stun_baton` | 165 | 15 | common |
+| `flashbang_grenade` | 85 | 11 | common |
+| `smoke_grenade` | 60 | 6 | common |
+| `stun_baton` | 165 | 12 | common |
 | `combat_knife` | 75 | 10 | common |
-| `glock_receiver` | 200 | 10 | common |
-| `stun_gun` | 250 | 15 | common |
-| `smg` | 280 | 10 | common |
-| `shotgun` | 310 | 5 | common |
-| `current_converter` | 300 | 5 | common |
-| `tazer` | 100 | 10 | common |
+| `glock_receiver` | 200 | 12 | common |
+| `stun_gun` | 250 | 29 | common |
+| `current_converter` | 300 | 8 | common |
+| `tazer` | 100 | 12 | common |
 | `cf_cmd_keycard_t2` | 200 | 30 | rare |
 | `stun_gun` | 250 | 20 | rare |
 | `smg` | 280 | 20 | rare |
@@ -198,11 +207,9 @@ rare 保底 1。
 | itemId | value | weight | 池 |
 |---|---:|---:|---|
 | `stun_baton` | 165 | 20 | common |
-| `glock_receiver` | 200 | 20 | common |
-| `stun_gun` | 250 | 25 | common |
-| `smg` | 280 | 15 | common |
-| `shotgun` | 310 | 10 | common |
-| `current_converter` | 300 | 10 | common |
+| `glock_receiver` | 200 | 19 | common |
+| `stun_gun` | 250 | 31 | common |
+| `current_converter` | 300 | 30 | common |
 | `cf_sec_keycard_t3` | 225 | 30 | rare |
 | `stun_gun` | 250 | 20 | rare |
 | `smg` | 280 | 20 | rare |
@@ -255,11 +262,9 @@ rare 保底 1。
 | itemId | value | weight | 池 |
 |---|---:|---:|---|
 | `stun_baton` | 165 | 15 | common |
-| `glock_receiver` | 200 | 15 | common |
-| `stun_gun` | 250 | 20 | common |
-| `smg` | 280 | 20 | common |
-| `shotgun` | 310 | 20 | common |
-| `current_converter` | 300 | 10 | common |
+| `glock_receiver` | 200 | 5 | common |
+| `stun_gun` | 250 | 44 | common |
+| `current_converter` | 300 | 36 | common |
 | `cf_cmd_keycard_t3` | 300 | 30 | rare |
 | `stun_gun` | 250 | 20 | rare |
 | `smg` | 280 | 20 | rare |
@@ -274,12 +279,12 @@ rare 保底 1。
 | ENG T2 | 225 | 190.75 | 255.00 | 3 | 4 | 827.25 | **3.677** | 805.62 | -2.61% | 3.6–3.9 |
 | SER T2 | 225 | 225.00 | 180.00 | 3 | 4 | 855.00 | **3.800** | 838.20 | -1.96% | 3.6–3.9 |
 | CMD T1 | 200 | 55.50 | 238.75 | 8 | 9 | 682.75 | **3.414** | 669.92 | -1.88% | 不變 |
-| CMD T2 | 350 | 172.75 | 259.00 | 6 | 7 | 1295.50 | **3.701** | 1274.25 | -1.64% | 3.6–3.9 |
-| SEC T3 | 300 | 238.50 | 266.50 | 4 | 5 | 1220.50 | **4.068** | 1209.35 | -0.91% | 3.9–4.5 |
+| CMD T2 | 350 | 172.75 | 259.00 | 6 | 7 | 1295.50 | **3.701** | 1285.55 | -0.77% | 3.6–3.9 |
+| SEC T3 | 300 | 238.50 | 266.50 | 4 | 5 | 1220.50 | **4.068** | 1207.85 | -1.04% | 3.9–4.5 |
 | MED T3 | 300 | 249.50 | 239.50 | 4 | 5 | 1237.50 | **4.125** | 1214.38 | -1.87% | 3.9–4.5 |
 | ENG T3 | 300 | 250.00 | 281.25 | 4 | 5 | 1281.25 | **4.271** | 1274.08 | -0.56% | 3.9–4.5 |
 | SER T3 | 300 | 262.50 | 226.50 | 4 | 5 | 1276.50 | **4.255** | 1261.35 | -1.19% | 3.9–4.5 |
-| CMD T3 | 500 | 252.75 | 289.00 | 7 | 8 | 2058.25 | **4.117** | 2046.30 | -0.58% | 3.9–4.5 |
+| CMD T3 | 500 | 252.75 | 289.00 | 7 | 8 | 2058.25 | **4.117** | 2050.30 | -0.39% | 3.9–4.5 |
 
 T2 ≥ 同家族 T1 + 0.2：
 
@@ -295,10 +300,12 @@ T2 ≥ 同家族 T1 + 0.2：
 > 直接解析本檔的權重、seed 20261116、抽取演算法同 `LootRegistry.Pick`；
 > 不是 in-game `CfLootProbe`。in-game `[CF-EV]` 仍待人類補跑。
 
-### T3 容量
+### T3／T2 容量（0.7.2 重算）
 
-T3 箱仍 9×8（CMD 10×8），但新池只要 **5 件（CMD 8 件）**，容量充裕；不需要再放大。
-T2 箱也維持原容量（7/5/4/4/7 件）。
+T3 不是「5 件就一定放得下」：SEC T3 的 5 件最大面積 85、CMD T3 的 8 件最大
+136，舊 9×8／10×8 會掉件。0.7.2 依實際 `itemShape` 重算成 SEC T3 13×8、
+CMD T3 15×9；MED／ENG／SER T3 仍 9×8（最大 40／30／30）。T2 同步調整：
+SEC T2 10×8、CMD T1 10×8、CMD T2 12×9，其餘不變。詳見 §3.3 容量段。
 
 ## 箱子貼圖決策（asset 字串掃描，2026-11-16）
 
@@ -369,7 +376,8 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - 卡價 = T2 卡價 ×1.5；核價 = T2 核價 ×1.5；核工作量 = T2 工作量 +100。
 - T3 沿用同家族 T2 的 sprite，`CF_CARD_FAMILY` / `CF_CARD_TIER=3`；
   開鎖規則 `cardTier >= crateTier` 自然成立。
-- **T3 箱已是本輪新增**（§3.3：9×8、CMD 10×8、300／500、`CF_CRATE_TIER=3`），
+- **T3 箱已是本輪新增**（§3.3：9×8、CMD 10×8、300／500、`CF_CRATE_TIER=3`；
+  0.7.2 起 SEC 13×8、CMD 15×9，見 §3.3），
   所以 T3 卡可以直接開 T3 箱；T3 卡只從箱子 rare（與小偷箱）來，
   卡匠／博士不再賣卡。
 - T3 核的 `DESEQUENCER_TARGET_ID_TAG` 指向同家族 T3 卡，專業解序器可直接做。
@@ -856,21 +864,30 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - 存檔裡的 T3 SEC 箱 5 件、已上鎖、`CF_CRATE_FILLED=true`。
 - T1 `sec_box` 沒有 `[CF-LOOT]` 是正常的（走 `PreBuiltItemHelper`，不經 fill patch）。
 
-**0.7.0 實機發現、0.7.1 已修（待實機重測）**：
+**0.7.1 已修，實機已通過**（2026-11-17 退回單之後）：
 
-- **紙本藍方塊**：遊戲 build 沒有 `PaperAssetCatalog`，`notebook_manual`／
-  `paper_buttons_*` 五次 `No sprite found`。0.7.1 用 `CfPaperSprites` 執行期產圖
-  註冊到 `LoadedMod.PaperSprites`；待確認：開書 log 不再有這五條、右上有 X／
-  放大鏡且落在紙面、背景有紙紋。
-- **3 高 + 1 低 → 低級箱**：0.7.0 升冪排序取第一張，`[T1,T2,T3,T3,T3]` 被切成
-  `[T1,T2,T3]` → T1。0.7.1 改降冪、組內取最後一張（最低）；新語意見 §3.9.2。
-  待實機：3 T3 + 1 T1 → 1 個 T3 箱；2 T1 + 3 T2 → 1 個 T2 箱。
-- **SEC T2 rare 放不進**：`[CF-LOOT] spawn table=cf_sec_t2_rare item=stun_gun
-  remaining=1`，箱子少一件 rare（EV −24%）。0.7.1 改成 rare 先放＋SEC T2
-  7×7→8×8，並加 overflow 警告。待實機：開箱確認 7 件齊全、log 沒有
-  `[CF-LOOT] overflow`。
+- 紙本：`CfPaperSprites` 執行期產生紙底與 X／放大鏡／左右箭頭，開書不再有
+  `No sprite found`、右上角不是藍方塊。
+- 分組：降冪排序＋組內取最低；3 T3 + 1 T1 → T3、2 T1 + 3 T2 → T2、
+  1 T1 + 2 T2 → T1、3 T1 + 3 T2 → T1 + T2。
+- SEC T2 rare：8×8＋rare 先放後，開箱 7 件齊全（0.7.1 的 rare-first 在 0.7.2
+  被「全部 roll 完、按面積大→小放」取代，行為等價且更穩）。
 
-**仍未實機（0.7.1）**：
+**0.7.2 容量修正（待實機重測）**：
+
+- 0.7.1 實機仍抓到 SEC T3 掉件；CMD T3／T2 高度可疑。用 66 個存檔的實際
+  `itemShape` 面積＋10 萬次 rolls 重算：SEC T3 最大 85、CMD T3 最大 136、
+  CMD T2 最大 112（0.7.1 的 9×8／10×8／9×8 明顯不夠）。
+- 修法：`LootTables.Fill` 先 roll 全部、再按 shape 面積**大→小**放入
+  （grid 放置本身會試 4 旋轉＋2 翻轉）；`smg`／`shotgun`（7×3）從 SEC T3／
+  CMD T2／CMD T3 的 **common** 池移除（rare 保留），三張表權重重配、
+  common EV 與整箱 EV 完全不變；容量見 §3.3（SEC T2 10×8、CMD T1 10×8、
+  CMD T2 12×9、SEC T3 13×8、CMD T3 15×9）。
+- overflow 改成**每箱一行**，測試可以看到第二箱以後的掉件。
+- 待實機：T3 SEC ×5、T3 CMD ×5、T2 CMD ×3，每箱件數 = rolls + 1，
+  log 沒有 `[CF-LOOT] overflow`；SEC T2 也順便看。
+
+**仍未實機（0.7.2）**：
 
 - 紙本 item 註冊在 `ModItemDirectory` 尚未 live 時的第一輪會靜默失敗，
   依賴 `OnGameLoadedLate`／`OnNewGameStarted`（與 `Grant` 前）補註冊；
@@ -881,8 +898,9 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
   的移除不會再印 log（行為正確、只是沒有第二條 log）。
 - 芯片升級「每晚每家族最多 1 次」與舊 alias 讀取（`cf_<slug>_crypto_module_t3`）
   只有離線邏輯核對，沒有實機把 3 T1＋3 T2 放進垃圾桶跑過。
-- 紙本中文渲染與版面：0.7.0 已看到內文沒有溢出，但 0.7.1 改了文字與加入
-  runtime sprite，仍需再看一次換行與按鈕位置。
+- 新容量（尤其 CMD T3 15×9）在 UI 上的實際格子大小與可讀性，只有離線
+  packing 模擬（0/3000 失敗、adversarial 全 4×3＋7×3 也放得下）與
+  面積計算，未進遊戲量過。
 
 ## §3.10 黑市與小偷（P4 只做第 2 項）
 
