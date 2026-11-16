@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-16（P4 修訂：4 個升級、博士販售、小偷只賣 T2/T3、新增 T3 箱；程式＋離線驗證，**實機未跑**）
+更新時間：2026-11-16（P4 修訂＋CMD 箱執行期染色貼圖；程式＋離線驗證，**實機未跑**）
 
 ## 階段
 
@@ -17,19 +17,21 @@
   小偷只賣 T2／T3 分級箱、Wild Network **4 個** `CF_FENCE_*` 升級
   （`tab="CardFence"`）、`CF_SAWYER_*` 只在交換所未解鎖時隱藏。新增 5 家族
   T3 卡／核與 **5 個 T3 箱**（9×8／CMD 10×8、300／500、rolls 11/11/6/7/11）。
-  實機驗證（到訪、買賣、分頁、T3 fit）尚未跑。**P5（索耶）依指示未開。**
+  **CMD 箱貼圖**改為執行期染色：`sec_box`／`sec_box_u` → 深藍 `cmd_box`／
+  `cmd_box_u`，註冊進 `LoadedMod.Sprites`，零美術檔。實機驗證（到訪、買賣、
+  分頁、T3 fit、染色外觀）尚未跑。**P5（索耶）依指示未開。**
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.5.0 |
+| ModVersion | 0.5.1 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 54,784 bytes |
-| SHA256 | `72FE61D565B515156A1DC1107C461DE30CB0D465128108C87EDAC86F5D1B8AE2` |
+| 大小 | 58,880 bytes |
+| SHA256 | `71C82595794B6596DAA2F35CA281AC7D0E67596C6F48414A97A806028DA0F2CA` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
 | dist / Mods hash | 尚未同步（Mods 仍是 P3 的 `C8FFF6…`） |
-| git | P1–P3＋P4 已提交：`9aab571`（P4 第一版）、`0f62dfc`（本輪修訂）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| git | P1–P4 已提交：`9aab571`、`0f62dfc`、本輪 0.5.1（見 git log）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 ## P3 實機驗證（2026-11-16，Player.log 逐行）
 
@@ -69,7 +71,7 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 
 ## P4 修訂已驗收（本輪實際輸出，2026-11-16）
 
-- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／54,784 bytes）。
+- `tools/Build-Mods.ps1`：exit 0，三個 DLL（15,872／9,216／58,880 bytes）。
 - `tools/Verify-Mods.ps1`：`RESULT: PASS`；CardCraft **7 個 patch**：
   `CfTryOpenLockPatch -> LockHelper.TryOpenLock`、
   `CfCrateTooltipPatch -> LockHelper.CreateLockerContainerTooltip`、
@@ -96,6 +98,15 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
   直接從 `CardCraftAndFence.cs` 解析 T3 表，驗證 common 池 = T2 common 池、
   rare 池保留 T2 rare、權重合計 100；model EV 與 spec 逐箱相符（誤差 <0.02），
   200 樣本離線模擬見 spec §3.3。
+- `.scratch/p5spritecheck`（scratch-only，`SPRITE CHECK: PASS`）：
+  - `cmd_box`／`cmd_box_u` key、tint `0.24/0.35/0.62`、lum `0.299/0.587/0.114`；
+  - `GetPixels`／`SetPixels`／`Sprite.Create`、`SetSpriteAndShapeFromMod`、
+    `FindAllItem` 都在 IL；
+  - `CfCmdBoxSprite` **沒有** `[HarmonyPatch]`；
+  - `CfTryOpenLockPatch.Prefix` 的呼叫順序是
+    `RemoveGameItemType` → `UnlockContainer` → `ApplyUnlocked`；
+  - `ItemFactory.BuildContainer` 有 `ApplyLocked`；
+  - `OnEnable` 訂閱、`OnDisable` 取消訂閱 `OnModAssetsLoaded`／`OnGameLoadedLate`。
 
 ## P4 修訂實作要點（詳見 spec §3.8／§3.10／§3.11）
 
@@ -137,6 +148,30 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 | 7 | 解鎖 `CF_FENCE_T3` + 聲望 ≥85 | 小偷給 1 個 T3 箱；用 T3 卡可開 |
 | 8 | 打開 Wild Network | 第 3 個分頁「制卡」只有 4 個升級、無第 4 個分頁 |
 | 9 | T3 箱 12 件 | 9×8／CMD 10×8 放得下（未實機量） |
+| 10 | 生成 CMD T1/T2/T3 | 深藍箱、6×4、輪廓與治安箱一致；`[CF-SPRITE] registered …` |
+| 11 | 用對應卡開 CMD 箱 | 換成深藍 `cmd_box_u`；無 `unknown`、無 `Mod sprite … not found` |
+| 12 | 存檔→重載 | CMD 箱仍是深藍；應有 `[CF-SPRITE] reapplied … after load` |
+| 13 | SEC／MED／ENG／SER 箱 | 外觀完全沒變 |
+
+## CMD 箱貼圖＝執行期染色（0.5.1，詳見 spec §3.12）
+
+- **零美術檔**：`CfCmdBoxSprite` 用 `RenderHandler.LoadFromAtlas("Items/items_container",
+  "sec_box" / "sec_box_u")` 取原版圖，`GetPixels` 子區域後去色
+  （`0.299/0.587/0.114`）再乘 `CmdBlue = (0.24, 0.35, 0.62)`，`Texture2D` RGBA32 +
+  Point + Clamp，`Sprite.Create(..., 100f)`；96×64 → 6×4 格。
+- **註冊**：塞進本 MOD `LoadedMod.Sprites["cmd_box"]` / `["cmd_box_u"]`。
+  `ModLoader` 是 `OnEnable()` 之後才 `Mods.Add`，所以 OnEnable 第一次找不到自己；
+  實作是 OnEnable 嘗試（靜默）＋`OnModAssetsLoaded` 正式註冊＋
+  `BuildContainer`／`OnGameLoadedLate` 懶註冊。
+- **建立**：`ItemFactory.BuildContainer` 只對 CMD 家族用
+  `SetSpriteAndShapeFromMod(ModId,"cmd_box")`；失敗才 fallback `sec_box`（先把
+  `useSpriteFromMod` 設回 false）。
+- **解鎖**：既有 `CfTryOpenLockPatch` 先 `RemoveGameItemType("SUPPLY_CRATE")`、
+  再 `UnlockContainer`、最後 `ApplyUnlocked`（`cmd_box_u`，失敗 fallback
+  `sec_box_u`）。**沒有新增 Harmony patch**。
+- **存讀檔**：`OnGameLoadedLate` 掃 `FindAllItem(false)`，對
+  `spriteAtlasPath == ModId` 的 CMD 箱重跑貼圖，避免掉旗標變 unknown。
+- **不動**：其他四家族箱子的 sprite、原版 `sec_box_u`、`LockHelper` 本體。
 
 ## P3 實作要點（詳見 spec §3.5）
 
@@ -171,6 +206,12 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 - **P4 修訂全部未實機**：PRO 工具包、製卡匠／博士到訪與買賣、小偷 T2/T3 箱、
   Wild Network 4 個升級、T3 箱開鎖，都只有離線驗證；`Player.log` 沒有任何
   `[CF-NET]`／`[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`。
+- **CMD 箱染色未實機**：深藍 `0.24/0.35/0.62` 的觀感、6×4 輪廓、`SetNativeSize`
+  大小、解鎖 `cmd_box_u`、存讀檔重貼，全部只有 IL／字串核對。
+- **`ModLoader.Mods` 時序**：`OnEnable` 在 `Mods.Add` 之前，本輪用
+  `OnModAssetsLoaded` 補註冊；它是否一定早於第一個 CMD 箱，還沒用 `Player.log` 驗。
+  若來不及，該箱會先 fallback 成 `sec_box`（褐色），直到 `OnGameLoadedLate` 或
+  下一箱才變深藍。
 - **tabBar 實際寬度**：spec §3.11.1 的 1060 來自 `WildNetworkStyle.TABS_W` 常數，
   不是 prefab 或 runtime `RectTransform` 量測；如果 prefab 的 tabBar 不是 1060，
   第 3 個分頁的結論要重算。
@@ -193,17 +234,17 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 - P3 的 #5／#6／#7 仍未補 log 證據（沿用上一輪結論）。
 - `unitValue`（晶片 250／解序器 800／T3 卡核新價）是定案值但未經遊戲平衡驗證。
 - `long_module2` 是否真的是 1×4：由 sprite 切片決定，未在 runtime 量過。
-- **完整 §3.1–3.11 規格**：仍未補齊；目前只有 P1/P2 定案段、§3.3 loot 表、
-  §3.4 errata、§3.4b T3 定價、§3.5 P3、§3.8／§3.10(2)／§3.11 P4。
+- **完整 §3.1–3.12 規格**：仍未補齊；目前只有 P1/P2 定案段、§3.3 loot 表、
+  §3.4 errata、§3.4b T3 定價、§3.5 P3、§3.8／§3.10(2)／§3.11 P4、§3.12 貼圖。
 - **`Resources.LoadAll<Sprite>` runtime 清單**：目前只有 asset 字串掃描。
 - **CMD T2 -7.37%**：已接受的例外，未改。
 - **CMD 箱來源**：T1／T2／T3 在江洋大盜（P6）之前沒有正常來源，先留著。
 
 ## 下一步
 
-1. 本輪 P4 修訂已提交（`0f62dfc`，本機 commit、未 push）。
-2. 人類實機跑 P4 修訂驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／`[CF-INVENTOR]`／
-   `[CF-THIEF]`，並補 T3 in-game `[CF-EV]` 200 樣本。
+1. 本輪 0.5.1（CMD 箱染色）已提交（本機 commit、未 push）。
+2. 人類實機跑 P4 修訂與 CMD 貼圖驗收卡，收集 `[CF-NET]`／`[CF-MAKER]`／
+   `[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`，並補 T3 in-game `[CF-EV]`。
 3. **索耶（P5）**：依指示本輪不開；`CF_SAWYER_*` 的隱藏規則已先掛好。
 4. **江洋大盜（P6）**：補 CMD 箱的正常來源。
 5. 紙本與其餘黑市內容；補 §3.1–3.11 全文與 `Resources.LoadAll` 實機清單。
@@ -219,12 +260,13 @@ mod 不自己乘係數，所以換插別的模組這些數字就會不同。
 ## 主要檔案
 
 - `src/CardCraftAndFence/CardCraftAndFence.cs`（P4 修訂新增 `CfCardStock`、
-  `CfInventorStock`、`CfInventorPatch`；`CfNetwork` 縮成 4 個升級；
-  `CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables` 擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.5.0）
-- `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、§3.10、§3.11）
+  `CfInventorStock`、`CfInventorPatch`；0.5.1 新增 `CfCmdBoxSprite`；
+  `CfNetwork` 縮成 4 個升級；`CfThiefBoxes` 只賣 T2/T3；
+  `ItemFactory`／`LootTables` 擴到 T3 箱）
+- `src/CardCraftAndFence/manifest.xml`（0.5.1）
+- `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、§3.10、§3.11、§3.12）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、
   `tools/Probe-Logic.ps1`（本輪未改）
 - `.scratch/p3check/`、`.scratch/p4check/`、`.scratch/p4bcheck/`、
-  `.scratch/p4t3loot/`（scratch-only 離線核對，不進 MOD）
+  `.scratch/p4t3loot/`、`.scratch/p5spritecheck/`（scratch-only 離線核對，不進 MOD）

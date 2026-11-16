@@ -16,7 +16,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.5.0";
+        internal const string ModVersion = "0.5.1";
 
         public void Init(ModManifest manifest)
         {
@@ -29,15 +29,27 @@ namespace DeepSpaceQoL
             CfItemDirectory.EnsureCreated();
             LootTables.EnsureRegistered();
             CfNetwork.EnsureRegistered();
+            // Must run before any crate is built: cmd_box / cmd_box_u are
+            // generated from sec_box / sec_box_u at runtime (no art files).
+            CfCmdBoxSprite.EnsureRegistered();
             // -= before += so a mod reload cannot subscribe the handler twice.
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
             ModHook.OnGenerateCustomerVeryLate += CfRetiredCardmaker.OnGenerateCustomerVeryLate;
+            ModHook.OnGameLoadedLate -= CfCmdBoxSprite.OnGameLoadedLate;
+            ModHook.OnGameLoadedLate += CfCmdBoxSprite.OnGameLoadedLate;
+            // ModLoader adds the LoadedMod to ModLoader.Mods *after* OnEnable, so
+            // the first registration attempt above cannot see it. OnModAssetsLoaded
+            // hands us the real LoadedMod later in startup, still before gameplay.
+            ModHook.OnModAssetsLoaded -= CfCmdBoxSprite.OnModAssetsLoaded;
+            ModHook.OnModAssetsLoaded += CfCmdBoxSprite.OnModAssetsLoaded;
             Log.Info("enabled v" + ModVersion);
         }
 
         public void OnDisable()
         {
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
+            ModHook.OnGameLoadedLate -= CfCmdBoxSprite.OnGameLoadedLate;
+            ModHook.OnModAssetsLoaded -= CfCmdBoxSprite.OnModAssetsLoaded;
             // Directory<GameItem> is a DontDestroyOnLoad singleton. Owned items may
             // still need its factories after the mod is disabled, so never destroy it.
             Log.Info("disabled; CfItemDirectory kept alive");
@@ -96,7 +108,19 @@ namespace DeepSpaceQoL
             {
                 EmporiumAudioPlayer.Instance.audioClickClick.Play();
                 key.Destroy();
+                if (crateFamily == CardFamily.CMD)
+                {
+                    // Vanilla UnlockContainer swaps the sprite through
+                    // Resources.LoadAll (which cannot see mod sprites) when the
+                    // item is still SUPPLY_CRATE. Drop that type first so the
+                    // vanilla swap is skipped, then apply cmd_box_u ourselves.
+                    box.RemoveGameItemType("SUPPLY_CRATE");
+                }
                 LockHelper.UnlockContainer(box);
+                if (crateFamily == CardFamily.CMD)
+                {
+                    CfCmdBoxSprite.ApplyUnlocked(box);
+                }
             }
             else
             {
@@ -468,7 +492,16 @@ namespace DeepSpaceQoL
             var (window, inventory) = DirectoryUtils.CreateInventoryWindow(width, height);
             GameItem item = ItemDirectory.CreateEmptyItem();
             item.SetContentWindow(window);
-            item.SetSpriteAndShape("Items/items_container", ContainerSprite(family));
+            if (family == CardFamily.CMD)
+            {
+                // Runtime-tinted sec_box (no art files). Apply() also handles the
+                // fallback when the sprite dictionary is not ready yet.
+                CfCmdBoxSprite.ApplyLocked(item);
+            }
+            else
+            {
+                item.SetSpriteAndShape("Items/items_container", ContainerSprite(family));
+            }
             item.name = LocHelper.GetLocalizedOrDefault(
                 "Item",
                 "item_cf_" + Slug(family) + "_box_t" + tier + "_name",
@@ -1722,6 +1755,229 @@ namespace DeepSpaceQoL
                 || !store.exchangeManager.isExchangeUnlocked)
             {
                 __result = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Runtime-tinted CMD crate sprites. There are no art files: sec_box and
+    /// sec_box_u are copied pixel-by-pixel, desaturated, and tinted CmdBlue, then
+    /// registered in this mod's LoadedMod.Sprites as "cmd_box" / "cmd_box_u".
+    /// GameItem.SetSpriteAndShapeFromMod reads that dictionary, so the crate's
+    /// shape (6x4, same silhouette as sec_box) comes from the tinted sprite.
+    /// </summary>
+    internal static class CfCmdBoxSprite
+    {
+        internal const string LockedKey = "cmd_box";
+        internal const string UnlockedKey = "cmd_box_u";
+
+        // Only tune this constant after looking at it in game.
+        private static readonly Color CmdBlue = new Color(0.24f, 0.35f, 0.62f);
+
+        private static readonly HashSet<string> _warned = new HashSet<string>();
+        private static bool _registered;
+
+        internal static void OnGameLoadedLate()
+        {
+            try
+            {
+                if (PlayerStore.Instance == null || EmporiumEntry.Instance == null)
+                {
+                    return;
+                }
+                if (!EnsureRegistered())
+                {
+                    return;
+                }
+                int fixedCount = 0;
+                foreach (GameItem item in PlayerStore.Instance.FindAllItem(false))
+                {
+                    if (item == null
+                        || !string.Equals(item.spriteAtlasPath, CardCraftAndFenceMod.ModId, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    string key = item.spritePath;
+                    if (key == LockedKey)
+                    {
+                        Apply(item, LockedKey, "sec_box");
+                        fixedCount++;
+                    }
+                    else if (key == UnlockedKey)
+                    {
+                        Apply(item, UnlockedKey, "sec_box_u");
+                        fixedCount++;
+                    }
+                }
+                if (fixedCount > 0)
+                {
+                    Log.Info("[CF-SPRITE] reapplied mod sprite to " + fixedCount + " CMD crate(s) after load");
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-SPRITE] load reapply failed: " + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        internal static void OnModAssetsLoaded(LoadedMod mod)
+        {
+            if (mod == null || mod.Manifest == null
+                || !string.Equals(mod.Manifest.ID, CardCraftAndFenceMod.ModId, StringComparison.Ordinal))
+            {
+                return;
+            }
+            try
+            {
+                EnsureRegistered(mod);
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-SPRITE] registration failed: " + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        internal static bool EnsureRegistered(LoadedMod knownMod = null)
+        {
+            LoadedMod mod = knownMod ?? FindMod();
+            if (mod == null)
+            {
+                // OnEnable runs before ModLoader.Mods.Add, so this is expected on
+                // the first attempt. OnModAssetsLoaded / the first crate retries.
+                return false;
+            }
+            if (_registered
+                && mod.Sprites.ContainsKey(LockedKey)
+                && mod.Sprites.ContainsKey(UnlockedKey))
+            {
+                return true;
+            }
+            bool locked = Register(mod, LockedKey, "sec_box");
+            bool unlocked = Register(mod, UnlockedKey, "sec_box_u");
+            _registered = locked && unlocked;
+            if (_registered)
+            {
+                Log.Info("[CF-SPRITE] registered cmd_box/cmd_box_u (runtime tint "
+                    + CmdBlue.r + "," + CmdBlue.g + "," + CmdBlue.b + ")");
+            }
+            return _registered;
+        }
+
+        internal static void ApplyLocked(GameItem box)
+        {
+            Apply(box, LockedKey, "sec_box");
+        }
+
+        internal static void ApplyUnlocked(GameItem box)
+        {
+            Apply(box, UnlockedKey, "sec_box_u");
+        }
+
+        private static void Apply(GameItem box, string key, string fallback)
+        {
+            if (box == null)
+            {
+                return;
+            }
+            if (EnsureRegistered())
+            {
+                box.SetSpriteAndShapeFromMod(CardCraftAndFenceMod.ModId, key);
+                if (box.useSpriteFromMod
+                    && string.Equals(box.spritePath, key, StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+            // SetSpriteAndShape does not clear useSpriteFromMod, so clear it
+            // explicitly; otherwise the renderer would keep looking in the mod
+            // dictionary for a key that is not there and draw "unknown".
+            box.useSpriteFromMod = false;
+            box.SetSpriteAndShape("Items/items_container", fallback);
+        }
+
+        private static LoadedMod FindMod()
+        {
+            foreach (LoadedMod mod in ModLoader.Mods)
+            {
+                if (mod != null && mod.Manifest != null
+                    && string.Equals(mod.Manifest.ID, CardCraftAndFenceMod.ModId, StringComparison.Ordinal))
+                {
+                    return mod;
+                }
+            }
+            return null;
+        }
+
+        private static bool Register(LoadedMod mod, string key, string sourceKey)
+        {
+            if (mod.Sprites.ContainsKey(key))
+            {
+                return true;
+            }
+            Sprite source = RenderHandler.LoadFromAtlas("Items/items_container", sourceKey);
+            if (source == null || source.texture == null)
+            {
+                WarnOnce("source:" + sourceKey, "[CF-SPRITE] source sprite " + sourceKey + " is not readable");
+                return false;
+            }
+            Sprite tinted = Colorize(source, CmdBlue);
+            if (tinted == null)
+            {
+                return false;
+            }
+            tinted.name = key;
+            if (tinted.texture != null)
+            {
+                tinted.texture.name = "cf_" + key;
+            }
+            mod.Sprites[key] = tinted;
+            return true;
+        }
+
+        // Desaturate then tint, so the original highlights/shadows survive. Do
+        // not multiply the RGB directly: that turns black outlines black-blue and
+        // loses the box's light structure.
+        private static Sprite Colorize(Sprite source, Color tint)
+        {
+            Rect rect = source.rect;
+            int width = (int)rect.width;
+            int height = (int)rect.height;
+            if (width <= 0 || height <= 0)
+            {
+                WarnOnce("rect", "[CF-SPRITE] source sprite has an empty rect");
+                return null;
+            }
+            Color[] pixels;
+            try
+            {
+                pixels = source.texture.GetPixels(
+                    (int)rect.x, (int)rect.y, width, height);
+            }
+            catch (Exception e)
+            {
+                WarnOnce("pixels", "[CF-SPRITE] GetPixels failed: " + e.GetType().Name + ": " + e.Message);
+                return null;
+            }
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                Color c = pixels[i];
+                float lum = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
+                pixels[i] = new Color(tint.r * lum, tint.g * lum, tint.b * lum, c.a);
+            }
+            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Point;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.SetPixels(pixels);
+            texture.Apply();
+            return Sprite.Create(texture, new Rect(0f, 0f, width, height),
+                new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        private static void WarnOnce(string key, string message)
+        {
+            if (_warned.Add(key))
+            {
+                Log.Warn(message);
             }
         }
     }

@@ -4,7 +4,7 @@
 > §3.3 箱體定案表（含 T3 箱）與 loot 表（含 T3 loot／EV）、貼圖決策與 errata、
 > §3.4b 的 T3 卡／核定價、§3.5 的 P3 實作（空白卡晶片、專業密序器、批量模組），
 > 以及 P4 的 §3.8（退休製卡匠／博士）、§3.10(2)（小偷分級箱）、
-> §3.11（Wild Network 4 個升級）。
+> §3.11（Wild Network 4 個升級）、§3.12（CMD 箱執行期染色貼圖）。
 
 ## §3.3 箱子 — 定案表（P2／P4 已實作）
 
@@ -14,7 +14,7 @@
 | MED | `med_box`（原版） | 7×5 | 200 | `cf_med_box_t2` | **8×8** | 225 | `cf_med_box_t3` | 9×8 | 300 | `med_box` |
 | ENG | `eng_box`（原版） | 7×5 | 200 | `cf_eng_box_t2` | 7×7 | 225 | `cf_eng_box_t3` | 9×8 | 300 | `eng_box` |
 | SER | `service_box`（原版） | 7×5 | 175 | `cf_ser_box_t2` | 7×7 | 225 | `cf_ser_box_t3` | 9×8 | 300 | `service_box` |
-| CMD | `cf_cmd_box_t1`（新） | **7×7** | 200 | `cf_cmd_box_t2` | **9×8** | 350 | `cf_cmd_box_t3` | **10×8** | 500 | `sec_box` |
+| CMD | `cf_cmd_box_t1`（新） | **7×7** | 200 | `cf_cmd_box_t2` | **9×8** | 350 | `cf_cmd_box_t3` | **10×8** | 500 | `cmd_box`（執行期染色，§3.12） |
 
 - **容量校正**：MED T2 用 8×8、CMD T1 用 7×7、CMD T2 用 9×8。原因是
   10／11 rolls + rare 在原本 7×7／7×5 會放不下（med 實測 -13.36%、
@@ -429,11 +429,11 @@ sprite：
   `toolbox_new`、`toolbox_old`。
 - **沒有 `cmd_box`／`cmd_box_u`**。
 
-決策：CMD 箱（`cf_cmd_box_t1`、`cf_cmd_box_t2`）使用
-`Items/items_container` + `sec_box`；`LockHelper.UnlockContainer` 會把
-`SUPPLY_CRATE` 的 sprite 換成 `sec_box_u`，兩張圖都存在，不會 fallback 成
-`unknown`。代價是 CMD 箱圖示與 SEC 箱相同；好處是 locked／unlocked 都有圖。
-T1 SEC／MED／ENG／SER 用原版箱，不動貼圖。
+**決策更新（0.5.1）**：CMD 箱（`cf_cmd_box_t1/t2/t3`）改用 §3.12 的
+執行期染色 `cmd_box`／`cmd_box_u`，不再直接共用 `sec_box`／`sec_box_u`。
+原本「用 `sec_box` + 讓 `UnlockContainer` 自動換 `_u`」的方案已淘汰，原因：
+`LockHelper.UnlockContainer` 的 `_u` 換圖走 `Resources.LoadAll`，看不到 mod
+sprite；而且 CMD 箱與 SEC 箱同圖。T1 SEC／MED／ENG／SER 用原版箱，不動貼圖。
 
 > 這是 asset 字串掃描，不是 `Resources.LoadAll<Sprite>` 的 runtime 結果；
 > 實機第一次進遊戲時仍應以 `Resources.LoadAll` 印出的清單為準。
@@ -833,9 +833,79 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
 - `[CF-NET] PRO kit granted printer+chip+cnc+2 electronic+2 plastic`
 - `[CF-INVENTOR] stock desequencer+batch tier2=… tier3=…`
 
+## §3.12 CMD 箱貼圖＝執行期染色（0.5.1）
+
+CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期去色再染成指揮卡的深藍，
+註冊成本 MOD 自帶的 `cmd_box`／`cmd_box_u`，再由 `SetSpriteAndShapeFromMod` 使用。
+輪廓（6×4 格）、alpha 與明暗結構都跟原版治安箱一致。
+
+### §3.12.1 註冊與時序
+
+- 目標字典：`ModLoader.Mods` 裡本 MOD 的 `LoadedMod.Sprites`；
+  key `cmd_box`／`cmd_box_u`，已存在就跳過。
+- **時序陷阱**：`ModLoader.LoadModDll` 是先呼叫 `mod.OnEnable()`、之後才
+  `Mods.Add(loadedMod)`（`ModLoader.cs:1167/1195`），所以 OnEnable 第一次
+  `Mods.Find(...)` 一定找不到自己。實作因此是三段式：
+  1. `OnEnable` 先嘗試（找不到就靜默返回，不記 warning）；
+  2. `ModHook.OnModAssetsLoaded` 拿到真正的 `LoadedMod` 後註冊（正常路徑）；
+  3. `BuildContainer`／`OnGameLoadedLate` 再懶註冊一次（保險）。
+- 註冊成功 log：`[CF-SPRITE] registered cmd_box/cmd_box_u (runtime tint 0.24,0.35,0.62)`。
+
+### §3.12.2 Colorize
+
+- 取子區域：`Rect r = src.rect;` →
+  `src.texture.GetPixels((int)r.x, (int)r.y, (int)r.width, (int)r.height)`；
+  不要拿整張 atlas。
+- 逐像素：`lum = 0.299r + 0.587g + 0.114b`；
+  `out = (tint.r*lum, tint.g*lum, tint.b*lum, a)`（去色再上色，保留明暗；
+  不是直接把 RGB 乘藍色）。
+- `new Texture2D(w, h, TextureFormat.RGBA32, false)`、`filterMode = Point`、
+  `wrapMode = Clamp`、`SetPixels` + `Apply`；
+  `Sprite.Create(tex, new Rect(0,0,w,h), new Vector2(0.5f,0.5f), 100f)`。
+- `CmdBlue = new Color(0.24f, 0.35f, 0.62f)`；**只調這一個常數**再實機看。
+- `sec_box` 是 96×64 px，`gridSize = 16` → 6×4 格；`SetSpriteAndShapeFromMod`
+  用 `sprite.rect.width / gridSize` 算形狀，所以形狀與治安箱一致。
+
+### §3.12.3 建立、解鎖、存讀檔
+
+- **建立**（`ItemFactory.BuildContainer`，只 CMD 家族）：
+  `item.SetSpriteAndShapeFromMod(ModId, "cmd_box")`；
+  若 `useSpriteFromMod == false` 或 `spritePath != "cmd_box"` → 先把
+  `useSpriteFromMod` 設回 false，再
+  `SetSpriteAndShape("Items/items_container", "sec_box")`。
+  其他四家族完全不動。
+- **解鎖**（既有 `CfTryOpenLockPatch`，沒有新增 patch）：
+  1. `box.RemoveGameItemType("SUPPLY_CRATE")`（讓原版 `UnlockContainer` 的
+     `Resources.LoadAll` `_u` 換圖分支跳過）；
+  2. `LockHelper.UnlockContainer(box)`；
+  3. `box.SetSpriteAndShapeFromMod(ModId, "cmd_box_u")`；
+     失敗則 `useSpriteFromMod=false` + `SetSpriteAndShape("Items/items_container","sec_box_u")`。
+  - 必須先移除 `SUPPLY_CRATE`：原版 `LockHelper.UnlockContainer` 會在該 tag 存在時
+    用 `spriteAtlasPath` + `"_u"` 去 `Resources.LoadAll`，看不到 mod sprite。
+- **存讀檔**：`ModHook.OnGameLoadedLate` 掃
+  `PlayerStore.Instance.FindAllItem(false)`，對 `spriteAtlasPath == ModId` 且
+  `spritePath` 是 `cmd_box`／`cmd_box_u` 的物品重跑 `SetSpriteAndShapeFromMod`；
+  避免 `useSpriteFromMod` 掉旗標後被畫成 `unknown`。
+  log：`[CF-SPRITE] reapplied mod sprite to N CMD crate(s) after load`。
+- 兩個 fallback 都要先把 `useSpriteFromMod` 設為 false：`SetSpriteAndShape`
+  本身不會清這個旗標，否則 renderer 會繼續拿 `Items/items_container` 當 mod id
+  去查字典，畫成 `unknown`。
+
+### §3.12.4 不變的承諾
+
+- 不改 `sec_box`／`sec_box_u` 原版 sprite，也不改其他四家族的箱子外觀。
+- 不新增 Harmony patch：用既有的 `CfTryOpenLockPatch`、`ModHook.OnGameLoadedLate`
+  與 `ModHook.OnModAssetsLoaded`。
+- 零美術檔；紋理是執行期 `Texture2D`，`Point` filter、無 mipmap。
+
 ## P4 未核實（截至本輪）
 
 - 工匠、博士、小偷的實際 UI／對話流程（需人類開遊戲）。
 - T3 箱的 12 件在 9×8／10×8 是否真的放得下（未在 runtime 量）。
 - T3 模型 EV 的「200 樣本」是離線同權重模擬，不是 in-game probe（見 §3.3）。
 - 工匠一次到訪 10 個 T1 + 6 個 T2 + 2 個 T3 是否會把前台塞滿。
+- **CMD 箱染色**：深藍 `0.24/0.35/0.62` 的實際觀感、6×4 輪廓與原版治安箱的
+  對齊、`SetNativeSize` 後的大小、解鎖 `_u` 換圖、存讀檔重貼，都只有離線
+  IL／字串核對，未進遊戲看過。
+- `ModLoader.Mods` 在 `OnEnable` 之後才 `Add`：本輪用 `OnModAssetsLoaded` 補註冊；
+  這個時序在實機是否早於第一個 CMD 箱，未用 `Player.log` 驗。
