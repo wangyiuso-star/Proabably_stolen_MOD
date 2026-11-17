@@ -9,23 +9,24 @@
 - **P5 功能完成、離線驗收通過、實機已於 2026-11-17 驗收**（P5-01／04／06／07
   通過、P5-08 通過；P5-09／10 未測；P5-11／12 延後到 1.0）。
 - **P6 江洋大盜已實作、離線驗收通過、實機待跑**（0.8.0）。
-- 版本 **0.8.0**（`79,360 bytes／8E6238AF…`），HEAD `83197a6`（P6 提交前；
-  提交後看 `git log -1`），**未 push**。
-- 遊戲 `Mods` 目前還是 **0.7.7**（`75,776／592F866F…`）；要測 0.8.0 要先覆蓋並完全重開。
-- P6 0.8.0 與本文件同一提交（hash 見 `git log -1`；本文件不寫死自身 commit）。
+- 版本 **0.8.0**（`79,360 bytes／8E6238AF…`）；P6 實作 `479c270`，本輪 docs 修正另見
+  `git log`；**未 push**。
+- 遊戲 `Mods` 目前是 **0.7.8**（`76,288／EEBF0941…`，2026-11-17 12:14 安裝）；
+  要測 0.8.0 要先覆蓋並完全重開。
+- P6 實作 `479c270` 已含 docs；本輪再補一次 docs 修正（hash 見 `git log -1`）。
 
 ## 1. Repo／產物
 
 | 項目 | 值 |
 |---|---|
-| HEAD | `83197a6`（P6 提交前）；P6 提交後以 `git log -1` 為準 |
-| 0.8.0 實作 | P6 江洋大盜，與 docs 同一提交（hash 見 `git log -1`） |
+| HEAD | P6 後以 `git log -1` 為準；P6 實作 `479c270` |
+| 0.8.0 實作 | `479c270`（P6 江洋大盜，含 docs）；本輪 docs 修正見 `git log` |
 | 0.7.8 實作 | `7f10b7c`（+ `8256e40` STATUS） |
 | 0.7.7 | `3e1c4fa` |
 | 0.7.6–0.7.3 | `225f17b`／`c59107c`／`d13d49d`／`4fe6b3f` |
 | dist DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll`，79,360 bytes，SHA256 `8E6238AFD611269E30DA2D199067DE9334112A2C3215B90B7B78EA6694B3650E` |
-| 已安裝 | `.../Probably Stolen/Mods/CardCraftAndFence`，0.7.7，75,776／`592F866F…` |
-| git status | P6 0.8.0 與 docs 同一提交；另有 `docs/ACCEPTANCE_REVIEW.md`、`docs/DEVELOPER_DIAGNOSTIC.md` 兩個 11-02 舊修改（未提交） |
+| 已安裝 | `.../Probably Stolen/Mods/CardCraftAndFence`，0.7.8，76,288／`EEBF0941…` |
+| git status | P6 實作 `479c270`；本輪 docs 修正見 `git log`；另有 `docs/ACCEPTANCE_REVIEW.md`、`docs/DEVELOPER_DIAGNOSTIC.md` 兩個 11-02 舊修改（未提交） |
 | push | 沒有，也不要 push |
 
 ## 2. P5 狀態矩陣（以此為準）
@@ -44,15 +45,15 @@
 
 **離線已關（0.7.8）**
 - P5-02 rare 先放、P5-03 容量數字、P5-05 null 診斷、P5-13（P5 部分）、P5-14 CMD T2 -0.77%。
-- P5-04 MED／ENG／SER T3 的 40／30／30 已用 shape 複算，**但實機各 3 箱仍待**。
+- P5-04 MED／ENG／SER T3 的 40／30／30 離線複算；**2026-11-17 實機各 3 箱已通過**。
 
-**P5 關閉必要實機（4 項）**
+**歷史：P5 關閉必要實機（4 項；2026-11-17 已通過）**
 1. **P5-01**：T3 SEC ×5（5 件）、T3 CMD ×5（8 件）、T2 CMD ×3（7 件）；無 `[CF-LOOT] overflow box=…`。
 2. **P5-04**：T3 MED／ENG／SER 各 3 箱（各 5 件），同樣看 overflow。
 3. **P5-06**：芯片 3 同級→下一級、每家族每晚 1 次、T3 不升、不佔 cap。
 4. **P5-07**：促銷 UI 立即消失／重開／重載／重啟不復活。
 
-**不擋 P5 關**
+**歷史：不擋 P5 關（P5-08 已通過；P5-09／10 未測）**
 - P5-08 紙本重載不重複、P5-09 `CF_SAWYER_*` 隱藏、P5-10 CMD T1 開箱 9 件。
 
 **1.0 前**
@@ -108,7 +109,8 @@ Select-String -Path "$env:USERPROFILE\AppData\LocalLow\Questing Goose Studio\Pro
 - 用 F9 debug 或既有存檔把 BM 調到 30／60／85／150；**不要直接改存檔檔**。
 - 各睡 1–2 天，看每天最多一行（新的一天是 `roll`，同日重載是 `roll cached`）：
   `[CF-HIGHWAY] roll day=… bm=30 chance=8 ok=…`、`60 → 14`、`85 → 20`、`150 → 33`。
-- 若 BM 到不了 150，先回報「設計前提不成立」，**不要自行降門檻**。
+- BM 數值上限是 200（`StoreReputation.CheckReputation` 的 clamp）；若存檔／debug
+  仍到不了 150，先回報「設計前提不成立」，**不要自行降門檻**。
 
 **B. 到訪與箱（BM150＋Tier3）**
 - 睡到 `ok=1`（33% 下 10 天內至少一次；P(無)=0.67^10≈1.8%）。
@@ -173,7 +175,7 @@ python .scratch\p6highwayman\check.py    # P6 88/0 + 10 萬日機率模擬
 ## 7. 文件與已知不一致
 
 - `docs/P5_HANDOFF.md`：有「0.7.8 狀態」欄；關閉條件已含 P5-04（`89bd79e`）。
-- `docs/CARD_CRAFT_STATUS.md`：build 表 0.8.0／79,360／`8E6238AF…`；Mods 行仍寫 0.7.7（0.8.0 待覆蓋）。
+- `docs/CARD_CRAFT_STATUS.md`：build 表 0.8.0／79,360／`8E6238AF…`；Mods 行 0.7.8（0.8.0 待覆蓋）。
 - `docs/CARD_CRAFT_SPEC.md`：§3.3 容量數字 69／105／93、SEC T2 80<93 例外；§3.12.2 HSV 換色。
 - **兩個舊 docs**（`ACCEPTANCE_REVIEW.md`、`DEVELOPER_DIAGNOSTIC.md`）自 11-02 未提交，是 AppraisalAssistant 的舊帳，非 P5；要嘛 commit 要嘛 revert，不要一直掛 `git status`。
 - P5-14：CMD T2 統一 -0.77%（1285.55／1295.50）；舊 -7.37／-1.64 作廢。
@@ -181,7 +183,7 @@ python .scratch\p6highwayman\check.py    # P6 88/0 + 10 萬日機率模擬
 
 ## 8. P6（江洋大盜，0.8.0 已實作／離線已驗／實機待跑）
 
-- P6 0.8.0 與 docs 同一提交（hash 見 `git log -1`）。
+- P6 實作 `479c270`；本輪 docs 修正見 `git log`。
 - 新增黑市 client `cf_highwayman`（江洋大盜）：每日以黑市聲望 roll 一次
   （30–59 8%、60–84 14%、85–149 20%、>=150 33%），成功才加 1 個 SELL client；
   到訪只給 1 箱 CMD 物資箱：T1 需 `CF_FENCE_PRO` + bm>=30、T2 加
@@ -190,6 +192,10 @@ python .scratch\p6highwayman\check.py    # P6 88/0 + 10 萬日機率模擬
   CMD 價格 200／350／500、容量與 loot 表不動；五個既有類別本體與 0.7.8 相同。
 - 實機待跑：到訪／購買／開箱（T1／T2／T3）、同日只 roll 一次、前台塞滿 skip、
   bm<30 與未買 PRO 的 skip log。
+- 靜態核對：BM 上限是 200（`StoreReputation.CheckReputation` 把 amount 夾在
+  −200～200，StoreReputation.cs:120），所以 150 在數值範圍內；`PlayerStore.EndDay()`
+  會 `DismissClientStack()` 清空 `clientStack`（PlayerStore.cs:1651／
+  StoreClientManager.cs:1489），未接待的江洋大盜不會跨日堆疊。兩者仍待實機確認。
 
 ## 9. 禁用
 
@@ -200,4 +206,5 @@ python .scratch\p6highwayman\check.py    # P6 88/0 + 10 萬日機率模擬
 
 ## 10. 如果要一句話回報
 
-> P5 功能完成、離線面 0.7.8 已關、實機剩 P5-01／04／06／07；P6 未開始；HEAD `89bd79e`；dist 76,288／`EEBF0941…`；Mods 還是 0.7.7。
+> P5 已於 2026-11-17 實機驗收；P6 0.8.0 已實作並提交 `479c270`、離線驗證通過、
+> 實機待跑；dist 79,360／`8E6238AF…`；Mods 仍 0.7.8（0.8.0 待覆蓋）；未 push。
