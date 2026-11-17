@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-17（0.7.8：P5 收尾——rare 先放、容量數字對帳、null 診斷）
+更新時間：2026-11-17（0.8.0：P6 江洋大盜，CMD T1／T2／T3 有了正常來源）
 
 ## 階段
 
@@ -59,13 +59,13 @@
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.7.8 |
+| ModVersion | 0.8.0 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 76,288 bytes |
-| SHA256 | `EEBF0941E34F265C93E3505249986AF88900DD56FDE2955692CD079DCBB74358` |
+| 大小 | 79,360 bytes |
+| SHA256 | `8E6238AFD611269E30DA2D199067DE9334112A2C3215B90B7B78EA6694B3650E` |
 | Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
-| dist / Mods hash | Mods 仍是 0.7.7 的 75,776 bytes／`592F866F…`；0.7.8 待覆蓋 |
-| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）、`4fe6b3f`（0.7.3）、`d13d49d`（0.7.4）、`c59107c`（0.7.5）、`225f17b`（0.7.6）、`3e1c4fa`（0.7.7）、`7f10b7c`（0.7.8）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| dist / Mods hash | Mods 仍是 0.7.7 的 75,776 bytes／`592F866F…`；0.8.0 待覆蓋 |
+| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）、`4fe6b3f`（0.7.3）、`d13d49d`（0.7.4）、`c59107c`（0.7.5）、`225f17b`（0.7.6）、`3e1c4fa`（0.7.7）、`7f10b7c`（0.7.8）；0.8.0（P6）與 docs 同一提交（hash 見 `git log -1`）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 > **0.7.7**：HSV 換色參數定案——`BlueHue=0.62`（指揮卡深藍取樣 `39,52,86`
 > 的 H 0.62）、`BlueValueGain=1.00`，保留來源 S 與陰影；白標籤（`s<0.15`）
@@ -660,6 +660,81 @@ EXIT=0
 - **P5-07**：促銷 UI 立即消失／重開／重載不復活。
 - P5-08／09／10 順手過；P5-11／12 依交辦單留到 1.0 前。
 
+## P6 0.8.0 江洋大盜（黑市 CMD 箱來源）
+
+### 1) 改了什麼
+
+- `CardCraftAndFence.cs`：`ModVersion` 0.7.8 → 0.8.0；`OnEnable`／`OnDisable`
+  增減 `CfHighwayman.OnGenerateCustomerVeryLate`；新增 `CfHighwayman`
+  （黑市 SELL 客戶、每日黑市聲望 roll、tier 1/2/3、`DirectoryMaster.Item` +
+  `GraphUtils.CanAccept` + `TryAddDirectSellingItemToTable(isStolen:true)`）。
+- `manifest.xml`：`<ModVersion>0.8.0</ModVersion>`，Description 追加「江洋大盜」。
+- **沒有**新增 Harmony patch（仍 8）、沒有新物品、沒有改 CMD 價格／容量／
+  loot 表；`CfSawyerExchange`／`CfThiefBoxes`／`CfRetiredCardmaker`／
+  `CfInventorStock`／`LootTables` 的類別本體與 0.7.8 位元相同。
+- 每日機率：30–59 8%、60–84 14%、85–149 20%、>=150 33%；每次到訪只給 1 箱。
+
+### 2) 0.8.0 驗收（實際輸出）
+
+**Build**
+```text
+Compiling CardCraftAndFence...
+  -> ...\CardCraftAndFence.dll (79360 bytes)
+Build OK: C:\Users\wangy\Desktop\Probably_Stolen_MOD\dist
+EXIT=0
+```
+
+**Verify-Mods（CardCraft 段）**
+```text
+PASS CardCraftAndFence.dll: no banned IL APIs
+PASS CardCraftAndFence.dll: CfThiefPatch -> StoreClientList.CreateThief
+PASS CardCraftAndFence.dll: HarmonyPatch attributes checked (8)
+RESULT: PASS
+EXIT=0
+```
+
+**Probe-Patches**
+```text
+patched 8 method(s)
+  DirectoryMaster.Item
+  LockHelper.CreateLockerContainerTooltip
+  LockHelper.TryOpenLock
+  MachinePrinter.FinishPrinting
+  NetworkUpgrade.IsHiddenForRun
+  StoreClientList.CreateInventor
+  StoreClientList.CreateInventorStorage
+  StoreClientList.CreateThief
+RESULT: PASS
+EXIT=0
+```
+
+**Probe-Logic**
+```text
+[Scan] CardCraftAndFence.dll refused=False capabilities=[] findings=0 error=null
+PASS scan CardCraftAndFence.dll
+RESULT: PASS
+EXIT=0
+```
+
+**Scratch `python .scratch\p6highwayman\check.py`**
+```text
+sim BM30: 7.99% target 8% PASS
+sim BM60: 14.06% target 14% PASS
+sim BM85: 20.15% target 20% PASS
+sim BM150: 32.89% target 33% PASS
+passed: 88  failed: 0
+P6 HIGHWAYMAN CHECK: PASS
+EXIT=0
+```
+
+### 3) 仍待實機
+
+- 江洋大盜真的到訪、對話、買箱、開箱（T1／T2／T3 各 1）。
+- 同一天只 roll 一次／只出現 1 個 client；存檔重載不重複。
+- 前台塞滿時 `counter full, skipped` 且不重複 Destroy。
+- CMD 箱外觀（既有 0.7.7 染色）與新 client 的 shady sprite。
+- 未買 PRO／bm<30 的 skip log 各只印一次。
+
 ## 0.5.2 啟動 NRE 修正（實機回報）
 
 實機 0.5.1 的 log：
@@ -1001,7 +1076,8 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 - **CMD T2 EV 對帳**：0.7.2 重配權重後，200 樣本 `measured200=1285.55`、
   model 1295.50、誤差 **-0.77%**（spec 表同一個數字）。舊的 -7.37%／-1.64%
   是舊池／舊樣本，已作廢。
-- **CMD 箱來源**：T1／T2／T3 在江洋大盜（P6）之前沒有正常來源，先留著。
+- **CMD 箱來源**：0.8.0（P6 江洋大盜）起 T1／T2／T3 都有正常來源；
+  換卡（P5）仍只產 CMD T1。
 
 ## 下一步
 
@@ -1010,14 +1086,13 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 1. 0.6.2（博士住所 hook／小偷順序）已提交（`75d227f`，本機 commit、未 push）。
 2. **P5 0.7.0 已提交 `66266cf`；0.7.1 已提交 `81c2d08`；0.7.2 已提交
    `801a5b0`；0.7.7 已提交 `3e1c4fa`；0.7.8（P5-02／03／04／05／13／14）
-   已提交 `7f10b7c`、未 push**；工作區只剩本輪開始前就存在的
-   `ACCEPTANCE_REVIEW.md`／`DEVELOPER_DIAGNOSTIC.md` 修改（非本輪）。
-3. 人類實機重測 **0.7.8**：P5-01 容量三箱（T3 SEC ×5、T3 CMD ×5、
-   T2 CMD ×3，件數 = rolls+1、無 overflow）、**P5-04 T3 MED／ENG／SER
-   各 3 箱**、P5-06 芯片、P5-07 促銷 UI；再跑 P4 修訂、CMD 貼圖與其餘驗收卡，收集 `[CF-NET]`／
-   `[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`／
-   `[CF-SAWYER]`／`[CF-PAPER]`，並補 T3 in-game `[CF-EV]`。
-4. **江洋大盜（P6）**：補 CMD 箱的正常來源（P5 的換卡已先給 CMD T1 一個來源）。
+   已提交 `7f10b7c`；0.8.0（P6）與 docs 同一提交、未 push**；工作區只剩
+   本輪開始前就存在的 `ACCEPTANCE_REVIEW.md`／`DEVELOPER_DIAGNOSTIC.md`
+   修改（非本輪）。
+3. 人類實機已於 **2026-11-17** 驗收 P5：P5-01／04／06／07 通過、P5-08 通過；
+   P5-09／10 未測、P5-11／12 延後到 1.0。**不要再重跑 0.7.8 的 P5 卡。**
+4. **江洋大盜（P6）0.8.0 已實作、離線已驗**；實機卡見
+   `docs/NEXT_SESSION_HANDOFF.md` §4b（到訪／買箱／開箱、同日 roll、前台塞滿）。
 5. 其餘黑市內容；補 §3.1–3.11 全文與 `Resources.LoadAll` 實機清單。
 
 ## 禁區
@@ -1037,16 +1112,17 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
   貼圖）並改降冪分組；0.7.2 重算 T2/T3 容量（SEC T2 10×8、CMD T1 10×8、
   CMD T2 12×9、SEC T3 13×8、CMD T3 15×9）、`Fill` 改大件先放、smg/shotgun
   移出三張 common 池並重配權重、overflow 每箱一行；0.7.8 改 rare 先放＋
-  null-safe 排序／`rolled/spawned/expected/actual/dropped` 診斷**；`CfNetwork`
+  null-safe 排序／`rolled/spawned/expected/actual/dropped` 診斷**；0.8.0（P6）
+  新增 `CfHighwayman`（江洋大盜、每日黑市聲望 roll、CMD T1/T2/T3 箱）；`CfNetwork`
   由 4 個升級變 7 個；`CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables`
   擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.7.8）
+- `src/CardCraftAndFence/manifest.xml`（0.8.0）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、**§3.9 P5**、
-  §3.10、§3.11、§3.12）
+  §3.10、§3.11、§3.12、**§3.13 P6**）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、
   `tools/Probe-Logic.ps1`（本輪未改）
 - `.scratch/p3check/`、`.scratch/p4check/`、`.scratch/p4bcheck/`、
   `.scratch/p4t3loot/`、`.scratch/p5spritecheck/`、`.scratch/regcheck/`、
-  `.scratch/upgradecheck/`、**`.scratch/p5sawyer/check.py`**（scratch-only
-  離線核對，不進 MOD）
+  `.scratch/upgradecheck/`、**`.scratch/p5sawyer/check.py`**、
+  **`.scratch/p6highwayman/check.py`**（scratch-only 離線核對，不進 MOD）

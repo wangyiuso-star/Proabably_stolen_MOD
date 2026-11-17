@@ -1169,3 +1169,106 @@ CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期把來
   IL／字串核對，未進遊戲看過。
 - `ModLoader.Mods` 在 `OnEnable` 之後才 `Add`：本輪用 `OnModAssetsLoaded` 補註冊；
   這個時序在實機是否早於第一個 CMD 箱，未用 `Player.log` 驗。
+
+## §3.13 江洋大盜（P6，0.8.0）
+
+> 本節只寫「已寫進代碼、且已用離線檢查核對過」的規則；實機到訪、購買、開箱
+> 尚未驗，見 §3.13.6。
+
+### §3.13.1 客戶欄位
+
+- `identifier = "cf_highwayman"`；`displayName` 用
+  `LocHelper.GetLocalizedOrDefault("Client", "name_cf_highwayman", "江洋大盗")`。
+- `StoreClientFactionSetup.InitBlackMarket(client)`（`FACTION_BLACK_MARKET`＋
+  `BLACK_MARKET` tag）、`clientIntent = ClientIntent.SELL`、`nonShootable = true`、
+  `spriteName = SpriteDict.GetRandomShadySpriteName()`、
+  `acceptRetailMarkup = false`。
+- 對話兩行：`dialog_cf_highwayman_1`（黑市一箱封好的 CMD 物資、不拆不驗）、
+  `dialog_cf_highwayman_2`（不問來路、當場結帳）；`SetEndAction` 掛在**最後一行**，
+  執行 `Offer()`。
+- `AddBasicDialog()`、`CompleteClientCreation()`、
+  `ModHelper.SetClientSource(client, ModId)`，最後由呼叫端
+  `manager.AddClient(client)`。
+- **沒有新增 Harmony patch**（總數仍是 8）：只用既有的
+  `ModHook.OnGenerateCustomerVeryLate`；`OnEnable` 先 `-=` 再 `+=`，
+  `OnDisable` `-=`。
+
+### §3.13.2 每日 roll（黑市聲望）
+
+- 前置（缺一就跳過；同一原因 process 內只印一次 log）：
+  1. `manager`、`StoreStation.Instance`、`PlayerStore.Instance` 都不是 null；
+  2. `CF_FENCE_PRO` 已解鎖；
+  3. `StoreReputation.GetBMReputation() >= 30`；
+  4. `StoreStation.Instance.dayCounter > 0`。
+- 每天只 roll 一次：`RNG.GetRandomInt(1, 100) <= chance`；結果寫進存檔型
+  modData：`highwayman_roll_day`（預設 -1）、`highwayman_roll_ok`（0/1，預設 0）、
+  `highwayman_added_day`（預設 -1）。同一天重複 `GenerateClient` 只讀快取，
+  每天最多印一行 roll／cached。
+- roll 成功才加入 1 個 SELL client；`highwayman_added_day == day` 時不再加第二個。
+- **沒有** `day % N`、沒有固定星期、沒有補訪、沒有追趕（catch-up）。
+
+| 黑市聲望 | 每日機率 | 平均間隔（天） |
+|---:|---:|---:|
+| 30–59 | 8% | 12.5 |
+| 60–84 | 14% | 7.1 |
+| 85–149 | 20% | 5 |
+| >=150 | 33% | 3.03 |
+
+- `ChanceFor(int bm)` 的門檻固定為 `>=150 -> 33`、`>=85 -> 20`、`>=60 -> 14`、
+  其餘 `8`。機率是離線 10 萬日模擬（`check.py`）核對，不是實機統計。
+
+### §3.13.3 箱等級（到訪時重讀聲望）
+
+| tier | 條件（由上往下第一個成立） | id | 價格 |
+|---:|---|---|---:|
+| 3 | `CF_FENCE_PRO` + `bm>=30` + `CF_FENCE_T2` + `CF_FENCE_T3` + `bm>=85` | `cf_cmd_box_t3` | 500 |
+| 2 | `CF_FENCE_PRO` + `bm>=30` + `CF_FENCE_T2` | `cf_cmd_box_t2` | 350 |
+| 1 | `CF_FENCE_PRO` + `bm>=30` | `cf_cmd_box_t1` | 200 |
+
+- id 一律由 `ItemFactory.ContainerId(CardFamily.CMD, tier)` 取得，**不硬寫**；
+  價格／容量／loot 表完全不動（200／350／500，容量 10×8／12×9／15×9）。
+- 每次到訪**只給 1 箱**；不因聲望或任何加成增加數量。
+
+### §3.13.4 上架
+
+- 先 `GraphUtils.CanAccept(EmporiumEntry.Instance.frontInvinvElement, box)` 探測；
+  放不下就 `box.Destroy()`＋`counter full, skipped <id>`，不進後台、不進玩家背包。
+- 放得下才 `PlayerStore.Instance.TryAddDirectSellingItemToTable(
+  box, isOwend: false, isStolen: true)`；CMD 箱一律標 stolen。
+- `TryAddDirectSellingItemToTable` 回 `false` 時**不再 Destroy**（原版已銷毀），
+  只印 `added=false`。
+- 全程 try/catch：hook 例外印 `visit hook failed`、endAction 例外印
+  `offer failed`，都不讓例外外洩。
+
+### §3.13.5 診斷 log
+
+- `[CF-HIGHWAY] skip: CF_FENCE_PRO not unlocked`
+- `[CF-HIGHWAY] skip: bm=<n> < 30`
+- `[CF-HIGHWAY] roll day=<d> bm=<n> chance=<c> ok=<0|1>`
+- `[CF-HIGHWAY] roll cached day=<d> bm=<n> chance=<c> ok=<ok>`（每天最多一行）
+- `[CF-HIGHWAY] visit day=<d> tier=<1|2|3> id=<id> bm=<n>`
+- `[CF-HIGHWAY] no item for <id>`
+- `[CF-HIGHWAY] counter full, skipped <id>`
+- `[CF-HIGHWAY] box tier=<n> id=<id> added=<true|false>`
+- `[CF-HIGHWAY] visit hook failed: <Type>: <Message>`
+- `[CF-HIGHWAY] offer failed: <Type>: <Message>`
+- 以上都帶 `[CardCraftAndFence] ` 前綴。
+- 每日診斷**最多一行**：新 roll 當天先佔用 `roll-day-<d>` 這個 diag key，之後
+  同日重複 `GenerateClient` 不會再印 `roll cached`；換 process（存檔重載）後
+  `_diag` 清空，才會再印一次 `roll cached`。
+- `Offer()` 在到訪時重讀聲望；若已被降回 bm<30／PRO 失效，沿用上面兩條
+  `skip:` 格式，不新增別的格式。
+
+### §3.13.6 實機驗收（尚未跑）
+
+- 啟動：`Init ... v0.8.0`、`enabled v0.8.0`、Harmony 仍 8、無 `Init failed`。
+- `CF_FENCE_PRO` + bm>=30：log 出現 `[CF-HIGHWAY] roll …` 與
+  `[CF-HIGHWAY] visit … tier=1 id=cf_cmd_box_t1`，店裡出現「江洋大盜」；
+  買下後前台有 1 個 CMD T1 箱，開箱有 loot、有鎖、貼圖是深藍 CMD 箱。
+- `CF_FENCE_T2`：tier=2、`cf_cmd_box_t2`、價 350；`CF_FENCE_T3` + bm>=85：
+  tier=3、`cf_cmd_box_t3`、價 500。
+- 同一天重複 `GenerateClient`／存檔重載：只有一行 roll（或 cached），
+  只出現 1 個江洋大盜。
+- 前台塞滿：`counter full, skipped cf_cmd_box_*`，沒有例外、沒有重複 Destroy。
+- bm<30：`skip: bm=… < 30` 只印一次；未買 PRO 時
+  `skip: CF_FENCE_PRO not unlocked` 只印一次。

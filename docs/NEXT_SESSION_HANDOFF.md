@@ -6,25 +6,32 @@
 
 ## 0. 一句話現況
 
-- **P5 功能完成、離線驗收通過、實機 4 項待補**（P5-01／04／06／07）。
-- 版本 **0.7.8**（`76,288 bytes／EEBF0941…`），HEAD `89bd79e`，**未 push**。
-- 遊戲 `Mods` 目前還是 **0.7.7**（`75,776／592F866F…`）；要測 0.7.8 要先覆蓋並完全重開。
-- **P6 未開始**（0 行實作、0 commit）；不要在這輪開 P6，除非使用者明確改口。
+- **P5 功能完成、離線驗收通過、實機已於 2026-11-17 驗收**（P5-01／04／06／07
+  通過、P5-08 通過；P5-09／10 未測；P5-11／12 延後到 1.0）。
+- **P6 江洋大盜已實作、離線驗收通過、實機待跑**（0.8.0）。
+- 版本 **0.8.0**（`79,360 bytes／8E6238AF…`），HEAD `83197a6`（P6 提交前；
+  提交後看 `git log -1`），**未 push**。
+- 遊戲 `Mods` 目前還是 **0.7.7**（`75,776／592F866F…`）；要測 0.8.0 要先覆蓋並完全重開。
+- P6 0.8.0 與本文件同一提交（hash 見 `git log -1`；本文件不寫死自身 commit）。
 
 ## 1. Repo／產物
 
 | 項目 | 值 |
 |---|---|
-| HEAD | `89bd79e` Align P5 closure condition with P5-04 |
+| HEAD | `83197a6`（P6 提交前）；P6 提交後以 `git log -1` 為準 |
+| 0.8.0 實作 | P6 江洋大盜，與 docs 同一提交（hash 見 `git log -1`） |
 | 0.7.8 實作 | `7f10b7c`（+ `8256e40` STATUS） |
 | 0.7.7 | `3e1c4fa` |
 | 0.7.6–0.7.3 | `225f17b`／`c59107c`／`d13d49d`／`4fe6b3f` |
-| dist DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll`，76,288 bytes，SHA256 `EEBF0941E34F265C93E3505249986AF88900DD56FDE2955692CD079DCBB74358` |
+| dist DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll`，79,360 bytes，SHA256 `8E6238AFD611269E30DA2D199067DE9334112A2C3215B90B7B78EA6694B3650E` |
 | 已安裝 | `.../Probably Stolen/Mods/CardCraftAndFence`，0.7.7，75,776／`592F866F…` |
-| git status | 只剩 `docs/ACCEPTANCE_REVIEW.md`、`docs/DEVELOPER_DIAGNOSTIC.md` 兩個 11-02 的舊修改（非 P5） |
+| git status | P6 0.8.0 與 docs 同一提交；另有 `docs/ACCEPTANCE_REVIEW.md`、`docs/DEVELOPER_DIAGNOSTIC.md` 兩個 11-02 舊修改（未提交） |
 | push | 沒有，也不要 push |
 
 ## 2. P5 狀態矩陣（以此為準）
+
+> **2026-11-17 實機驗收**：P5-01／04／06／07、P5-08 已通過，P5-09／10 未測，
+> P5-11／12 延後到 1.0。以下保留原始矩陣作歷史；不要再重跑 0.7.8 的 P5 卡。
 
 **已實機通過**
 - 分組高→低：3 T3+1 T1 → T3、2 T1+3 T2 → T2、1 T1+2 T2 → T1（0.7.1 log）。
@@ -53,13 +60,15 @@
 
 ## 3. 接手第一步（照順序）
 
-1. 讀 `docs/P5_HANDOFF.md`（含 0.7.8 狀態欄）與 `docs/CARD_CRAFT_STATUS.md` 的「P5 0.7.8」段。
-2. 確認 `git log -1`、`dist` hash、`Mods` 版本；不要假設 0.7.8 已安裝。
-3. 若使用者要繼續：把 0.7.8 複製到 `Mods`、完全退出遊戲再開，跑上面 4 項（測試卡見 §4）。
-4. 四項過 → 更新 `STATUS`／`P5_HANDOFF`（P5 關閉），commit docs；再討論 P6。
-5. 四項不過 → 把 log 原文貼進新的 work item，不要為了過而改數字；P5 維持有條件通過。
+1. 讀 `docs/P5_HANDOFF.md` 與 `docs/CARD_CRAFT_STATUS.md` 的「P6 0.8.0」段。
+2. 確認 `git log -1`、`dist` hash、`Mods` 版本；不要假設 0.8.0 已安裝。
+3. P5 四項已於 2026-11-17 由驗收方通過，**不要重跑**；本輪只剩 P6 實機卡（§4b）。
+4. 把 `dist\CardCraftAndFence\*` 複製到 `Mods`，完全退出遊戲再開，跑 §4b。
+5. P6 不過 → 把 `Player.log` 原文貼進 work item，不要為了過而改數字或放寬 gate。
 
-## 4. 實機測試卡（0.7.8）
+## 4. 實機測試卡（0.7.8，歷史；P5 已於 2026-11-17 驗收）
+
+> 這一節保留 0.7.8 的 P5 卡作歷史，**不要重跑**；P6 卡見 §4b。
 
 安裝：
 - 完全退出遊戲 → 備份 `AppData\LocalLow\Questing Goose Studio\Probably Stolen\save_*.es3`、`SaveFile.es3`。
@@ -87,6 +96,45 @@ Select-String -Path "$env:USERPROFILE\AppData\LocalLow\Questing Goose Studio\Pro
   ForEach-Object { $_.Line }
 ```
 
+## 4b. P6 實機測試卡（0.8.0，人類跑；agent 不啟動遊戲）
+
+安裝：
+- 完全退出遊戲 → 備份 `AppData\LocalLow\Questing Goose Studio\Probably Stolen\save_*.es3`、`SaveFile.es3`。
+- 複製 `dist\CardCraftAndFence\*`（79,360／`8E6238AF…`）到
+  `...\Probably Stolen\Mods\CardCraftAndFence\`；重新核可。
+- 啟動 log 要有 `Init … v0.8.0`、`enabled v0.8.0`、`Harmony: 8`；沒有 `Init failed`。
+
+**A. chance 表（先驗這個）**
+- 用 F9 debug 或既有存檔把 BM 調到 30／60／85／150；**不要直接改存檔檔**。
+- 各睡 1–2 天，看每天最多一行（新的一天是 `roll`，同日重載是 `roll cached`）：
+  `[CF-HIGHWAY] roll day=… bm=30 chance=8 ok=…`、`60 → 14`、`85 → 20`、`150 → 33`。
+- 若 BM 到不了 150，先回報「設計前提不成立」，**不要自行降門檻**。
+
+**B. 到訪與箱（BM150＋Tier3）**
+- 睡到 `ok=1`（33% 下 10 天內至少一次；P(無)=0.67^10≈1.8%）。
+- log 要有 `[CF-HIGHWAY] visit … tier=3 id=cf_cmd_box_t3 bm=…` 與
+  `[CF-HIGHWAY] box … added=true`；店裡出現「江洋大盗」。
+- 買 T3 箱：8 件、上鎖、T3 卡可開、無 `overflow`。
+
+**C. 分級**
+- BM85＋Tier2（無 Tier3）→ `tier=2`、`cf_cmd_box_t2`、7 件、價 350。
+- BM85＋無 Tier2 → `tier=1`、`cf_cmd_box_t1`、9 件、價 200。
+
+**D. 櫃台塞滿**
+- 前台先擺滿（例：3 個 6×4 箱）→ log `[CF-HIGHWAY] counter full, skipped cf_cmd_box_*`；
+  箱子不在背包／後台，沒有 `?` 物品。
+
+**E. 同日重載**
+- 同一天存檔→重載：log 出現 `roll cached`，**不再加第二個 client／box**。
+
+**F. log 總檢查**
+- 沒有 `cf_` 的 `Could not find GameItem identifier`、沒有 `Init failed`、`Harmony: 8`。
+```powershell
+Select-String -Path "$env:USERPROFILE\AppData\LocalLow\Questing Goose Studio\Probably Stolen\Player.log" `
+  -Pattern 'v0\.8\.0|CF-HIGHWAY|CF-LOOT|overflow box=|Init failed|Harmony' |
+  ForEach-Object { $_.Line }
+```
+
 ## 5. 環境與工具（照這個跑）
 
 - 遊戲路徑：`C:\Program Files (x86)\Steam\steamapps\common\Probably Stolen`。
@@ -103,6 +151,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Probe-Logic.ps1
 python .scratch\p5sawyer\check.py        # 108/0
 python .scratch\p5loot\parse_code.py     # VALUE-FLOOR + CMD T2 -0.77
 python .scratch\review\ev_check.py       # 11 張表 EV（驗收方腳本）
+python .scratch\p6highwayman\check.py    # P6 88/0 + 10 萬日機率模擬
 ```
 - 沙箱：本 session 有時是 read-only；Build 要寫 `dist/`、Verify/Probe 要寫 `.tools/`，被擋就對同一條命令提權一次（workspace-write），不要改路徑繞過。
 - Mono 的 `internal call`／out-of-sync 警告是既有環境問題；看 `RESULT: PASS` 與 patch 清單。
@@ -124,17 +173,23 @@ python .scratch\review\ev_check.py       # 11 張表 EV（驗收方腳本）
 ## 7. 文件與已知不一致
 
 - `docs/P5_HANDOFF.md`：有「0.7.8 狀態」欄；關閉條件已含 P5-04（`89bd79e`）。
-- `docs/CARD_CRAFT_STATUS.md`：build 表 0.7.8／76,288／EEBF；Mods 行寫 0.7.7（目前正確，裝 0.7.8 後要改）。
+- `docs/CARD_CRAFT_STATUS.md`：build 表 0.8.0／79,360／`8E6238AF…`；Mods 行仍寫 0.7.7（0.8.0 待覆蓋）。
 - `docs/CARD_CRAFT_SPEC.md`：§3.3 容量數字 69／105／93、SEC T2 80<93 例外；§3.12.2 HSV 換色。
 - **兩個舊 docs**（`ACCEPTANCE_REVIEW.md`、`DEVELOPER_DIAGNOSTIC.md`）自 11-02 未提交，是 AppraisalAssistant 的舊帳，非 P5；要嘛 commit 要嘛 revert，不要一直掛 `git status`。
 - P5-14：CMD T2 統一 -0.77%（1285.55／1295.50）；舊 -7.37／-1.64 作廢。
 - P5-15（未列入交辦單）：`P5_HANDOFF.md` 的歷史表保留原始清單，狀態看「0.7.8 狀態」欄，不要把「離線已關」重做。
 
-## 8. P6（未開始）
+## 8. P6（江洋大盜，0.8.0 已實作／離線已驗／實機待跑）
 
-- P6 是「江洋大盜」＋CMD 箱的正常來源（T1/T2/T3）。目前 CMD T1 只有小偷 5% 賣 `cmd_keycard` → P5 換卡這條間接路徑；CMD T2/T3 仍無正常來源。
-- 沒有 P6 程式、沒有 commit；不要把它當成「補 bug」，是從零的新 client／內容。
-- 使用者已多次說「P6 不開」；除非他明確改口，不要把 P6 放進這輪。
+- P6 0.8.0 與 docs 同一提交（hash 見 `git log -1`）。
+- 新增黑市 client `cf_highwayman`（江洋大盜）：每日以黑市聲望 roll 一次
+  （30–59 8%、60–84 14%、85–149 20%、>=150 33%），成功才加 1 個 SELL client；
+  到訪只給 1 箱 CMD 物資箱：T1 需 `CF_FENCE_PRO` + bm>=30、T2 加
+  `CF_FENCE_T2`、T3 加 `CF_FENCE_T3` 且 bm>=85。CMD T1／T2／T3 因此有了正常來源。
+- 離線已驗：`python .scratch\p6highwayman\check.py` 88/0 PASS；Harmony 仍 8 個、
+  CMD 價格 200／350／500、容量與 loot 表不動；五個既有類別本體與 0.7.8 相同。
+- 實機待跑：到訪／購買／開箱（T1／T2／T3）、同日只 roll 一次、前台塞滿 skip、
+  bm<30 與未買 PRO 的 skip log。
 
 ## 9. 禁用
 

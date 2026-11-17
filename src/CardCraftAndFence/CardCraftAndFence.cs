@@ -18,7 +18,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.7.8";
+        internal const string ModVersion = "0.8.0";
 
         public void Init(ModManifest manifest)
         {
@@ -44,6 +44,8 @@ namespace DeepSpaceQoL
             // -= before += so a mod reload cannot subscribe the handler twice.
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
             ModHook.OnGenerateCustomerVeryLate += CfRetiredCardmaker.OnGenerateCustomerVeryLate;
+            ModHook.OnGenerateCustomerVeryLate -= CfHighwayman.OnGenerateCustomerVeryLate;
+            ModHook.OnGenerateCustomerVeryLate += CfHighwayman.OnGenerateCustomerVeryLate;
             ModHook.OnPlaceInventorInventoryItemEarly -= CfInventorStock.OnInventorCounter;
             ModHook.OnPlaceInventorInventoryItemEarly += CfInventorStock.OnInventorCounter;
             // Runs inside PlayerStore.EndNight, before HandleJanitorial: everything
@@ -69,6 +71,7 @@ namespace DeepSpaceQoL
         public void OnDisable()
         {
             ModHook.OnGenerateCustomerVeryLate -= CfRetiredCardmaker.OnGenerateCustomerVeryLate;
+            ModHook.OnGenerateCustomerVeryLate -= CfHighwayman.OnGenerateCustomerVeryLate;
             ModHook.OnPlaceInventorInventoryItemEarly -= CfInventorStock.OnInventorCounter;
             ModHook.OnHandlingNightlyServicesEarly -= CfSawyerExchange.OnHandlingNightlyServicesEarly;
             ModHook.OnGameLoadedLate -= CfNetwork.OnGameLoadedLate;
@@ -3325,6 +3328,234 @@ namespace DeepSpaceQoL
                 parts.Add("t3");
             }
             return string.Join(",", parts);
+        }
+
+        private static void Diag(string key, string message)
+        {
+            if (_diag.Add(key))
+            {
+                Log.Info(message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// P6 black-market "highwayman" client. Each day a single roll against
+    /// black-market reputation decides whether one SELL client visits; that
+    /// visit offers exactly one CMD supply crate on the front counter, so
+    /// cf_cmd_box_t1/t2/t3 finally have a normal in-game source. The tier is
+    /// re-read in the dialogue end action: T1 needs CF_FENCE_PRO and bm>=30,
+    /// T2 adds CF_FENCE_T2, T3 adds CF_FENCE_T3 and bm>=85. No Harmony patch:
+    /// the existing OnGenerateCustomerVeryLate hook does the whole job.
+    /// </summary>
+    internal static class CfHighwayman
+    {
+        internal const string ClientId = "cf_highwayman";
+
+        // Save-backed roll bookkeeping. roll_day/roll_ok make the daily roll
+        // sticky across repeated GenerateClient passes and save reloads;
+        // added_day stops a second client from being queued the same day.
+        private const string RollDayKey = "highwayman_roll_day";
+        private const string RollOkKey = "highwayman_roll_ok";
+        private const string AddedDayKey = "highwayman_added_day";
+
+        private static readonly HashSet<string> _diag = new HashSet<string>();
+
+        internal static void OnGenerateCustomerVeryLate(StoreClientManager manager)
+        {
+            // Runs inside StoreClientManager.GenerateClient for every customer.
+            // An exception would abort the rest of the generation pass, so it
+            // never escapes into the game.
+            try
+            {
+                TryAdd(manager);
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-HIGHWAY] visit hook failed: " + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        private static void TryAdd(StoreClientManager manager)
+        {
+            if (manager == null || StoreStation.Instance == null || PlayerStore.Instance == null)
+            {
+                // No run loaded (or the store singleton is between scenes): the
+                // roll bookkeeping lives in PlayerStore modData, so adding a
+                // client here would repeat on every generation pass.
+                return;
+            }
+            if (!CfNetwork.Unlocked(CfNetwork.Pro))
+            {
+                Diag("locked", "[CF-HIGHWAY] skip: CF_FENCE_PRO not unlocked");
+                return;
+            }
+            int bm = StoreReputation.GetBMReputation();
+            if (bm < 30)
+            {
+                Diag("bm", "[CF-HIGHWAY] skip: bm=" + bm + " < 30");
+                return;
+            }
+            int day = StoreStation.Instance.dayCounter;
+            if (day <= 0)
+            {
+                return;
+            }
+            int chance = ChanceFor(bm);
+            int rollDay = ModHelper.GetModDataInt(CardCraftAndFenceMod.ModId, RollDayKey, -1);
+            int ok;
+            if (rollDay != day)
+            {
+                // New day: roll once and persist the outcome before anything else.
+                ok = RNG.GetRandomInt(1, 100) <= chance ? 1 : 0;
+                ModHelper.SetModDataInt(CardCraftAndFenceMod.ModId, RollDayKey, day);
+                ModHelper.SetModDataInt(CardCraftAndFenceMod.ModId, RollOkKey, ok);
+                // Claim the per-day diag key here: the roll line is this day's
+                // one line, so later same-day passes (which read the cache)
+                // must not print a second "roll cached" line. A reload is a new
+                // process with an empty _diag, so it still logs cached once.
+                _diag.Add("roll-day-" + day);
+                Log.Info("[CF-HIGHWAY] roll day=" + day + " bm=" + bm
+                    + " chance=" + chance + " ok=" + ok);
+            }
+            else
+            {
+                // roll_day == day: reuse the cached result; the diag set keeps
+                // repeated GenerateClient passes the same day from spamming.
+                ok = ModHelper.GetModDataInt(CardCraftAndFenceMod.ModId, RollOkKey, 0);
+                Diag("roll-day-" + day, "[CF-HIGHWAY] roll cached day=" + day
+                    + " bm=" + bm + " chance=" + chance + " ok=" + ok);
+            }
+            if (ok == 0)
+            {
+                return;
+            }
+            int addedDay = ModHelper.GetModDataInt(CardCraftAndFenceMod.ModId, AddedDayKey, -1);
+            if (addedDay == day)
+            {
+                return;
+            }
+            manager.AddClient(BuildClient());
+            ModHelper.SetModDataInt(CardCraftAndFenceMod.ModId, AddedDayKey, day);
+        }
+
+        private static StoreClient BuildClient()
+        {
+            StoreClient client = new StoreClient();
+            client.identifier = ClientId;
+            client.displayName = LocHelper.GetLocalizedOrDefault(
+                "Client", "name_cf_highwayman", "江洋大盗");
+            StoreClientFactionSetup.InitBlackMarket(client);
+            client.clientIntent = StoreClient.ClientIntent.SELL;
+            client.nonShootable = true;
+            client.spriteName = SpriteDict.GetRandomShadySpriteName();
+            client.acceptRetailMarkup = false;
+            client.mainDialogue
+                .SetText(client.displayName, LocHelper.GetLocalizedOrDefault(
+                    "Dialogue",
+                    "dialog_cf_highwayman_1",
+                    "「黑市的路子，一箱封好的指挥物资，不拆不验。」"))
+                .NextDialogue()
+                .SetText(client.displayName, LocHelper.GetLocalizedOrDefault(
+                    "Dialogue",
+                    "dialog_cf_highwayman_2",
+                    "「别问来路，当场结账，箱子归你。」"))
+                .SetEndAction(delegate
+                {
+                    // The game calls endAction when the dialogue ends; keep the
+                    // offer isolated so a failure cannot break the conversation.
+                    try
+                    {
+                        Offer();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error("[CF-HIGHWAY] offer failed: " + e.GetType().Name + ": " + e.Message);
+                    }
+                });
+            client.AddBasicDialog();
+            client.CompleteClientCreation();
+            ModHelper.SetClientSource(client, CardCraftAndFenceMod.ModId);
+            return client;
+        }
+
+        // Four-tier daily chance: bm 30-59 8%, 60-84 14%, 85-149 20%, >=150 33%.
+        private static int ChanceFor(int bm)
+        {
+            if (bm >= 150)
+            {
+                return 33;
+            }
+            if (bm >= 85)
+            {
+                return 20;
+            }
+            if (bm >= 60)
+            {
+                return 14;
+            }
+            return 8;
+        }
+
+        private static void Offer()
+        {
+            // Re-read reputation at visit time: it can change between the daily
+            // roll and the dialogue actually being opened.
+            int bm = StoreReputation.GetBMReputation();
+            int tier;
+            if (CfNetwork.Unlocked(CfNetwork.Pro) && bm >= 30
+                && CfNetwork.Unlocked(CfNetwork.Tier2)
+                && CfNetwork.Unlocked(CfNetwork.Tier3) && bm >= 85)
+            {
+                tier = 3;
+            }
+            else if (CfNetwork.Unlocked(CfNetwork.Pro) && bm >= 30
+                && CfNetwork.Unlocked(CfNetwork.Tier2))
+            {
+                tier = 2;
+            }
+            else if (CfNetwork.Unlocked(CfNetwork.Pro) && bm >= 30)
+            {
+                tier = 1;
+            }
+            else
+            {
+                // Reputation can change between the roll and the visit, so tell
+                // the two specified skip reasons apart instead of inventing a
+                // new log format here.
+                if (!CfNetwork.Unlocked(CfNetwork.Pro))
+                {
+                    Diag("locked", "[CF-HIGHWAY] skip: CF_FENCE_PRO not unlocked");
+                }
+                else
+                {
+                    Diag("bm", "[CF-HIGHWAY] skip: bm=" + bm + " < 30");
+                }
+                return;
+            }
+            int day = StoreStation.Instance.dayCounter;
+            string id = ItemFactory.ContainerId(CardFamily.CMD, tier);
+            GameItem box = DirectoryMaster.Item(id);
+            if (box == null)
+            {
+                Log.Warn("[CF-HIGHWAY] no item for " + id);
+                return;
+            }
+            Log.Info("[CF-HIGHWAY] visit day=" + day + " tier=" + tier
+                + " id=" + id + " bm=" + bm);
+            // Probe first: TryAddDirectSellingItemToTable destroys the box if the
+            // front counter rejects it, and a 6x4 crate needs six consecutive
+            // free columns on the vanilla 18x4 counter.
+            if (!GraphUtils.CanAccept(EmporiumEntry.Instance.frontInvinvElement, box))
+            {
+                box.Destroy();
+                Log.Info("[CF-HIGHWAY] counter full, skipped " + id);
+                return;
+            }
+            bool added = PlayerStore.Instance.TryAddDirectSellingItemToTable(
+                box, isOwend: false, isStolen: true);
+            Log.Info("[CF-HIGHWAY] box tier=" + tier + " id=" + id + " added=" + added);
+            // Do not Destroy() again when added == false: the store already does.
         }
 
         private static void Diag(string key, string message)
