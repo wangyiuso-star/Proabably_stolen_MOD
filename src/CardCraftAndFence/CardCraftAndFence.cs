@@ -13,12 +13,14 @@ namespace DeepSpaceQoL
     /// graded-box offer, the four Wild Network "CardFence" upgrades that gate
     /// those channels, and the T3 crates. P5: Sawyer's nightly card/box and
     /// core exchange in the storefront trash, its permanent-channel upgrade,
-    /// and the paper card catalogue.
+    /// and the paper card catalogue. P6: the highwayman's daily black-market
+    /// CMD box client. P7: laundry — box heat inheritance on open, doubled
+    /// nightly stolen-heat decay, and clean purchases.
     /// </summary>
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.8.0";
+        internal const string ModVersion = "0.9.0";
 
         public void Init(ModManifest manifest)
         {
@@ -52,6 +54,10 @@ namespace DeepSpaceQoL
             // Sawyer consumes is still in the trashcan at that point.
             ModHook.OnHandlingNightlyServicesEarly -= CfSawyerExchange.OnHandlingNightlyServicesEarly;
             ModHook.OnHandlingNightlyServicesEarly += CfSawyerExchange.OnHandlingNightlyServicesEarly;
+            // P7: fires before the vanilla StolenHelper.UpdateStolenItem loop, so
+            // the extra pass there is what doubles the nightly heat decay.
+            ModHook.OnHandlingNightlyServicesLate -= CfLaundry.OnHandlingNightlyServicesLate;
+            ModHook.OnHandlingNightlyServicesLate += CfLaundry.OnHandlingNightlyServicesLate;
             ModHook.OnGameLoadedLate -= CfNetwork.OnGameLoadedLate;
             ModHook.OnGameLoadedLate += CfNetwork.OnGameLoadedLate;
             ModHook.OnNewGameStarted -= CfNetwork.OnNewGameStarted;
@@ -74,6 +80,7 @@ namespace DeepSpaceQoL
             ModHook.OnGenerateCustomerVeryLate -= CfHighwayman.OnGenerateCustomerVeryLate;
             ModHook.OnPlaceInventorInventoryItemEarly -= CfInventorStock.OnInventorCounter;
             ModHook.OnHandlingNightlyServicesEarly -= CfSawyerExchange.OnHandlingNightlyServicesEarly;
+            ModHook.OnHandlingNightlyServicesLate -= CfLaundry.OnHandlingNightlyServicesLate;
             ModHook.OnGameLoadedLate -= CfNetwork.OnGameLoadedLate;
             ModHook.OnNewGameStarted -= CfNetwork.OnNewGameStarted;
             ModHook.OnGameLoadedLate -= CfCmdBoxSprite.OnGameLoadedLate;
@@ -144,6 +151,34 @@ namespace DeepSpaceQoL
                     // item is still SUPPLY_CRATE. Drop that type first so the
                     // vanilla swap is skipped, then apply cmd_box_u ourselves.
                     box.RemoveGameItemType("SUPPLY_CRATE");
+                }
+                // P7-1: a stolen box that is being opened hands its own heat to
+                // everything inside it, then the now-empty box is cleaned so the
+                // shell itself can never be reported. Sawyer crates are produced
+                // clean (no STOLEN_TAG), so a fresh box never enters this branch.
+                if (box.IsTag("STOLEN_TAG"))
+                {
+                    int boxHeat = StolenHelper.GetFoundChance(box);
+                    int children = 0;
+                    if (boxHeat > 0)
+                    {
+                        foreach (GameItem child in GraphUtils.FindAllChildrenType<GameItem>(box))
+                        {
+                            if (child == null)
+                            {
+                                continue;
+                            }
+                            children++;
+                            int childHeat = child.IsTag("STOLEN_TAG")
+                                ? StolenHelper.GetFoundChance(child)
+                                : 0;
+                            StolenHelper.SetHeat(child, Math.Max(childHeat, boxHeat));
+                        }
+                    }
+                    StolenHelper.RemoveStolenStatus(box);
+                    Log.Info("[CF-LAUNDRY] open box=" + box.identifier
+                        + " heat=" + boxHeat
+                        + " children=" + children);
                 }
                 LockHelper.UnlockContainer(box);
                 if (crateFamily == CardFamily.CMD)
@@ -1710,6 +1745,12 @@ namespace DeepSpaceQoL
         internal const string SawyerBatch = "CF_SAWYER_BATCH";
         internal const string SawyerChip = "CF_SAWYER_CHIP";
 
+        // P7 laundry chain. Both sit in the same CardFence tab: P6 already used
+        // 792 of the 1060 px budget, a fourth tab would be exactly 1060 px wide
+        // with no margin.
+        internal const string LaundryFast = "CF_LAUNDRY_FAST";
+        internal const string LaundryClean = "CF_LAUNDRY_CLEAN";
+
         internal const int ProCost = 1500;
         internal const int Tier2Cost = 1200;
         internal const int Tier3Cost = 3000;
@@ -1717,6 +1758,8 @@ namespace DeepSpaceQoL
         internal const int SawyerPermanentCost = 400;
         internal const int SawyerBatchCost = 700;
         internal const int SawyerChipCost = 900;
+        internal const int LaundryFastCost = 1200;
+        internal const int LaundryCleanCost = 3000;
 
         internal static void EnsureTabLabel()
         {
@@ -1781,8 +1824,17 @@ namespace DeepSpaceQoL
                 new[] { SawyerPermanent },
                 null) ? 1 : 0;
 
-            Log.Info("[CF-NET] registered " + ok + "/7 CardFence upgrades tab=CardFence width=792/1060");
-            if (ok == 7)
+            ok += Add(LaundryFast, LaundryFastCost, "洗白", "快速洗白",
+                "每晚赃物热度的自然衰减翻倍（由 18 提升到 36）。对所有带赃物标记的物品生效，箱子里的东西也算在内。",
+                null,
+                null) ? 1 : 0;
+            ok += Add(LaundryClean, LaundryCleanCost, "洗白", "彻底洗白",
+                "从今往后买进的物品直接干净入库：物品本身与它开箱后得到的子物品，赃物热度一律清零。只影响今后的购买，已有赃物照常每晚衰减。",
+                new[] { LaundryFast },
+                null) ? 1 : 0;
+
+            Log.Info("[CF-NET] registered " + ok + "/9 CardFence upgrades tab=CardFence width=792/1060");
+            if (ok == 9)
             {
                 Log.Info("[CF-NET] hide CF_SAWYER_* until the exchange is unlocked");
             }
@@ -1901,6 +1953,111 @@ namespace DeepSpaceQoL
                     + e.GetType().Name + ": " + e.Message);
                 return false;
             }
+        }
+    }
+
+    /// <summary>
+    /// P7 laundry, passive half. ModHook.OnHandlingNightlyServicesLate fires from
+    /// PlayerStore.EndNight at PlayerStore.cs:1744, *before* the vanilla
+    /// StolenHelper.UpdateStolenItem loop at 1757. One extra UpdateStolenItem per
+    /// stolen item here therefore makes the vanilla pass decay 36 instead of 18
+    /// (16/14/12/10 for CONTRABAND_LEVEL_LOW/MID/HIGH/CRITICAL, which both passes
+    /// subtract). No patch: the hook is already exposed, and the extra call has
+    /// to happen before vanilla's own.
+    /// laundry_last_day keeps a second EndNight on the same dayCounter from
+    /// decaying twice.
+    /// </summary>
+    internal static class CfLaundry
+    {
+        private const string LastDayKey = "laundry_last_day";
+
+        // EndNight must never be interrupted, so nothing throws out of here.
+        internal static void OnHandlingNightlyServicesLate()
+        {
+            try
+            {
+                RunNight();
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-LAUNDRY] night handler failed: " + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        private static void RunNight()
+        {
+            if (!CfNetwork.Unlocked(CfNetwork.LaundryFast))
+            {
+                return;
+            }
+            PlayerStore store = PlayerStore.Instance;
+            if (store == null || StoreStation.Instance == null)
+            {
+                return;
+            }
+            int day = StoreStation.Instance.dayCounter;
+            if (day <= 0)
+            {
+                return;
+            }
+            // PlayerStore.ModData survives a save/load; without this guard a
+            // reload on the same day would decay the heat a second time.
+            if (ModHelper.GetModDataInt(CardCraftAndFenceMod.ModId, LastDayKey, -1) == day)
+            {
+                return;
+            }
+            int n = 0;
+            foreach (GameItem item in store.FindAllItem())
+            {
+                // UpdateStolenItem is a no-op on clean items, but calling it only
+                // for stolen ones keeps the count honest and the log meaningful.
+                if (item == null || !StolenHelper.IsStolenItem(item))
+                {
+                    continue;
+                }
+                StolenHelper.UpdateStolenItem(item);
+                n++;
+            }
+            ModHelper.SetModDataInt(CardCraftAndFenceMod.ModId, LastDayKey, day);
+            Log.Info("[CF-LAUNDRY] night day=" + day + " items=" + n);
+        }
+    }
+
+    /// <summary>
+    /// P7 laundry, purchase half. PlayerStore.BuyItem(item) is the common path:
+    /// BuyItemFromTable and NegociationUIManager.BuyMultipleItem both end up
+    /// there, so one postfix covers table buys and multi-buys. The purchase has
+    /// already gone through by then, so the bundle's children can be walked.
+    /// </summary>
+    [HarmonyPatch(typeof(PlayerStore), nameof(PlayerStore.BuyItem))]
+    internal static class CfLaundryBuyPatch
+    {
+        private static void Postfix(GameItem item)
+        {
+            if (!CfNetwork.Unlocked(CfNetwork.LaundryClean) || item == null)
+            {
+                return;
+            }
+            bool changed = StolenHelper.IsStolenItem(item);
+            StolenHelper.RemoveStolenStatus(item);
+            int n = 0;
+            foreach (GameItem child in GraphUtils.FindAllChildrenType<GameItem>(item))
+            {
+                if (child == null)
+                {
+                    continue;
+                }
+                if (StolenHelper.IsStolenItem(child))
+                {
+                    n++;
+                }
+                StolenHelper.RemoveStolenStatus(child);
+            }
+            if (!changed && n == 0)
+            {
+                return;
+            }
+            Log.Info("[CF-LAUNDRY] bought clean id=" + item.identifier + " children=" + n);
         }
     }
 
