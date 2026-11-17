@@ -6,29 +6,32 @@
 
 ## 0. 一句話現況
 
-- **P7 0.9.0 已實作、離線驗收通過、實機尚未跑**（箱子繼承＋兩級洗白）。
-- 版本 **0.9.0**（`81,408 bytes／672BB474…`）；dist 已建好；**未 push**。
-- 遊戲 `Mods` 目前仍是 **0.8.0**（`79,360／8E6238AF…`）；要測 0.9.0 要先覆蓋
+- **P8 0.10.0 已實作、離線驗收通過、實機尚未跑**（9 個升級 normal base、小偷
+  賣卡、製卡匠 3 同家族核心）。
+- **P7 0.9.0 A–F 仍待跑**；P7 洗白行為沒有被 P8 改動，排在 P8 之後。
+- 版本 **0.10.0**（`82,432 bytes／FCECBE0A…`）；dist 已建好；**未 push**。
+- 遊戲 `Mods` 目前仍是 **0.8.0**（`79,360／8E6238AF…`）；要測 0.10.0 要先覆蓋
   dist、完全重開並重新核可。
-- **P6 實機現況**：核心觸發／T3 箱已通過實機；6／8 件數未核實（非阻塞）；
+- **P6 實機現況不變**：核心觸發／T3 箱已通過實機；6／8 件數未核實（非阻塞）；
   T1／T2／低機率／櫃台塞滿／同日重載未測。
 - **P5 已關閉**（P5-01／04／06／07、P5-08 於 2026-11-17 通過；P5-09／10 未測；
   P5-11／12 延後到 1.0）。
-- P7 code commit `9d4b307`；docs 另 commit。
+- P8 code commit `c29ccce`（docs 另 commit）；P7 code commit `9d4b307`。
 
 ## 1. Repo／產物
 
 | 項目 | 值 |
 |---|---|
-| HEAD | P7 docs commit 後以 `git log -1` 為準；P7 code commit `9d4b307` |
+| HEAD | P8 docs commit 後以 `git log -1` 為準；P8 code commit `c29ccce` |
+| 0.10.0 實作 | `c29ccce`（code；docs 另 commit） |
 | 0.9.0 實作 | `9d4b307`（code；docs 另 commit） |
 | 0.8.0 實作 | `479c270`（P6 江洋大盜，含 docs） |
 | 0.7.8 實作 | `7f10b7c`（+ `8256e40` STATUS） |
 | 0.7.7 | `3e1c4fa` |
 | 0.7.6–0.7.3 | `225f17b`／`c59107c`／`d13d49d`／`4fe6b3f` |
-| dist DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll`，81,408 bytes，SHA256 `672BB474B90EC59B3A6E92CF834D4D25639D3E972602235F46B24128F9BB20CD` |
-| 已安裝 | `.../Probably Stolen/Mods/CardCraftAndFence`，**0.9.0 待覆蓋**；目前仍是 0.8.0，79,360／`8E6238AF…` |
-| git status | P7 code `9d4b307` 與 docs 已提交；工作區只剩 `docs/ACCEPTANCE_REVIEW.md`、`docs/DEVELOPER_DIAGNOSTIC.md` 兩個 11-02 舊修改（未提交） |
+| dist DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll`，82,432 bytes，SHA256 `FCECBE0A5B6FAA85ABFAE54699560FB5BEB5F193D3E3AB287EBE18833C58EB7E` |
+| 已安裝 | `.../Probably Stolen/Mods/CardCraftAndFence`，**0.10.0 待覆蓋**；目前仍是 0.8.0，79,360／`8E6238AF…` |
+| git status | P8 code `c29ccce` 與 docs 已提交；工作區只剩 `docs/ACCEPTANCE_REVIEW.md`、`docs/DEVELOPER_DIAGNOSTIC.md` 兩個 11-02 舊修改（未提交） |
 | push | 沒有，也不要 push |
 
 ## 2. P5 狀態矩陣（以此為準）
@@ -63,14 +66,15 @@
 
 ## 3. 接手第一步（照順序）
 
-1. 讀 `docs/P5_HANDOFF.md` 與 `docs/CARD_CRAFT_STATUS.md` 的「P7 0.9.0」段。
-2. 確認 `git log -1`、`dist` hash、`Mods` 版本；不要假設 0.9.0 已安裝。
-3. 把 `dist\CardCraftAndFence\*`（81,408／`672BB474…`）複製到 `Mods`，
+1. 讀 `docs/P5_HANDOFF.md` 與 `docs/CARD_CRAFT_STATUS.md` 的「P8 0.10.0」段。
+2. 確認 `git log -1`、`dist` hash、`Mods` 版本；不要假設 0.10.0 已安裝。
+3. 把 `dist\CardCraftAndFence\*`（82,432／`FCECBE0A…`）複製到 `Mods`，
    完全退出遊戲再開、重新核可。
-4. 啟動 log 應有 `Init … v0.9.0`、`enabled v0.9.0`、
+4. 啟動 log 應有 `Init … v0.10.0`、`enabled v0.10.0`、
    `[CF-NET] registered 9/9`、`Harmony: 9`；沒有 `Init failed`。
-5. 接著跑 §4c 的 A–F；P7 不過 → 把 `Player.log` 原文貼進 work item，
+5. 接著跑 §4d 的 A–F；P8 不過 → 把 `Player.log` 原文貼進 work item，
    不要為了過而改數字或放寬 gate。
+6. P8 之後再跑 §4c 的 P7 A–F（P7 洗白行為未被 P8 改動）。
 
 ## 4. 實機測試卡（0.7.8，歷史；P5 已於 2026-11-17 驗收）
 
@@ -199,6 +203,52 @@ Select-String -Path "$env:USERPROFILE\AppData\LocalLow\Questing Goose Studio\Pro
   ForEach-Object { $_.Line }
 ```
 
+## 4d. P8 實機測試卡（0.10.0，人類跑；agent 不啟動遊戲）
+
+安裝：
+- 完全退出遊戲 → 備份 `AppData\LocalLow\Questing Goose Studio\Probably Stolen\save_*.es3`、`SaveFile.es3`。
+- 複製 `dist\CardCraftAndFence\*`（82,432／`FCECBE0A…`）到
+  `...\Probably Stolen\Mods\CardCraftAndFence\`；重新核可。
+- 啟動 log 要有 `Init … v0.10.0`、`enabled v0.10.0`、
+  `[CF-NET] registered 9/9`、`Harmony: 9`；沒有 `Init failed`。
+
+**A. 價格 base／hard**
+- normal 難度 9 個升級：350／350／900／500／400／500／700／350／1800
+  （PRO／T2／T3／THIEF_T2／PERMANENT／BATCH／CHIP／FAST／CLEAN）。
+- hard 難度：700／700／1800／1000／800／1000／1400／700／3600（同順序）。
+- MOD 不應另外加價或打折；hard 的 ×2 由遊戲自己算。
+
+**B. 小偷 T2 卡＋箱（bm 60）**
+- T2 卡先上架，再上 T2 箱：log 依序
+  `[CF-THIEF] card family=<F> tier=2 id=… price=… added=true`、
+  `[CF-THIEF] box family=<F> tier=2 …`。
+- 卡價 = `CardPrice × 1.5`（SEC 225、MED／ENG 165、SER 90）；高價卡不應被箱
+  或原版商品擠掉。用那張卡開同家族 T2 箱。
+
+**C. 小偷 T3 卡＋箱（bm 85＋`CF_FENCE_T3`）**
+- log 順序是 T3 卡 → T2 卡 → 箱；三件都應在 18×4 櫃台上。
+- T3 卡 338（SEC）／248（MED／ENG）／135（SER）；T2 卡 225／165／165／90。
+- 箱子仍只有 1 個。
+
+**D. 製卡匠核心**
+- 到訪時櫃台先出現 **3 顆同家族、最高已解鎖等級**的核心（同一天 3 顆）。
+- log 不應有 `[CF-STOCK] counter full, skipped <core id>`（核心先上架）。
+- 已買 `CF_SAWYER_CHIP` 時，3 顆同級核心可換 1 顆下一級（索耶，隔夜）。
+
+**E. 存讀檔**
+- 買卡／買升級後存檔→重載：升級仍已買；卡與箱的 `unitValue`、`STOLEN_TAG`
+  保持一致。
+- P7 的 A–F（§4c）另外照舊跑一輪，不要因為 P8 跳過。
+
+**F. log 總檢查**
+- 沒有 `cf_` 的 `Could not find GameItem identifier` dummy、沒有 `Init failed`、
+  `Harmony: 9`、`registered 9/9`。
+```powershell
+Select-String -Path "$env:USERPROFILE\AppData\LocalLow\Questing Goose Studio\Probably Stolen\Player.log" `
+  -Pattern 'v0\.10\.0|CF-THIEF card|CF-STOCK|registered 9/9|Harmony' |
+  ForEach-Object { $_.Line }
+```
+
 ## 5. 環境與工具（照這個跑）
 
 - 遊戲路徑：`C:\Program Files (x86)\Steam\steamapps\common\Probably Stolen`。
@@ -217,6 +267,7 @@ python .scratch\p5loot\parse_code.py     # VALUE-FLOOR + CMD T2 -0.77
 python .scratch\review\ev_check.py       # 11 張表 EV（驗收方腳本）
 python .scratch\p6highwayman\check.py    # P6 88/0 + 10 萬日機率模擬
 python .scratch\p7laundry\check.py       # P7 107/0
+python .scratch\p8balance\check.py       # P8 111/0（0.10.0 價格／小偷卡／核心順序）
 ```
 - 沙箱：本 session 有時是 read-only；Build 要寫 `dist/`、Verify/Probe 要寫 `.tools/`，被擋就對同一條命令提權一次（workspace-write），不要改路徑繞過。
 - Mono 的 `internal call`／out-of-sync 警告是既有環境問題；看 `RESULT: PASS` 與 patch 清單。
@@ -238,10 +289,11 @@ python .scratch\p7laundry\check.py       # P7 107/0
 ## 7. 文件與已知不一致
 
 - `docs/P5_HANDOFF.md`：有「0.7.8 狀態」欄；關閉條件已含 P5-04（`89bd79e`）。
-- `docs/CARD_CRAFT_STATUS.md`：build 表 0.9.0／81,408／`672BB474…`；Mods 行仍是
-  0.8.0（0.9.0 待覆蓋）。
+- `docs/CARD_CRAFT_STATUS.md`：build 表 0.10.0／82,432／`FCECBE0A…`；Mods 行仍是
+  0.8.0（0.10.0 待覆蓋）。
 - `docs/CARD_CRAFT_SPEC.md`：§3.3 容量數字 69／105／93、SEC T2 80<93 例外；
-  §3.12.2 HSV 換色；**§3.14 P7**（開箱繼承＋兩級洗白）。
+  §3.12.2 HSV 換色；**§3.14 P7**（開箱繼承＋兩級洗白；其 §3.14.6 的輸出是
+  P7 當下 0.9.0）；**§3.15 P8**（9 個 base 價、小偷卡、核心順序）。
 - **兩個舊 docs**（`ACCEPTANCE_REVIEW.md`、`DEVELOPER_DIAGNOSTIC.md`）自 11-02 未提交，是 AppraisalAssistant 的舊帳，非 P5；要嘛 commit 要嘛 revert，不要一直掛 `git status`。
 - P5-14：CMD T2 統一 -0.77%（1285.55／1295.50）；舊 -7.37／-1.64 作廢。
 - P5-15（未列入交辦單）：`P5_HANDOFF.md` 的歷史表保留原始清單，狀態看「0.7.8 狀態」欄，不要把「離線已關」重做。
@@ -267,7 +319,7 @@ python .scratch\p7laundry\check.py       # P7 107/0
 ## 8b. P7（贓物熱度，0.9.0 已實作／離線已驗／實機待跑）
 
 - 0.9.0；`ModVersion` 與 manifest 都已改 0.9.0；`dist` 81,408 bytes
-  （`672BB474…`）。
+  （`672BB474…`）。（P8 起是 0.10.0／82,432／`FCECBE0A…`，見 §8c。）
 - P7-1：`CfTryOpenLockPatch.Prefix` 在 `canOpen` 內、`UnlockContainer` 之前，
   只對有 `STOLEN_TAG` 的 CF 箱，把 `boxHeat` 以 `Math.Max` 繼承給遞迴子物品，
   最後 `RemoveStolenStatus(box)`；P4 小偷 T2／T3 CF 箱／P6 CMD 箱（原版 T1
@@ -278,16 +330,45 @@ python .scratch\p7laundry\check.py       # P7 107/0
 - CLEAN：新 patch `CfLaundryBuyPatch`（`PlayerStore.BuyItem` postfix，8→9），
   購買後物品＋子物品 `RemoveStolenStatus`；只影響今後購買。
 - 兩個升級 `CF_LAUNDRY_FAST` 1200／`CF_LAUNDRY_CLEAN` 3000（前置 FAST），
-  subtitle `洗白`，註冊 `N/9`。
+  subtitle `洗白`，註冊 `N/9`。**P8（0.10.0）起 base 改成 350／1800
+  （hard 700／3600），行為不變**，見 §8c。
 - 離線已驗：Build exit 0（3 DLL）、Verify PASS（9 patches，含
   `CfLaundryBuyPatch -> PlayerStore.BuyItem`）、Probe PASS
   （實際 **8／4／9**；AppraisalAssistant 歷來 8 個、DLL 位元相同，不要改）、
   Logic PASS、`p7laundry/check.py` 107/0、`p6highwayman/check.py` 88/0
-  （標題仍印 0.8.0，美觀問題）。
+  （標題 P8 起改印 0.10.0）。
 - 實機待跑：§4c A–F（開箱繼承／FAST 64 vs 82／CLEAN 購買／未買升級與未開箱
   轉賣／9 卡 UI／存讀檔）。
 - 未核實：UI 9 卡版面與 overflow、存讀檔保留、runtime 熱度 100→64／82 都還沒
   在遊戲內看過。
+
+## 8c. P8（經濟平衡，0.10.0 已實作／離線已驗／實機待跑）
+
+- 0.10.0；`ModVersion` 與 manifest 都已改 0.10.0；`dist` 82,432 bytes
+  （`FCECBE0A5B6FAA85ABFAE54699560FB5BEB5F193D3E3AB287EBE18833C58EB7E`）。
+- **價格**：`CfNetwork` 只改 9 個 base 常數：PRO 350、T2 350、T3 900、
+  THIEF_T2 500、PERMANENT 400、BATCH 500、CHIP 700、FAST 350、CLEAN 1800；
+  hard 由遊戲自動 ×2（700／700／1800／1000／800／1000／1400／700／3600）。
+  沒有難度 API、沒有預先加倍；沒有改原版箱／卡／核價。
+- **小偷賣卡**：`CfThiefBoxes.Offer` 在建箱前 `OfferCards(family, tier)`；
+  T3 → T3 卡 → T2 卡 → 箱，T2 → T2 卡 → 箱。同家族（非 CMD）、
+  `price = (long)Math.Round(CardPrice * 1.5f)`、`isStolen:true`；
+  `CanAccept` 失敗 `Destroy()`＋`[CF-THIEF] card full, skipped <id>`；
+  `OfferCard` 包 try/catch，卡失敗不中止箱子；箱仍每次最多 1 個。
+- **製卡匠核心**：`AddMakerStock` 先上 3 顆**同家族**核心
+  （`HighestCoreTier()`、`start = ((day % 5) + 5) % 5`），再 printer／chip／
+  CNC／材料；無 chip／CNC 8 件、全補 10 件（上限 11），核心不會被 skip。
+- 沒有新 Harmony patch（仍 9）、沒有新物品／loot；P7 laundry 行為不動，
+  只有 FAST／CLEAN 價格改 350／1800。
+- 離線已驗：Build exit 0（3 DLL）、Verify PASS（9 patches，沒有新 patch，
+  清單同 0.9.0）、Probe PASS（實際 **8／4／9**；P8 交辦單本身也是 8／4／9）、
+  Logic PASS、`p8balance/check.py` 111/0、`p6highwayman/check.py` 88/0、
+  `p7laundry/check.py` 107/0（標題都已 0.10.0）。
+- P6／P7 檢查的最小更新：P7 價格期望改 350／1800、版本 0.10.0；兩支都只剝掉
+  P8 的 `OfferCards`／`OfferCard` 再比舊 `CfThiefBoxes`，通過數不變。
+- 實機待跑：§4d A–F（base／hard 價格、T2／T3 卡＋箱、3 核心、存讀檔、log 乾淨）。
+- 未核實：hard 實際顯示、卡在 18×4 的排版與優先順序、核心 skip 行為、1.5× 的
+  `.5` 進位顯示、存讀檔後 stolen 狀態、整體經濟曲線（沒有 runtime 模擬）。
 
 ## 9. 禁用
 
@@ -298,6 +379,7 @@ python .scratch\p7laundry\check.py       # P7 107/0
 
 ## 10. 如果要一句話回報
 
-> P7 0.9.0 已實作、離線驗證通過（107/0、Verify 9、Probe 8／4／9）、
-> 實機尚未跑；dist 81,408／`672BB474…`；Mods 仍 0.8.0（0.9.0 待覆蓋）；
-> P6 核心觸發／T3 箱已過實機、6／8 件數未核實、其餘未測；P5 已關閉；未 push。
+> P8 0.10.0 已實作、離線驗證通過（111/0、Verify 9、Probe 8／4／9）、
+> 實機尚未跑；dist 82,432／`FCECBE0A…`；Mods 仍 0.8.0（0.10.0 待覆蓋）；
+> P7 A–F 仍待跑；P6 狀態不變（核心觸發／T3 箱已過實機、6／8 件數未核實）；
+> P5 已關閉；未 push。

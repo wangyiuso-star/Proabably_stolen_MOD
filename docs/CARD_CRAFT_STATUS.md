@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-17（0.9.0：P7 贓物熱度，箱子繼承＋兩級洗白；實機尚未跑）
+更新時間：2026-11-17（0.10.0：P8 經濟平衡；P7 洗白與 P8 A–F 實機尚未跑）
 
 ## 階段
 
@@ -64,19 +64,27 @@
   `CF_LAUNDRY_FAST`（1200，每晚衰減 18→36）與 `CF_LAUNDRY_CLEAN`（3000，前置
   FAST，今後買進的物品與子物品熱度清零）。Harmony patch 8→9（新增
   `PlayerStore.BuyItem` postfix），升級 7→9；離線 `p7laundry/check.py`
-  107/0 PASS。實機尚未跑（見「P7 0.9.0」一節）。
+  107/0 PASS。實機尚未跑（見「P7 0.9.0」一節；**P8 起 FAST／CLEAN 價格改
+  350／1800，行為不變**）。
+- **P8：0.10.0 完成（離線）。** 9 個 `CF_*` 升級改成 normal base
+  （PRO 350／T2 350／T3 900／THIEF_T2 500／PERMANENT 400／BATCH 500／CHIP 700／
+  FAST 350／CLEAN 1800；hard 由遊戲自動 ×2）；小偷賣同家族卡（T3 箱
+  T3→T2 卡、T2 箱 T2 卡，1.5×、`isStolen`，卡先於箱）；製卡匠核心改成
+  「每天 3 顆同家族、最先上架」（`day % 5`、最高已解鎖等級）。Harmony 仍 9、
+  無新物品／loot；離線 `p8balance/check.py` 111/0 PASS；Patch 8／4／9。
+  **實機尚未跑**（見「P8 0.10.0 經濟平衡」一節）。
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.9.0 |
+| ModVersion | 0.10.0 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 81,408 bytes |
-| SHA256 | `672BB474B90EC59B3A6E92CF834D4D25639D3E972602235F46B24128F9BB20CD` |
-| Mods 安裝 | **0.9.0 待覆蓋**：本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區，目前 Mods 仍是 0.8.0）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
-| dist / Mods hash | dist 0.9.0 = **81,408 bytes／`672BB474…`**；Mods 仍是 0.8.0 的 **79,360 bytes／`8E6238AF…`**（必須先覆蓋才能測 0.9.0） |
-| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）、`4fe6b3f`（0.7.3）、`d13d49d`（0.7.4）、`c59107c`（0.7.5）、`225f17b`（0.7.6）、`3e1c4fa`（0.7.7）、`7f10b7c`（0.7.8）；0.8.0（P6）實作 `479c270`（含 docs）；0.9.0（P7）實作 `9d4b307`（code；docs 另 commit）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| 大小 | 82,432 bytes |
+| SHA256 | `FCECBE0A5B6FAA85ABFAE54699560FB5BEB5F193D3E3AB287EBE18833C58EB7E` |
+| Mods 安裝 | **0.10.0 待覆蓋**：本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區，目前 Mods 仍是 **0.8.0：79,360 bytes／`8E6238AF…`**）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
+| dist / Mods hash | dist 0.10.0 = **82,432 bytes／`FCECBE0A…`**；Mods 仍是 0.8.0 的 **79,360 bytes／`8E6238AF…`**（必須先覆蓋才能測 0.10.0） |
+| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）、`4fe6b3f`（0.7.3）、`d13d49d`（0.7.4）、`c59107c`（0.7.5）、`225f17b`（0.7.6）、`3e1c4fa`（0.7.7）、`7f10b7c`（0.7.8）；0.8.0（P6）實作 `479c270`（含 docs）；0.9.0（P7）實作 `9d4b307`（code；docs 另 commit）；0.10.0（P8）實作 `c29ccce`（code；docs 另 commit）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 > **0.7.7**：HSV 換色參數定案——`BlueHue=0.62`（指揮卡深藍取樣 `39,52,86`
 > 的 H 0.62）、`BlueValueGain=1.00`，保留來源 S 與陰影；白標籤（`s<0.15`）
@@ -760,7 +768,8 @@ EXIT=0
   與 `CfLaundryBuyPatch`（`PlayerStore.BuyItem` postfix，物品＋子物品洗白）。
 - `CfNetwork` 追加 `CF_LAUNDRY_FAST`（1200，無前置）與 `CF_LAUNDRY_CLEAN`
   （3000，前置 `CF_LAUNDRY_FAST`），subtitle 都是 `洗白`；註冊 log 改 `N/9`，
-  hide 那行只在 `ok == 9` 印。
+  hide 那行只在 `ok == 9` 印。（**P8 起價格改 350／1800，行為不變**，
+  見「P8 0.10.0 經濟平衡」。）
 - `manifest.xml`：`<ModVersion>0.9.0</ModVersion>`，Description 追加「赃物洗白」。
 - **行為變更（刻意）**：P4 小偷的 T2／T3 CF 箱（原版 T1 箱不在此列）與 P6
   江洋大盜 CMD 箱被打開後，箱內 loot 繼承箱子的熱度、箱殼洗淨；未開箱直接
@@ -865,6 +874,127 @@ EXIT=0
   未實機。
 - **runtime 衰減**：100→64／82、contraband 32／28／24／20 都是原始碼與
   `UpdateStolenItem` 常數推導，尚未在遊戲內看到實際 heat 變化。
+
+## P8 0.10.0 經濟平衡
+
+### 1) 改了什麼
+
+- `CardCraftAndFence.cs`：`ModVersion` 0.9.0 → 0.10.0；`CfNetwork` **只改 9 個
+  cost 常數**（normal base），並加註解「base 是 normal、hard 由遊戲 ×2」：
+  PRO 350、T2 350、T3 900、THIEF_T2 500、PERMANENT 400、BATCH 500、CHIP 700、
+  FAST 350、CLEAN 1800（hard 700／700／1800／1000／800／1000／1400／700／3600）。
+  沒有難度 API，沒有預先加倍。
+- `CfThiefBoxes.Offer`：選完 tier／family、**建箱之前** `OfferCards(family, tier)`；
+  T3 → T3 卡 → T2 卡 → 箱，T2 → T2 卡 → 箱。卡與箱同家族（非 CMD）、
+  `price = (long)Math.Round(CardPrice * 1.5f)`、`unitValue` = price、
+  `isStolen:true`、`CanAccept` 失敗 `Destroy()`＋
+  `[CF-THIEF] card full, skipped <id>`、`OfferCard` 整段 try/catch。
+  沒有 T1 卡；箱仍每次最多 1 個，箱價不變。
+- `CfCardStock.AddMakerStock`：核心改成 **3 顆同家族、最先上架**
+  （`coreTier = HighestCoreTier()`、`start = ((day % 5) + 5) % 5`、
+  `coreFamily = AllFamilies[start]`），之後才 printer／chip／CNC／材料。
+  無 chip／CNC = 8 件、全補 = 10 件，上限 11；核心不會被 skip。
+- `manifest.xml`：`<ModVersion>0.10.0</ModVersion>`，Description 追加
+  「经济平衡」。
+- **沒有**新 Harmony patch（仍 9）、沒有新物品／loot、沒有改原版箱／卡／核價格；
+  P7 laundry 行為不動。
+- P6／P7 離線檢查做了最小更新（見 §2 的揭露）：P7 價格期望改 350／1800、版本
+  0.10.0；兩支檢查只剝掉 P8 的 `OfferCards`／`OfferCard` 再比舊 baseline。
+
+### 2) 0.10.0 驗收（實際輸出）
+
+**Build**
+```text
+Compiling AppraisalAssistant...
+  -> ...\dist\AppraisalAssistant\AppraisalAssistant.dll (15872 bytes)
+Compiling AugSpotter...
+  -> ...\dist\AugSpotter\AugSpotter.dll (9216 bytes)
+Compiling CardCraftAndFence...
+  -> ...\dist\CardCraftAndFence\CardCraftAndFence.dll (82432 bytes)
+Build OK: C:\Users\wangy\Desktop\Probably_Stolen_MOD\dist
+EXIT=0
+```
+
+**Verify-Mods（CardCraft 段）**
+```text
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfLaundryBuyPatch -> PlayerStore.BuyItem
+PASS CardCraftAndFence.dll: HarmonyPatch attributes checked (9)
+RESULT: PASS
+EXIT=0
+```
+9 patches、沒有新 patch，清單與 0.9.0 相同；無 banned API。
+
+**Probe-Patches**
+```text
+patched 8 method(s)   # AppraisalAssistant
+patched 4 method(s)   # AugSpotter
+patched 9 method(s)   # CardCraftAndFence
+RESULT: PASS
+EXIT=0
+```
+P8 交辦單本身就預期 8／4／9，與實際一致。
+
+**Probe-Logic**
+```text
+[Scan] CardCraftAndFence.dll refused=False capabilities=[] findings=0 error=null
+PASS scan CardCraftAndFence.dll
+RESULT: PASS
+EXIT=0
+```
+
+**Scratch `python .scratch\p8balance\check.py`**
+```text
+passed: 111  failed: 0
+P8 BALANCE CHECK: PASS
+EXIT=0
+```
+
+**Scratch P6／P7（標題已是 0.10.0）**
+```text
+passed: 88  failed: 0      # p6highwayman
+P6 HIGHWAYMAN CHECK: PASS
+passed: 107  failed: 0     # p7laundry
+P7 LAUNDRY CHECK: PASS
+EXIT=0
+```
+
+**價格表（normal base → hard）**
+
+| 升級 | base | hard |
+|---|---:|---:|
+| `CF_FENCE_PRO` | 350 | 700 |
+| `CF_FENCE_T2` | 350 | 700 |
+| `CF_FENCE_T3` | 900 | 1800 |
+| `CF_FENCE_THIEF_T2` | 500 | 1000 |
+| `CF_SAWYER_PERMANENT` | 400 | 800 |
+| `CF_SAWYER_BATCH` | 500 | 1000 |
+| `CF_SAWYER_CHIP` | 700 | 1400 |
+| `CF_LAUNDRY_FAST` | 350 | 700 |
+| `CF_LAUNDRY_CLEAN` | 1800 | 3600 |
+
+**Mods 安裝**：仍是 **0.8.0：79,360 bytes／`8E6238AF…`**；0.10.0 未複製。
+
+### 3) 仍待實機（A–F，全部尚未跑）
+
+- **A. 價格 base／hard**：normal 與 hard 各看一次 9 個升級價格，hard = base×2，
+  沒有多餘加成。
+- **B. 小偷 T2 卡＋箱**：bm 60，T2 卡先於箱；1.5×（SEC 225、MED／ENG 165、
+  SER 90）；高價卡不被擠掉；用卡開同家族 T2 箱。
+- **C. 小偷 T3 卡＋箱**：bm 85＋T3，順序 T3 卡 → T2 卡 → 箱；三件都在櫃台。
+- **D. 製卡匠核心**：3 顆同家族、最高等級；沒有
+  `counter full, skipped <core>`；3 核可換下一級。
+- **E. 存讀檔**：買卡／升級後存讀檔，價格與 `STOLEN_TAG` 一致；P7 的 A–F 另行跑。
+- **F. log 乾淨**：無 `cf_` dummy、無 `Init failed`、`Harmony: 9`、
+  `registered 9/9`。
+
+### 4) 未核實
+
+- hard 難度的 ×2 是程式註解與既有行為，**沒有 hard 存檔實機看過價格**。
+- 小偷卡在 18×4 的實際排版、卡與箱誰先被擠掉、`card full, skipped` 未實機。
+- 製卡匠 3 核在櫃台的實際排列、核心是否真的永遠不被 skip，未實機。
+- 1.5× 的 `.5` 四捨五入（337.5 → 338、247.5 → 248）在 UI 上的顯示未看過。
+- 存讀檔後卡／箱的 stolen 狀態與價格是否保持，未實機。
+- 經濟曲線（350／900／500…）只照交辦單數字落地，**沒有 runtime 經濟模擬**。
 
 ## 0.5.2 啟動 NRE 修正（實機回報）
 
@@ -1152,14 +1282,16 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
   新的 per-box `[CF-LOOT] overflow …` 會直接指出。
 - **T3「200 樣本」是離線模擬**：同權重、同 `Pick` 演算法，但不是 in-game
   `CfLootProbe`；實機 `[CF-EV]` 數字仍待人類補。
-- **工匠 7–9 件（上限 11）**：printer 固定；chip／CNC 依數量差各 0–1；
-  材料 2+2、核心 2。前台 18×4 理論上放得下，放不下則該件 `skipped`、
-  本次不賣，不會掉進背包。
+- **工匠 8–10 件（上限 11；P8 起）**：printer 固定；chip／CNC 依數量差各 0–1；
+  材料 2+2、核心 3（同家族，先上架）。前台 18×4 理論上放得下，放不下則該件
+  `skipped`、本次不賣，不會掉進背包。0.7.x–0.9.0 的「核心 2／7–9 件」是歷史；
+  P8 細節見 spec §3.15.3。
 - **多台機器／核心輪換**：chip／CNC 的 `CountOwned` 用 `FindAllItem()`
-  （owned only）＋剛上架 printer；`day%5` 取連續 2 家族、最高已解鎖等級。
-  實際多台補件節奏、日期/等級行為未實機驗。
-  **總價見 spec §3.8.4 表格**（T1 890–1090／1540–1740、T2 1140–1540／
-  1790–2190、T3 1490–2090／2140–2740），參考帶不是硬門檻。
+  （owned only）＋剛上架 printer；`day % 5` 取**一個**家族、最高已解鎖等級
+  （P8 起改 3 顆同家族，見 spec §3.15.3）。實際多台補件節奏、日期/等級行為
+  未實機驗。**總價見 spec §3.8.4 的歷史參考表**（T1 890–1090／1540–1740、
+  T2 1140–1540／1790–2190、T3 1490–2090／2140–2740）；該表是 2 核心版本、
+  **P8 未重算**，參考帶不是硬門檻。
 - **`premiumBuy15` 對 SELL 客戶的實際效果**：照原版退休匠加，但這個 flag 主要
   影響客戶「買」東西的價格；SELL 客戶是否真的用到，未在 runtime 核。
 - **黑市聲望門檻 85／60／30**：是我方定案（spec §3.10.2），不是原版常數；
@@ -1201,8 +1333,8 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
   - P5 也把 CMD T1 箱納入換卡產出（`cf_cmd_box_t1`，200）；換卡是它第一個
     正常來源，未實機驗。
 - **完整 §3.1–3.12 規格**：仍未補齊；目前只有 P1/P2 定案段、§3.3 loot 表、
-  §3.4 errata、§3.4b T3 定價、§3.5 P3、§3.8／§3.10(2)／§3.11 P4、§3.12 貼圖，
-  以及 P5 的 §3.9。
+  §3.4 errata、§3.4b T3 定價、§3.5 P3、§3.8／§3.10(2)／§3.11 P4、§3.12 貼圖、
+  P5 的 §3.9、P6 的 §3.13、P7 的 §3.14、P8 的 §3.15。
 - **`Resources.LoadAll<Sprite>` runtime 清單**：目前只有 asset 字串掃描。
 - **CMD T2 EV 對帳**：0.7.2 重配權重後，200 樣本 `measured200=1285.55`、
   model 1295.50、誤差 **-0.77%**（spec 表同一個數字）。舊的 -7.37%／-1.64%
@@ -1214,23 +1346,22 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 
 > 接下一個對話請先讀 `docs/NEXT_SESSION_HANDOFF.md`。
 
-1. **P7 0.9.0 實機（優先）**：把 `dist\CardCraftAndFence\*`
-   （81,408／`672BB474…`）複製到 `...\Probably Stolen\Mods\CardCraftAndFence\`，
-   完全退出遊戲再開、重新核可；啟動應有 `Init … v0.9.0`、`enabled v0.9.0`、
+1. **P8 0.10.0 實機（優先）**：把 `dist\CardCraftAndFence\*`
+   （82,432／`FCECBE0A…`）複製到 `...\Probably Stolen\Mods\CardCraftAndFence\`，
+   完全退出遊戲再開、重新核可；啟動應有 `Init … v0.10.0`、`enabled v0.10.0`、
    `[CF-NET] registered 9/9`、`Harmony: 9`。接著跑
-   `docs/NEXT_SESSION_HANDOFF.md` §4c 的 A–F。
-2. P7 離線已綠：`p7laundry/check.py` 107/0、Verify 9 patches、Probe 實際
-   **8／4／9**（AppraisalAssistant 歷來 8 個，不要改）；Mods 仍是 0.8.0。
-3. **P6 0.8.0 已實作、離線已驗**；實機核心觸發／T3 箱已通過，6／8 件數未核實
-   （非阻塞），T1／T2／低機率／櫃台塞滿／同日重載尚未測；卡見
-   `docs/NEXT_SESSION_HANDOFF.md` §4b，**不阻塞 P7**。
+   `docs/NEXT_SESSION_HANDOFF.md` §4d 的 A–F。
+2. **P7 0.9.0 A–F 仍待跑**：排在 P8 之後，卡在
+   `docs/NEXT_SESSION_HANDOFF.md` §4c；P7 洗白行為沒有被 P8 改動。
+3. **P6 0.8.0**：狀態不變（核心觸發／T3 箱已過實機，6／8 件數未核實、非阻塞；
+   T1／T2／低機率／櫃台塞滿／同日重載未測）。**P8 不需要重跑 P6。**
 4. 人類實機已於 **2026-11-17** 驗收 P5：P5-01／04／06／07 通過、P5-08 通過；
    P5-09／10 未測、P5-11／12 延後到 1.0。**不要再重跑 0.7.8 的 P5 卡。**
 5. 0.6.2 已提交 `75d227f`；P5 0.7.0 `66266cf`、0.7.1 `81c2d08`、0.7.2
    `801a5b0`、0.7.7 `3e1c4fa`、0.7.8 `7f10b7c`；P6 0.8.0 `479c270`；
-   P7 code commit `9d4b307`；docs 另 commit；**未 push**。
-   工作區只剩本輪開始前就存在的 `ACCEPTANCE_REVIEW.md`／
-   `DEVELOPER_DIAGNOSTIC.md` 修改（非本輪）。
+   P7 code commit `9d4b307`；P8 code commit `c29ccce`（docs 另 commit）；
+   **未 push**。P8 code／docs commit 後，工作區應只剩本輪開始前就存在的
+   `ACCEPTANCE_REVIEW.md`／`DEVELOPER_DIAGNOSTIC.md` 修改（非本輪）。
 6. 其餘黑市內容；補 §3.1–3.11 全文與 `Resources.LoadAll` 實機清單。
 
 ## 禁區
@@ -1255,16 +1386,18 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
   （P7）新增 `CfLaundry`（夜間衰減翻倍）與 `CfLaundryBuyPatch`
   （`PlayerStore.BuyItem` 洗白）、`CfTryOpenLockPatch` 加開箱繼承；`CfNetwork`
   由 7 個升級變 9 個；`CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables`
-  擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.9.0）
+  擴到 T3 箱；**0.10.0（P8）只改 `CfNetwork` 9 個價格常數、`CfThiefBoxes`
+  加小偷卡（`OfferCards`／`OfferCard`）、`CfCardStock.AddMakerStock` 核心改
+  3 同家族先上架；沒有新 patch／物品／loot**）
+- `src/CardCraftAndFence/manifest.xml`（0.10.0）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、**§3.9 P5**、
-  §3.10、§3.11、§3.12、**§3.13 P6**、**§3.14 P7**）
+  §3.10、§3.11、§3.12、**§3.13 P6**、**§3.14 P7**、**§3.15 P8**）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
-- `docs/NEXT_SESSION_HANDOFF.md`（0.9.0 安裝步驟與 §4c 實機卡）
+- `docs/NEXT_SESSION_HANDOFF.md`（0.10.0 安裝步驟與 §4d 實機卡）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、
   `tools/Probe-Logic.ps1`（本輪未改）
 - `.scratch/p3check/`、`.scratch/p4check/`、`.scratch/p4bcheck/`、
   `.scratch/p4t3loot/`、`.scratch/p5spritecheck/`、`.scratch/regcheck/`、
   `.scratch/upgradecheck/`、**`.scratch/p5sawyer/check.py`**、
-  **`.scratch/p6highwayman/check.py`**、**`.scratch/p7laundry/check.py`**
-  （scratch-only 離線核對，不進 MOD）
+  **`.scratch/p6highwayman/check.py`**、**`.scratch/p7laundry/check.py`**、
+  **`.scratch/p8balance/check.py`**（scratch-only 離線核對，不進 MOD）

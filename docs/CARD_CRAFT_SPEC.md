@@ -5,8 +5,9 @@
 > §3.4b 的 T3 卡／核定價、§3.5 的 P3 實作（空白卡晶片、專業密序器、批量模組），
 > 以及 P4 的 §3.8（退休製卡匠／博士）、§3.10(2)（小偷分級箱）、
 > §3.11（Wild Network 9 個升級）、§3.12（CMD 箱執行期染色貼圖）、
-> P5 的 §3.9（索耶換卡／芯片／常駐服務／紙本目錄）、P6 的 §3.13（江洋大盜），
-> 和 P7 的 §3.14（贓物熱度：箱子繼承＋兩級洗白）。
+> P5 的 §3.9（索耶換卡／芯片／常駐服務／紙本目錄）、P6 的 §3.13（江洋大盜）、
+> P7 的 §3.14（贓物熱度：箱子繼承＋兩級洗白），以及 P8 的 §3.15
+> （經濟平衡：9 個升級 base／hard、小偷賣卡、製卡匠核心順序）。
 
 ## §3.3 箱子 — 定案表（P2／P4 已實作）
 
@@ -588,10 +589,10 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 ### §3.8.4 製卡匠庫存（售價 = 物品 `unitValue`，不標 stolen、不賣箱子）
 
-**每次到訪最多 11 件，實際 7–9 件**：printer 固定 1，chip／CNC 依數量差
-各加 0–1，材料 2+2，核心 2。不保存庫存，不做翻頁。核心已從所有 loot 表移除，
-所以卡匠是核心唯一穩定來源。**同一天不重複**：一天最多一位製卡匠，
-`maker_last_day` 已擋。
+**每次到訪最多 11 件，實際 8–10 件**：核心 3 顆（同一家族，先上架），
+printer 固定 1，chip／CNC 依數量差各加 0–1，材料 2+2。不保存庫存，不做翻頁。
+核心已從所有 loot 表移除，所以卡匠是核心唯一穩定來源。**同一天不重複**：
+一天最多一位製卡匠，`maker_last_day` 已擋。
 
 | 類別 | 物品 | 數量 | 單價 |
 |---|---|---:|---:|
@@ -600,27 +601,29 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 | 條件 | `printer_module_cnc` | 0 或 1 | 400 |
 | 材料 | `common_electronic` | 2 | 33 |
 | 材料 | `printer_plastic` | 2 | 12 |
-| 核心 | 2 家族輪換，最高已解鎖等級 | 2 | 依 id |
+| 核心 | 1 家族（`day % 5`），最高已解鎖等級 | 3 | 依 id |
 
 - **printer 每次固定 1 台**，售價 = `unitValue` 350，client 已掛
   `premiumBuy15`。
-- **chip／CNC 用數量差**：先放 printer，再算
+- **chip／CNC 用數量差**：先放核心與 printer，再算
   `CountOwned(id) < CountOwned("printer")`（含剛上架那台），成立才各加 1；
   一次最多補 1 個，缺很多台就多來幾次。`CountOwned` 用
   `PlayerStore.Instance.FindAllItem()` 數 `identifier`。
-- 沒有擴產需求時 **7 件**（printer＋4 材料＋2 核心）；chip／CNC 都補時 **9 件**；
-  上限 11 不會補滿。
+- 沒有擴產需求時 **8 件**（printer＋4 材料＋3 核心）；chip／CNC 都補時 **10 件**；
+  上限 11，max 10 ≤ 11，所以核心不會是被跳過的那件。
 - 核心等級：只取已解鎖的最高等級（T3 → T2 → T1）。
-- 核心家族：`start = day % 5`，取 `AllFamilies[start..start+1]`（環繞），
-  所以 5 天輪完五家族，每天 2 顆。
-- **每週總價（設計參考，不是硬門檻）**：
+- 核心家族：`start = ((day % 5) + 5) % 5`，只取 `AllFamilies[start]` 一個家族，
+  每天 3 顆；5 天輪完五家族。核心**最先**上架，之後才是 printer／chip／CNC／材料。
+- **每週總價（歷史參考：0.7.x–0.9.0 的「2 核心」版本；P8 起已不適用，未重算）**：
 
-| 等級 | 無擴產（7 件） | 擴產週（9 件） | 參考帶 |
+| 等級 | 無擴產（7 件，歷史） | 擴產週（9 件，歷史） | 參考帶 |
 |---|---:|---:|---:|
 | T1 | 890–1090 | 1540–1740 | 1000–1350 |
 | T2 | 1140–1540 | 1790–2190 | 1300–1900 |
 | T3 | 1490–2090 | 2140–2740 | 2000–2700 |
 
+  P8（0.10.0）起每次到訪多 1 顆同家族核心（2 → 3），每週總價約 +1 顆核心單價
+  （T1 200–300、T2 300–500、T3 450–750）；**上表沒有重算**，不要當成 P8 的總價。
   價格帶只當節奏參考；**不要為了壓價去改核心 `unitValue` 或移除 chip／CNC**。
   材料 90；chip 250、CNC 400 依需求。
 - 卡匠不再賣卡；卡只從箱子 rare／小偷箱來。博士也不賣卡／核。
@@ -826,9 +829,11 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 | id | 價格 | 前置 | 效果 |
 |---|---:|---|---|
 | `CF_SAWYER_PERMANENT` | 400 | —（無 prerequisites） | 索耶常駐：每夜換卡＋接管原版三個 crate barter；`onUnlock` 發紙本目錄 |
-| `CF_SAWYER_BATCH` | 700 | `CF_SAWYER_PERMANENT` | 取消「每晚 1 箱」上限 |
-| `CF_SAWYER_CHIP` | 900 | `CF_SAWYER_PERMANENT` | 開啟芯片升級（3 同級→下一級） |
+| `CF_SAWYER_BATCH` | 500 | `CF_SAWYER_PERMANENT` | 取消「每晚 1 箱」上限 |
+| `CF_SAWYER_CHIP` | 700 | `CF_SAWYER_PERMANENT` | 開啟芯片升級（3 同級→下一級） |
 
+- 上表是 P8（0.10.0）的 normal base；hard 由遊戲自動 ×2（BATCH 1000、CHIP 1400），
+  見 §3.15.1。
 - 「交換所已解鎖」不是 prerequisites，而是既有 `CfSawyerHidePatch`
   （`NetworkUpgrade.IsHiddenForRun` postfix，§3.11.4）負責把 `CF_SAWYER_*`
   在交換所未解鎖前藏起來；**不要**再加一個前置 id。
@@ -923,14 +928,20 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 ### §3.10.1 觸發
 
-- 掛在 `StoreClientList.CreateThief` 的 postfix：**先放 1 個 CF 分級箱，
-  再跑原版 `endAction`**。
-- 這樣 6×4 箱一定先拿到六個連續空欄；若原版 thief 商品因此被擠掉，
+- 掛在 `StoreClientList.CreateThief` 的 postfix：**先放 CF 卡與 1 個 CF 分級箱，
+  再跑原版 `endAction`**（P8 起卡在箱之前）。
+- 這樣 CF 卡與 6×4 箱會先於原版 thief 商品拿到空欄；P8 起卡片更優先，
+  櫃台不夠時寧可犧牲箱（§3.15.2）。若原版 thief 商品因此被擠掉，
   是**刻意取捨**（櫃台 18×4，原版先鋪會讓箱子永遠 `counter full, skipped`）。
 - 每次 thief 到訪只給 1 箱；不因 `GetBMRepStockMult()` 增加數量。
 - **T1 一律不加**：原版 thief 已經會賣 T1 箱，CF 這條只補 T2／T3。
 - **永不給 CMD 箱**：小偷的家族池只有 SEC／MED／ENG／SER。
 - 不改 thief 的 `acceptRetailMarkup`（上一版曾設 false，本輪移除）。
+- **P8（0.10.0）小偷也賣卡**：選完箱等級與家族後、**建箱之前**先
+  `OfferCards(family, tier)`；T3 箱依序給 1 張 T3 卡、1 張 T2 卡、再給箱，
+  T2 箱只給 1 張 T2 卡再給箱。卡與箱同家族、都是 `isStolen: true`，卡價
+  1.5×（§3.10.4）；卡先於箱、也先於原版 thief 庫存。沒有 T1 卡、沒有 CMD；
+  箱仍是每次到訪最多 1 個（§3.15.2）。
 - **P7-1（0.9.0）**：被打開的贓物箱會把自身熱度繼承給箱內 loot，箱子外殼則被洗淨；
   這是刻意的行為變更（§3.14.1）。
 
@@ -945,7 +956,8 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 | `bm >= 30` 且已解鎖 `CF_FENCE_THIEF_T2` | T2 |
 | 其餘 | **不給 CF 箱**（不退回 T1） |
 
-- `CF_FENCE_THIEF_T2`（2200，無前置）把 T2 門檻從 60 降到 30，不改內容與價格。
+- `CF_FENCE_THIEF_T2`（P8 base 500、hard 1000；無前置）把 T2 門檻從 60 降到 30，
+  不改箱內容與箱價。
 - T3 箱要另外解鎖 `CF_FENCE_T3`（製卡匠／博士的高級門路）。
 
 ### §3.10.3 家族權重（合計 100，無 CMD）
@@ -968,12 +980,17 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - 所有 CF 箱（只有 SEC／MED／ENG／SER）都 `isStolen: true`。
 - 售價 = 箱子的 `unitValue`（T2 225、T3 300），不加零售 markup。
 - CMD 箱不經過小偷，`isStolen` 的 CMD 例外不再適用。
+- **P8 起小偷的鑰匙卡也是贓物**：`isStolen: true`，售價 =
+  `(long)Math.Round(CardPrice(family, cardTier) * 1.5f)`（§3.15.2），不套零售
+  markup；卡先上架，所以櫃台不夠時先被犧牲的是箱／原版庫存（卡本身放不下才會
+  `card full`）。
 - **櫃台形狀限制**：原版前台是 **18×4**，箱子是 **6×4**，因此需要
   **6 個連續空欄**才放得下；這是原版 `GameGridInventory` 的限制，不是本 MOD
   造成的。**櫃台滿＝該件本次不販售**：先 `GraphUtils.CanAccept(front, box)`
   探測，放不下就 `Destroy()`＋`[CF-THIEF] counter full, skipped <id>`，
-  不進後台、不進玩家背包。
-- **先 CF 箱、再原版庫存**：若原版 thief 商品因此被擠掉，這是刻意取捨；
+  不進後台、不進玩家背包。卡同樣先 `CanAccept`，放不下就 `Destroy()`＋
+  `[CF-THIEF] card full, skipped <id>`。
+- **先卡、再 CF 箱、再原版庫存**：若原版 thief 商品因此被擠掉，這是刻意取捨；
   CF 箱需要 6 個連續空欄，原版先鋪會讓箱子幾乎永遠放不下。
 - **P7-1（0.9.0）**：被打開的贓物箱會把自身熱度繼承給箱內 loot（刻意的行為變更，
   §3.14.1）；未開箱直接轉賣則不繼承。
@@ -982,6 +999,9 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 
 - `[CF-THIEF] box family=… tier=… id=… bm=… added=…`
 - `[CF-THIEF] counter full, skipped <id>`
+- `[CF-THIEF] card family=… tier=… id=… price=… added=…`（P8，每張卡一行）
+- `[CF-THIEF] card full, skipped <id>`（P8）
+- `[CF-THIEF] card offer failed: <Type>: <Message>`（P8，卡錯誤不中止箱子）
 - `[CF-THIEF] skip: no T2/T3 box (bm=…)`（同原因只印一次）
 
 ## §3.11 Wild Network「CardFence」分頁（P4／P5）
@@ -1019,20 +1039,24 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
   在地化檔）；`GetLocalizedTitle` 會先找 `NetworkUpgrade` 表的 `network_<id>_title`
   key，找不到才用 provider，所以之後補在地化不用改代碼。
 
-### §3.11.3 9 個升級（P7 追加兩級洗白）
+### §3.11.3 9 個升級（P7 追加兩級洗白；P8 改 base 價）
 
 | id | 價格 | 前置 | subtitle | 效果 |
 |---|---:|---|---|---|
-| `CF_FENCE_PRO` | 1500 | — | Cardmaker | 一次性發工具包（§3.8.3）；解鎖製卡匠到訪；博士開始賣 `cf_pro_desequencer`／`cf_batch_card_module` |
-| `CF_FENCE_T2` | 1200 | `CF_FENCE_PRO` | Cardmaker | 製卡匠與博士加賣 3 張 T2 卡 + 3 個 T2 核 |
-| `CF_FENCE_T3` | 3000 | `CF_FENCE_T2` | Cardmaker | 製卡匠與博士加賣 1 張 T3 卡 + 同家族 1 個 T3 核；小偷 T3 箱的前置 |
-| `CF_FENCE_THIEF_T2` | 2200 | — | Thief | 黑市聲望 30 就能買 T2 箱（原本 60） |
+| `CF_FENCE_PRO` | 350 | — | Cardmaker | 一次性發工具包（§3.8.3）；解鎖製卡匠到訪；博士開始賣 `cf_pro_desequencer`／`cf_batch_card_module` |
+| `CF_FENCE_T2` | 350 | `CF_FENCE_PRO` | Cardmaker | 製卡匠與博士加賣 3 張 T2 卡 + 3 個 T2 核 |
+| `CF_FENCE_T3` | 900 | `CF_FENCE_T2` | Cardmaker | 製卡匠與博士加賣 1 張 T3 卡 + 同家族 1 個 T3 核；小偷 T3 箱的前置 |
+| `CF_FENCE_THIEF_T2` | 500 | — | Thief | 黑市聲望 30 就能買 T2 箱（原本 60） |
 | `CF_SAWYER_PERMANENT` | 400 | — | 索耶 | 索耶常駐：每夜換卡、接管原版三個 crate barter；`onUnlock` 發換卡目錄紙本（§3.9） |
-| `CF_SAWYER_BATCH` | 700 | `CF_SAWYER_PERMANENT` | 索耶 | 取消「每晚 1 箱」上限 |
-| `CF_SAWYER_CHIP` | 900 | `CF_SAWYER_PERMANENT` | 索耶 | 芯片升級：3 個同家族同級核心 → 下一級（T3 不升） |
-| `CF_LAUNDRY_FAST` | 1200 | — | 洗白 | 贓物熱度的每晚自然衰減翻倍（18 → 36，§3.14.3） |
-| `CF_LAUNDRY_CLEAN` | 3000 | `CF_LAUNDRY_FAST` | 洗白 | 今後買進的物品與其開箱子物品熱度清零（§3.14.4） |
+| `CF_SAWYER_BATCH` | 500 | `CF_SAWYER_PERMANENT` | 索耶 | 取消「每晚 1 箱」上限 |
+| `CF_SAWYER_CHIP` | 700 | `CF_SAWYER_PERMANENT` | 索耶 | 芯片升級：3 個同家族同級核心 → 下一級（T3 不升） |
+| `CF_LAUNDRY_FAST` | 350 | — | 洗白 | 贓物熱度的每晚自然衰減翻倍（18 → 36，§3.14.3） |
+| `CF_LAUNDRY_CLEAN` | 1800 | `CF_LAUNDRY_FAST` | 洗白 | 今後買進的物品與其開箱子物品熱度清零（§3.14.4） |
 
+- 上表是 P8（0.10.0）的 normal base；hard 由遊戲把每個 `NetworkUpgrade`
+  價格自動 ×2（PRO 700、T2 700、T3 1800、THIEF_T2 1000、PERMANENT 800、
+  BATCH 1000、CHIP 1400、FAST 700、CLEAN 3600）。MOD 不預先加倍、不讀難度、
+  沒有 difficulty API（§3.15.1）。
 - 9 個升級都是**取得管道**的開關；只有 `CF_FENCE_PRO` 與 `CF_SAWYER_PERMANENT`
   會直接發物品（各一次性）。
 - `CF_SAWYER_*` 的三個**沒有**「交換所已解鎖」的 prerequisites id：那條由
@@ -1324,9 +1348,11 @@ P7-1 在既有的 `CfTryOpenLockPatch.Prefix` 裡，位置是 `if (canOpen)` 之
 
 | id | 價格 | 前置 | title | 效果 |
 |---|---:|---|---|---|
-| `CF_LAUNDRY_FAST` | 1200 | —（無 prerequisites） | 快速洗白 | 贓物熱度的每晚自然衰減翻倍（18 → 36） |
-| `CF_LAUNDRY_CLEAN` | 3000 | `new[] { CF_LAUNDRY_FAST }` | 彻底洗白 | 今後買進的物品及其開箱子物品熱度清零 |
+| `CF_LAUNDRY_FAST` | 350 | —（無 prerequisites） | 快速洗白 | 贓物熱度的每晚自然衰減翻倍（18 → 36） |
+| `CF_LAUNDRY_CLEAN` | 1800 | `new[] { CF_LAUNDRY_FAST }` | 彻底洗白 | 今後買進的物品及其開箱子物品熱度清零 |
 
+- 上表是 P8（0.10.0）的 normal base（FAST 原 1200、CLEAN 原 3000）；hard 由遊戲
+  自動 ×2（700／3600）。**效果與行為完全不變**，只改價格常數（§3.15.4）。
 - 兩個都註冊在 `CfNetwork.EnsureRegistered()`，`tab: "CardFence"`、`subtitle: "洗白"`；
   既有 7 個升級（Cardmaker／Thief／索耶）與 `CF_SAWYER_*` 的隱藏規則
   （§3.11.4）都不變。
@@ -1408,6 +1434,9 @@ patched 9 method(s)
 
 ### §3.14.6 離線驗收（實際輸出）與實機卡（尚未跑）
 
+> 本節是 **P7 當下（0.9.0）** 的離線輸出與實機卡；P8（0.10.0）的版本／hash／
+> 價格見 §3.15。A–F **仍未跑**。
+
 **版本與產物**
 
 - `src/CardCraftAndFence/CardCraftAndFence.cs`：`internal const string ModVersion = "0.9.0";`；
@@ -1474,5 +1503,175 @@ patched 9 method(s)
   效果持續；同一天（`dayCounter` 不變）存檔→重載→再睡，`laundry_last_day`
   不讓同一天扣第二次。贓物熱度、箱子 `STOLEN_TAG`、箱內 children 狀態都應
   正確保存。
+
+以上 A–F **全部尚未執行**；在人類回報 `Player.log` 之前，不得寫成已驗收。
+
+## §3.15 P8 經濟平衡（0.10.0）
+
+> 本節只寫「已寫進代碼、且已用離線檢查核對過」的規則；**沒有任何實機結果**。
+> §3.15.5 的 A–F 全部尚未跑。P8 只改 9 個價格常數、小偷賣卡、製卡匠核心順序；
+> 沒有新 Harmony patch、沒有新物品、沒有改 loot 表。
+
+### §3.15.1 9 個升級：normal base／hard
+
+P8 只改 `CfNetwork` 的 9 個 cost 常數；`Add(...)` 呼叫、id、前置、subtitle、
+title／description、icon 都沒有變。
+
+| id | normal base | hard（遊戲 ×2） |
+|---|---:|---:|
+| `CF_FENCE_PRO` | 350 | 700 |
+| `CF_FENCE_T2` | 350 | 700 |
+| `CF_FENCE_T3` | 900 | 1800 |
+| `CF_FENCE_THIEF_T2` | 500 | 1000 |
+| `CF_SAWYER_PERMANENT` | 400 | 800 |
+| `CF_SAWYER_BATCH` | 500 | 1000 |
+| `CF_SAWYER_CHIP` | 700 | 1400 |
+| `CF_LAUNDRY_FAST` | 350 | 700 |
+| `CF_LAUNDRY_CLEAN` | 1800 | 3600 |
+
+- **base 是 normal 難度**；hard 由遊戲把每個 `NetworkUpgrade` 價格自動 ×2，
+  程式註解明寫「do not pre-double them here」。MOD 不預先加倍、不讀難度、
+  沒有 difficulty API、沒有新增難度判斷。
+- **沒有改任何原版 `unitValue`**：箱價（T1 200／175、T2 225、T3 300、CMD 200／
+  350／500）、卡價、核心價與 §3.3／§3.4b 的數字都不動。
+- 相對 0.9.0：`CF_SAWYER_BATCH` 700 → 500、`CF_SAWYER_CHIP` 900 → 700；
+  `CF_LAUNDRY_FAST` 1200 → 350、`CF_LAUNDRY_CLEAN` 3000 → 1800
+  （洗白行為完全不變，§3.14）。
+- 註冊 log 仍 `[CF-NET] registered N/9 CardFence upgrades tab=CardFence
+  width=792/1060`；仍是 3 個分頁、792/1060，沒有第 4 個分頁。
+
+### §3.15.2 小偷賣卡（P8）
+
+`CfThiefBoxes.Offer` 的順序：先判箱等級與家族，**建箱之前**呼叫
+`OfferCards(family, tier)`，最後才 `ContainerId`／`DirectoryMaster.Item` 建箱。
+
+| 箱等級 | 卡片順序 | 最後 |
+|---|---|---|
+| T3 | 1 張同家族 T3 → 1 張同家族 T2 | 1 個 T3 箱 |
+| T2 | 1 張同家族 T2 | 1 個 T2 箱 |
+
+| 家族 | T2 卡 `CardPrice` | T2 小偷售價（×1.5） | T3 卡 `CardPrice` | T3 小偷售價（×1.5） |
+|---|---:|---:|---:|---:|
+| SEC | 150 | 225 | 225 | 338 |
+| MED | 110 | 165 | 165 | 248 |
+| ENG | 110 | 165 | 165 | 248 |
+| SER | 60 | 90 | 90 | 135 |
+
+- **價格**：`price = (long)Math.Round(ItemFactory.CardPrice(family, cardTier) * 1.5f)`，
+  寫進 `card.unitValue`；337.5 與 247.5 用 `Math.Round` 的預設 banker's rounding
+  進到偶數 **338／248**。卡不套零售 markup。
+- **家族**：卡與箱用同一個 `PickFamily()` 結果；家族池只有 SEC／MED／ENG／SER
+  （權重 32／27／21／20 不變），**沒有 CMD、沒有 T1 卡**。
+- **時機與優先**：卡先於箱、也先於原版 thief 庫存（`Attach` 先 `Offer()` 再
+  `original()`）。因為卡先佔位，櫃台不夠時先被犧牲的是箱或原版商品；卡本身
+  放不下時才印 `card full`。
+- **櫃台滿**：每張卡先 `GraphUtils.CanAccept(front, card)`；放不下就
+  `Destroy()`＋`[CF-THIEF] card full, skipped <id>`，不進後台、不進玩家背包。
+- **上架**：`TryAddDirectSellingItemToTable(card, isOwend:false, isStolen:true)`；
+  `!added` 時 `Destroy()`。每張卡 log
+  `[CF-THIEF] card family=… tier=… id=… price=… added=…`。
+- **失敗隔離**：`OfferCard` 整個方法包 try/catch，單張卡失敗只印
+  `[CF-THIEF] card offer failed: …`，不會中止後面的卡或箱子。
+- **箱不變**：每次到訪仍最多 1 個 CF 箱，分級門檻（bm 85／60／30）與箱價
+  （T2 225／T3 300）都不變（§3.10.2／§3.10.4）。
+
+### §3.15.3 製卡匠核心順序（P8）
+
+`CfCardStock.AddMakerStock(day)` 的順序改成：
+
+1. `coreTier = HighestCoreTier()`（T3 → T2 → T1）。
+2. `start = ((day % 5) + 5) % 5`；`coreFamily = AllFamilies[start]`，**只取一個家族**。
+3. 連續 3 次 `AddStock(ItemFactory.CryptoModuleId(coreFamily, coreTier))`。
+4. 再 printer →（chip／CNC 依 `CountOwned` 數量差）→ `common_electronic` ×2 →
+   `printer_plastic` ×2。
+
+- 核心由 0.9.0 的「2 家族 ×1」改成「1 家族 ×3」；5 天輪完五家族。
+- 核心**最先上架**，所以 18×4 櫃台真的滿時，被 `[CF-STOCK] counter full,
+  skipped <id>` 的是後面的 printer／chip／CNC／材料，**不會是核心**。
+- 件數：無 chip／CNC = printer 1 + 材料 4 + 核心 3 = **8**；chip／CNC 都補 =
+  **10**；上限 11，max 10 ≤ 11。
+- `StockSummary` 仍包含 cores；核心 `unitValue`、`Crafting` 與索耶的
+  3 同級→下一級（§3.9.4）都不變。
+- 其餘不變：不賣箱、不賣金屬模組、全部 `isOwend:false`、沒有額外 markup。
+
+### §3.15.4 沒有新 patch／物品／loot
+
+- `HarmonyPatch` 仍是 **9 個**，清單與 §3.14.5 完全相同（含
+  `CfLaundryBuyPatch -> PlayerStore.BuyItem`）；`CfThiefBoxes`／`CfCardStock`
+  沒有 `[HarmonyPatch]`。
+- 沒有新物品、沒有改 `CfItemDirectory.InitDirectory`、沒有改 loot 表或註冊、
+  沒有改箱價／容量。`ItemFactory.CardPrice`／`CorePrice`／`ContainerPrice`
+  與 0.9.0 相同。
+- **P7 洗白行為完全沒動**：`CfLaundry`、`CfLaundryBuyPatch`、
+  `CfTryOpenLockPatch` 的開箱繼承都與 0.9.0 相同；只改 FAST／CLEAN 的價格常數。
+- `CfSawyerExchange`／`CfRetiredCardmaker`／`CfInventorStock`／`CfHighwayman`／
+  `LootTables` 的類別本體與 0.9.0 相同。
+
+### §3.15.5 離線驗收（實際輸出）與實機卡（尚未跑）
+
+**版本與產物**
+
+- `src/CardCraftAndFence/CardCraftAndFence.cs`：`ModVersion = "0.10.0"`；
+  `manifest.xml`：`<ModVersion>0.10.0</ModVersion>`，Description 追加「经济平衡」。
+- `dist/CardCraftAndFence/CardCraftAndFence.dll` = **82,432 bytes**，SHA256
+  `FCECBE0A5B6FAA85ABFAE54699560FB5BEB5F193D3E3AB287EBE18833C58EB7E`。
+- `AppraisalAssistant.dll` 15,872 bytes／
+  `44BAFD769ACDF9B0BE35C56CF636D2E885102F00403281A06D90C8C6B335EA2E`；
+  `AugSpotter.dll` 9,216 bytes／
+  `CA20B617507A1FC1A9D53F4773F0A7A459BC40D71BCB7C0933E85DAE82332DA7`。
+- `Build-Mods.ps1` exit 0，3 個 DLL。
+
+**Verify-Mods.ps1**：`RESULT: PASS`；CardCraft **9 patches**，**沒有新 patch**，
+清單與 0.9.0 相同（含 `DeepSpaceQoL.CfLaundryBuyPatch -> PlayerStore.BuyItem`）；
+無 banned API；`HarmonyPatch attributes checked (9)`。
+
+**Probe-Patches.ps1**：`RESULT: PASS`；實際 `patched 8 method(s)`
+（AppraisalAssistant）、`patched 4 method(s)`（AugSpotter）、
+`patched 9 method(s)`（CardCraftAndFence）。**P8 交辦單本身就寫 8／4／9**，
+所以這次與預期一致，沒有 P7 那種 9／4／9 落差。
+
+**Probe-Logic.ps1**：`RESULT: PASS`；
+`[Scan] CardCraftAndFence.dll refused=False capabilities=[] findings=0`。
+
+**離線檢查**
+
+- `python .scratch\p8balance\check.py`：`passed: 111  failed: 0`／
+  `P8 BALANCE CHECK: PASS`，exit 0。
+- `python .scratch\p6highwayman\check.py`：`passed: 88  failed: 0`／
+  `P6 HIGHWAYMAN CHECK: PASS`，exit 0；標題已改成 `(0.10.0)`。
+- `python .scratch\p7laundry\check.py`：`passed: 107  failed: 0`／
+  `P7 LAUNDRY CHECK: PASS`，exit 0；標題已改成 `(0.10.0)`。
+- **P6／P7 檢查的最小更新（照實揭露）**：P7 的價格期望改成 FAST 350／CLEAN
+  1800、版本改 0.10.0；兩支檢查都只剝掉 P8 新增的 `OfferCards`／`OfferCard`
+  方法與 `OfferCards(family, tier);` 這一行，再與舊 baseline 比
+  `CfThiefBoxes`；通過數仍是 88／107，沒有放寬其他斷言。
+
+**Mods 安裝**：`.../Probably Stolen/Mods/CardCraftAndFence` 仍是 **0.8.0：
+79,360 bytes／`8E6238AFD611269E30DA2D199067DE9334112A2C3215B90B7B78EA6694B3650E`**；
+本輪 agent 沒有把 0.10.0 複製過去。
+
+**實機驗收卡（A–F，全部尚未跑；agent 不啟動遊戲）**
+
+> 安裝：完全退出遊戲 → 備份存檔 → 把 `dist\CardCraftAndFence\*`
+> （82,432／`FCECBE0A…`）覆蓋到 Mods → 重新核可。啟動 log 應有
+> `Init … v0.10.0`、`enabled v0.10.0`、`[CF-NET] registered 9/9`、`Harmony: 9`。
+
+- **A. 價格 base／hard**：normal 難度 9 個升級顯示 350／350／900／500／400／
+  500／700／350／1800；hard 依 §3.15.1 為 700／700／1800／1000／800／1000／
+  1400／700／3600。MOD 沒有另外加價或打折。
+- **B. 小偷 T2 卡＋箱（bm 60）**：log 依序有 `[CF-THIEF] card family=<F>
+  tier=2 id=… price=<1.5×> added=true`、`[CF-THIEF] box family=<F> tier=2 …`；
+  卡價是 `CardPrice × 1.5`（SEC 225、MED／ENG 165、SER 90）。卡先上架，高價卡
+  不應被箱或原版商品擠掉；用卡開同家族 T2 箱。
+- **C. 小偷 T3 卡＋箱（bm 85＋`CF_FENCE_T3`）**：log 順序是 T3 卡 → T2 卡 → 箱；
+  三件都在櫃台上（T3 卡 338／248、T2 卡 225／165／165／90，依家族）。
+  箱子仍只有 1 個。
+- **D. 製卡匠核心**：到訪時櫃台先出現 **3 顆同家族、最高已解鎖等級**的核心；
+  log 不應有 `[CF-STOCK] counter full, skipped <core id>`。3 顆核心可用索耶
+  芯片升級換成下一級（若已買 `CF_SAWYER_CHIP`，見 §3.9.4）。
+- **E. 存讀檔**：買卡／買升級後存檔→重載：升級仍已買、卡與箱的 `unitValue`
+  與 `STOLEN_TAG` 保持一致；P7 的 A–F 另外照 §3.14.6 跑一輪。
+- **F. log 乾淨**：沒有 `cf_` 的 `Could not find GameItem identifier` dummy、
+  沒有 `Init failed`、`Harmony: 9`、`registered 9/9`。
 
 以上 A–F **全部尚未執行**；在人類回報 `Player.log` 之前，不得寫成已驗收。
