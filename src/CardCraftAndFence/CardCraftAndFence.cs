@@ -20,7 +20,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.9.0";
+        internal const string ModVersion = "0.10.0";
 
         public void Init(ModManifest manifest)
         {
@@ -1751,15 +1751,18 @@ namespace DeepSpaceQoL
         internal const string LaundryFast = "CF_LAUNDRY_FAST";
         internal const string LaundryClean = "CF_LAUNDRY_CLEAN";
 
-        internal const int ProCost = 1500;
-        internal const int Tier2Cost = 1200;
-        internal const int Tier3Cost = 3000;
-        internal const int ThiefTier2Cost = 2200;
+        // P8 economy: these are normal difficulty bases. The game doubles every
+        // NetworkUpgrade cost on hard, so 350 shows as 700 there; do not
+        // pre-double them here.
+        internal const int ProCost = 350;
+        internal const int Tier2Cost = 350;
+        internal const int Tier3Cost = 900;
+        internal const int ThiefTier2Cost = 500;
         internal const int SawyerPermanentCost = 400;
-        internal const int SawyerBatchCost = 700;
-        internal const int SawyerChipCost = 900;
-        internal const int LaundryFastCost = 1200;
-        internal const int LaundryCleanCost = 3000;
+        internal const int SawyerBatchCost = 500;
+        internal const int SawyerChipCost = 700;
+        internal const int LaundryFastCost = 350;
+        internal const int LaundryCleanCost = 1800;
 
         internal static void EnsureTabLabel()
         {
@@ -3268,12 +3271,21 @@ namespace DeepSpaceQoL
             CardFamily.CMD
         };
 
-        // Cap 11. The printer is always stocked now (expansion); the chip and CNC
-        // are only added while their owned count is below the printer count.
-        // Cores are no longer in any loot table; 2 families rotate on day % 5 and
-        // the tier is the highest unlocked.
+        // Cap 11. Three cores of the same family are stocked first (family
+        // rotates on day % 5, tier is the highest unlocked), then up to seven
+        // other items: the worst case is 10 <= 11, so cores are never the item
+        // skipped on a full counter. The printer is always stocked; the chip and
+        // CNC are only added while their owned count is below the printer count.
         internal static void AddMakerStock(int day)
         {
+            int coreTier = HighestCoreTier();
+            int start = ((day % 5) + 5) % 5;
+            CardFamily coreFamily = AllFamilies[start];
+            for (int i = 0; i < 3; i++)
+            {
+                AddStock(ItemFactory.CryptoModuleId(coreFamily, coreTier));
+            }
+
             bool printerAdded = AddStock("printer");
             int printers = CountOwned("printer") + (printerAdded ? 1 : 0);
             if (CountOwned(ItemFactory.BlankKeycardChipId) < printers)
@@ -3288,14 +3300,6 @@ namespace DeepSpaceQoL
             AddStock("common_electronic");
             AddStock("printer_plastic");
             AddStock("printer_plastic");
-
-            int coreTier = HighestCoreTier();
-            int start = ((day % 5) + 5) % 5;
-            for (int i = 0; i < 2; i++)
-            {
-                CardFamily family = AllFamilies[(start + i) % 5];
-                AddStock(ItemFactory.CryptoModuleId(family, coreTier));
-            }
         }
 
         // Highest unlocked tier: T3, then T2, then T1.
@@ -3803,6 +3807,7 @@ namespace DeepSpaceQoL
             }
             int tier = tier3 ? 3 : 2;
             CardFamily family = PickFamily();
+            OfferCards(family, tier);
             string id = ItemFactory.ContainerId(family, tier);
             GameItem box = DirectoryMaster.Item(id);
             if (box == null)
@@ -3843,6 +3848,51 @@ namespace DeepSpaceQoL
                 }
             }
             return CardFamily.SEC;
+        }
+
+        private static void OfferCards(CardFamily family, int tier)
+        {
+            if (tier >= 3)
+            {
+                OfferCard(family, 3);
+            }
+            OfferCard(family, 2);
+        }
+
+        private static void OfferCard(CardFamily family, int cardTier)
+        {
+            try
+            {
+                string id = ItemFactory.KeycardId(family, cardTier);
+                GameItem card = DirectoryMaster.Item(id);
+                if (card == null)
+                {
+                    Log.Warn("[CF-THIEF] no item for " + id);
+                    return;
+                }
+                long price = (long)Math.Round(ItemFactory.CardPrice(family, cardTier) * 1.5f);
+                card.unitValue = price;
+                // Probe first: TryAddDirectSellingItemToTable destroys the card
+                // if the front counter rejects it.
+                if (!GraphUtils.CanAccept(EmporiumEntry.Instance.frontInvinvElement, card))
+                {
+                    card.Destroy();
+                    Log.Info("[CF-THIEF] card full, skipped " + id);
+                    return;
+                }
+                bool added = PlayerStore.Instance.TryAddDirectSellingItemToTable(
+                    card, isOwend: false, isStolen: true);
+                if (!added)
+                {
+                    card.Destroy();
+                }
+                Log.Info("[CF-THIEF] card family=" + family + " tier=" + cardTier
+                    + " id=" + id + " price=" + price + " added=" + added);
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-THIEF] card offer failed: " + e.GetType().Name + ": " + e.Message);
+            }
         }
 
         private static void Diag(string key, string message)
