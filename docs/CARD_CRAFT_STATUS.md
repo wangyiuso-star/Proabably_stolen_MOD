@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-17（0.8.0：P6 江洋大盜，CMD T1／T2／T3 有了正常來源）
+更新時間：2026-11-17（0.9.0：P7 贓物熱度，箱子繼承＋兩級洗白；實機尚未跑）
 
 ## 階段
 
@@ -54,18 +54,29 @@
   大→小放**，`smg`／`shotgun`（7×3）只留 rare，三張表權重重配後 EV 不變；
   overflow 每箱一行並記 `rolled/spawned/expected/actual/dropped`。Wild Network
   由 4 個升級變 **7 個**。
+- **P6：0.8.0 江洋大盜完成（離線），實機部分通過。** 每日以黑市聲望 roll
+  （30–59 8%／60–84 14%／85–149 20%／>=150 33%），成功才加 1 個 SELL client，
+  到訪只給 1 箱 CMD T1／T2／T3；離線 `p6highwayman/check.py` 88/0。實機核心
+  觸發／T3 箱已通過，6／8 件數未核實、其餘未測（見「P6 0.8.0」一節）。
+- **P7：0.9.0 完成（離線），接在 P6（0.8.0 江洋大盜）之後。** 開箱時把贓物箱的
+  熱度繼承給箱內 loot（`GraphUtils.FindAllChildrenType` 遞迴、`Math.Max`、外殼
+  `RemoveStolenStatus`），箱子本身洗完；Wild Network `CardFence` 分頁追加
+  `CF_LAUNDRY_FAST`（1200，每晚衰減 18→36）與 `CF_LAUNDRY_CLEAN`（3000，前置
+  FAST，今後買進的物品與子物品熱度清零）。Harmony patch 8→9（新增
+  `PlayerStore.BuyItem` postfix），升級 7→9；離線 `p7laundry/check.py`
+  107/0 PASS。實機尚未跑（見「P7 0.9.0」一節）。
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.8.0 |
+| ModVersion | 0.9.0 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 79,360 bytes |
-| SHA256 | `8E6238AFD611269E30DA2D199067DE9334112A2C3215B90B7B78EA6694B3650E` |
-| Mods 安裝 | 本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
-| dist / Mods hash | Mods 已是 0.7.8 的 **76,288 bytes／`EEBF0941…`**（2026-11-17 12:14 安裝）；0.8.0 待覆蓋 |
-| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）、`4fe6b3f`（0.7.3）、`d13d49d`（0.7.4）、`c59107c`（0.7.5）、`225f17b`（0.7.6）、`3e1c4fa`（0.7.7）、`7f10b7c`（0.7.8）；0.8.0（P6）實作 `479c270`（含 docs），本輪 docs 修正見 `git log`；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
+| 大小 | 81,408 bytes |
+| SHA256 | `672BB474B90EC59B3A6E92CF834D4D25639D3E972602235F46B24128F9BB20CD` |
+| Mods 安裝 | **0.9.0 待覆蓋**：本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區，目前 Mods 仍是 0.8.0）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
+| dist / Mods hash | dist 0.9.0 = **81,408 bytes／`672BB474…`**；Mods 仍是 0.8.0 的 **79,360 bytes／`8E6238AF…`**（必須先覆蓋才能測 0.9.0） |
+| git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）、`4fe6b3f`（0.7.3）、`d13d49d`（0.7.4）、`c59107c`（0.7.5）、`225f17b`（0.7.6）、`3e1c4fa`（0.7.7）、`7f10b7c`（0.7.8）；0.8.0（P6）實作 `479c270`（含 docs）；0.9.0（P7）實作 `9d4b307`（code；docs 另 commit）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 > **0.7.7**：HSV 換色參數定案——`BlueHue=0.62`（指揮卡深藍取樣 `39,52,86`
 > 的 H 0.62）、`BlueValueGain=1.00`，保留來源 S 與陰影；白標籤（`s<0.15`）
@@ -727,13 +738,133 @@ P6 HIGHWAYMAN CHECK: PASS
 EXIT=0
 ```
 
+### 3) 實機現況（2026-11-17，P7 交接單）
+
+- 江洋大盜的**核心觸發**（到訪／對話／買箱）與 **T3 箱**已實機通過。
+- **6／8 件數未核實、不阻斷**；不要為了這個數字改 P6。
+- 尚未測：T1／T2 箱、低檔 chance（30–59）、前台塞滿 `counter full, skipped`、
+  同一天只 roll 一次／存檔重載不重複。
+- CMD 箱外觀（既有 0.7.7 染色）與新 client 的 shady sprite 仍待實機看。
+- 未買 PRO／bm<30 的 skip log 各只印一次（未測）。
+
+## P7 0.9.0 贓物熱度（箱子繼承＋兩級洗白）
+
+### 1) 改了什麼
+
+- `CardCraftAndFence.cs`：`ModVersion` 0.8.0 → 0.9.0；`OnEnable`／`OnDisable`
+  增減 `CfLaundry.OnHandlingNightlyServicesLate`；P7-1 寫在既有
+  `CfTryOpenLockPatch.Prefix` 的 `if (canOpen)` 內、`LockHelper.UnlockContainer(box)`
+  之前（只處理 `CF_CRATE_TIER` 箱、只在箱子有 `STOLEN_TAG` 時，把 `boxHeat`
+  以 `Math.Max` 繼承給遞迴子物品，最後 `RemoveStolenStatus(box)`）。
+- 新增 `CfLaundry`（夜間多跑一趟 `UpdateStolenItem`、`laundry_last_day` 同日去重）
+  與 `CfLaundryBuyPatch`（`PlayerStore.BuyItem` postfix，物品＋子物品洗白）。
+- `CfNetwork` 追加 `CF_LAUNDRY_FAST`（1200，無前置）與 `CF_LAUNDRY_CLEAN`
+  （3000，前置 `CF_LAUNDRY_FAST`），subtitle 都是 `洗白`；註冊 log 改 `N/9`，
+  hide 那行只在 `ok == 9` 印。
+- `manifest.xml`：`<ModVersion>0.9.0</ModVersion>`，Description 追加「赃物洗白」。
+- **行為變更（刻意）**：P4 小偷的 T2／T3 CF 箱（原版 T1 箱不在此列）與 P6
+  江洋大盜 CMD 箱被打開後，箱內 loot 繼承箱子的熱度、箱殼洗淨；未開箱直接
+  轉賣不繼承；索耶產出的乾淨箱不受影響。
+- **沒有**新物品、沒有改 loot 表／CMD 價格／容量；P5 五個類別本體與
+  `CfHighwayman` 與舊版位元相同（`check.py` 對 `83197a6`／`479c270`），
+  `InitDirectory`／`ContainerId`／`ContainerPrice` 不變。
+
+### 2) 0.9.0 驗收（實際輸出）
+
+**Build**
+```text
+Compiling AppraisalAssistant...
+  -> ...\dist\AppraisalAssistant\AppraisalAssistant.dll (15872 bytes)
+Compiling AugSpotter...
+  -> ...\dist\AugSpotter\AugSpotter.dll (9216 bytes)
+Compiling CardCraftAndFence...
+  -> ...\dist\CardCraftAndFence\CardCraftAndFence.dll (81408 bytes)
+Build OK: C:\Users\wangy\Desktop\Probably_Stolen_MOD\dist
+EXIT=0
+```
+
+**Verify-Mods（CardCraft 段）**
+```text
+PASS CardCraftAndFence.dll: DeepSpaceQoL.CfLaundryBuyPatch -> PlayerStore.BuyItem
+PASS CardCraftAndFence.dll: HarmonyPatch attributes checked (9)
+RESULT: PASS
+EXIT=0
+```
+
+**Probe-Patches**
+```text
+patched 8 method(s)   # AppraisalAssistant
+patched 4 method(s)   # AugSpotter
+patched 9 method(s)   # CardCraftAndFence
+  DirectoryMaster.Item
+  LockHelper.CreateLockerContainerTooltip
+  LockHelper.TryOpenLock
+  MachinePrinter.FinishPrinting
+  NetworkUpgrade.IsHiddenForRun
+  PlayerStore.BuyItem
+  StoreClientList.CreateInventor
+  StoreClientList.CreateInventorStorage
+  StoreClientList.CreateThief
+RESULT: PASS
+EXIT=0
+```
+交辦單預期 `9 / 4 / 9`，實際是 `8 / 4 / 9`：AppraisalAssistant 歷來就只有 8 個
+patch attribute，且 DLL 與 P7 前建置位元相同；**不要**動它，記錄這個差異即可。
+
+**Probe-Logic**
+```text
+[Scan] CardCraftAndFence.dll refused=False capabilities=[] findings=0 error=null
+PASS scan CardCraftAndFence.dll
+RESULT: PASS
+EXIT=0
+```
+
+**Scratch `python .scratch\p7laundry\check.py`**
+```text
+passed: 107  failed: 0
+P7 LAUNDRY CHECK: PASS
+EXIT=0
+```
+
+**Scratch `python .scratch\p6highwayman\check.py`**
+```text
+passed: 88  failed: 0
+P6 HIGHWAYMAN CHECK: PASS
+EXIT=0
+```
+標題行仍印 `P6 HIGHWAYMAN CHECK (0.8.0)`（只改 patch 數 8→9、h1/h2 版本
+0.8.0→0.9.0）；這是美觀上的已知項目，不是失敗。
+
+**Mods 安裝**
+`.../Probably Stolen/Mods/CardCraftAndFence` 仍是 **0.8.0：79,360 bytes／
+`8E6238AF…`**；本輪 agent 無法、也沒有把 0.9.0 複製過去。
+
 ### 3) 仍待實機
 
-- 江洋大盜真的到訪、對話、買箱、開箱（T1／T2／T3 各 1）。
-- 同一天只 roll 一次／只出現 1 個 client；存檔重載不重複。
-- 前台塞滿時 `counter full, skipped` 且不重複 Destroy。
-- CMD 箱外觀（既有 0.7.7 染色）與新 client 的 shady sprite。
-- 未買 PRO／bm<30 的 skip log 各只印一次。
+- **A. 開箱繼承**：贓物箱開箱後 log `[CF-LAUNDRY] open box=… heat=… children=…`，
+  箱子不再 stolen、箱內 loot 熱度 = `max(原值, boxHeat)`；索耶乾淨箱不進分支。
+- **B. FAST**：熱度 100 睡一晚 → 64（有 FAST）／82（無 FAST）；log
+  `[CF-LAUNDRY] night day=… items=…`；同日重載不重複扣。
+- **C. CLEAN**：買箱／買贓物後 log `[CF-LAUNDRY] bought clean id=… children=…`，
+  heat 0、`STOLEN_TAG` 消失、children 全乾淨；舊贓物不回溯。
+- **D. 未買升級／未開箱轉賣**：未買時照原版 18／晚、買進仍贓；未開箱轉賣不繼承。
+- **E. UI**：9 個升級（4 張卡片：Cardmaker／Thief／索耶／洗白）、
+  `registered 9/9`、仍 3 分頁／792/1060、沒有第 4 分頁、
+  沒有 overflow；CLEAN 在 FAST 未買時鎖定。
+- **F. 存讀檔**：升級狀態、熱度、箱殼／children 的 `STOLEN_TAG` 都能存讀；
+  `laundry_last_day` 擋同日重複衰減。
+- **P6 實機現況（不阻塞 P7）**：核心觸發與 T3 箱已實機通過；6／8 件數未核實
+  （非阻塞）；T1／T2／低機率／櫃台塞滿／同日重載尚未測。
+
+### 4) 未核實
+
+- **UI 版面**：9 個升級（4 張卡片）在 792/1060 是否會擠壓／換行、`洗白`
+  那張的 subtitle 與前置鎖定外觀，只有離線檢查，沒有 runtime
+  `RectTransform` 量測。
+- **存讀檔**：`laundry_last_day` 與箱子／children 的 tag 是否真的跨存檔保留，
+  未實機。
+- **runtime 衰減**：100→64／82、contraband 32／28／24／20 都是原始碼與
+  `UpdateStolenItem` 常數推導，尚未在遊戲內看到實際 heat 變化。
 
 ## 0.5.2 啟動 NRE 修正（實機回報）
 
@@ -1083,17 +1214,24 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 
 > 接下一個對話請先讀 `docs/NEXT_SESSION_HANDOFF.md`。
 
-1. 0.6.2（博士住所 hook／小偷順序）已提交（`75d227f`，本機 commit、未 push）。
-2. **P5 0.7.0 已提交 `66266cf`；0.7.1 已提交 `81c2d08`；0.7.2 已提交
-   `801a5b0`；0.7.7 已提交 `3e1c4fa`；0.7.8（P5-02／03／04／05／13／14）
-   已提交 `7f10b7c`；0.8.0（P6）已提交 `479c270`、未 push**；本輪 docs 修正
-   見 `git log`；工作區只剩本輪開始前就存在的
-   `ACCEPTANCE_REVIEW.md`／`DEVELOPER_DIAGNOSTIC.md` 修改（非本輪）。
-3. 人類實機已於 **2026-11-17** 驗收 P5：P5-01／04／06／07 通過、P5-08 通過；
+1. **P7 0.9.0 實機（優先）**：把 `dist\CardCraftAndFence\*`
+   （81,408／`672BB474…`）複製到 `...\Probably Stolen\Mods\CardCraftAndFence\`，
+   完全退出遊戲再開、重新核可；啟動應有 `Init … v0.9.0`、`enabled v0.9.0`、
+   `[CF-NET] registered 9/9`、`Harmony: 9`。接著跑
+   `docs/NEXT_SESSION_HANDOFF.md` §4c 的 A–F。
+2. P7 離線已綠：`p7laundry/check.py` 107/0、Verify 9 patches、Probe 實際
+   **8／4／9**（AppraisalAssistant 歷來 8 個，不要改）；Mods 仍是 0.8.0。
+3. **P6 0.8.0 已實作、離線已驗**；實機核心觸發／T3 箱已通過，6／8 件數未核實
+   （非阻塞），T1／T2／低機率／櫃台塞滿／同日重載尚未測；卡見
+   `docs/NEXT_SESSION_HANDOFF.md` §4b，**不阻塞 P7**。
+4. 人類實機已於 **2026-11-17** 驗收 P5：P5-01／04／06／07 通過、P5-08 通過；
    P5-09／10 未測、P5-11／12 延後到 1.0。**不要再重跑 0.7.8 的 P5 卡。**
-4. **江洋大盜（P6）0.8.0 已實作、離線已驗**；實機卡見
-   `docs/NEXT_SESSION_HANDOFF.md` §4b（到訪／買箱／開箱、同日 roll、前台塞滿）。
-5. 其餘黑市內容；補 §3.1–3.11 全文與 `Resources.LoadAll` 實機清單。
+5. 0.6.2 已提交 `75d227f`；P5 0.7.0 `66266cf`、0.7.1 `81c2d08`、0.7.2
+   `801a5b0`、0.7.7 `3e1c4fa`、0.7.8 `7f10b7c`；P6 0.8.0 `479c270`；
+   P7 code commit `9d4b307`；docs 另 commit；**未 push**。
+   工作區只剩本輪開始前就存在的 `ACCEPTANCE_REVIEW.md`／
+   `DEVELOPER_DIAGNOSTIC.md` 修改（非本輪）。
+6. 其餘黑市內容；補 §3.1–3.11 全文與 `Resources.LoadAll` 實機清單。
 
 ## 禁區
 
@@ -1113,16 +1251,20 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
   CMD T2 12×9、SEC T3 13×8、CMD T3 15×9）、`Fill` 改大件先放、smg/shotgun
   移出三張 common 池並重配權重、overflow 每箱一行；0.7.8 改 rare 先放＋
   null-safe 排序／`rolled/spawned/expected/actual/dropped` 診斷**；0.8.0（P6）
-  新增 `CfHighwayman`（江洋大盜、每日黑市聲望 roll、CMD T1/T2/T3 箱）；`CfNetwork`
-  由 4 個升級變 7 個；`CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables`
+  新增 `CfHighwayman`（江洋大盜、每日黑市聲望 roll、CMD T1/T2/T3 箱）；0.9.0
+  （P7）新增 `CfLaundry`（夜間衰減翻倍）與 `CfLaundryBuyPatch`
+  （`PlayerStore.BuyItem` 洗白）、`CfTryOpenLockPatch` 加開箱繼承；`CfNetwork`
+  由 7 個升級變 9 個；`CfThiefBoxes` 只賣 T2/T3；`ItemFactory`／`LootTables`
   擴到 T3 箱）
-- `src/CardCraftAndFence/manifest.xml`（0.8.0）
+- `src/CardCraftAndFence/manifest.xml`（0.9.0）
 - `docs/CARD_CRAFT_SPEC.md`（§3.3 T3 箱／loot、§3.4b、§3.8、**§3.9 P5**、
-  §3.10、§3.11、§3.12、**§3.13 P6**）
+  §3.10、§3.11、§3.12、**§3.13 P6**、**§3.14 P7**）
 - `docs/CARD_CRAFT_STATUS.md`（本檔）
+- `docs/NEXT_SESSION_HANDOFF.md`（0.9.0 安裝步驟與 §4c 實機卡）
 - `tools/Build-Mods.ps1`、`tools/Verify-Mods.ps1`、`tools/Probe-Patches.ps1`、
   `tools/Probe-Logic.ps1`（本輪未改）
 - `.scratch/p3check/`、`.scratch/p4check/`、`.scratch/p4bcheck/`、
   `.scratch/p4t3loot/`、`.scratch/p5spritecheck/`、`.scratch/regcheck/`、
   `.scratch/upgradecheck/`、**`.scratch/p5sawyer/check.py`**、
-  **`.scratch/p6highwayman/check.py`**（scratch-only 離線核對，不進 MOD）
+  **`.scratch/p6highwayman/check.py`**、**`.scratch/p7laundry/check.py`**
+  （scratch-only 離線核對，不進 MOD）

@@ -4,8 +4,9 @@
 > §3.3 箱體定案表（含 T3 箱）與 loot 表（含 T3 loot／EV）、貼圖決策與 errata、
 > §3.4b 的 T3 卡／核定價、§3.5 的 P3 實作（空白卡晶片、專業密序器、批量模組），
 > 以及 P4 的 §3.8（退休製卡匠／博士）、§3.10(2)（小偷分級箱）、
-> §3.11（Wild Network 7 個升級）、§3.12（CMD 箱執行期染色貼圖），
-> 和 P5 的 §3.9（索耶換卡／芯片／常駐服務／紙本目錄）。
+> §3.11（Wild Network 9 個升級）、§3.12（CMD 箱執行期染色貼圖）、
+> P5 的 §3.9（索耶換卡／芯片／常駐服務／紙本目錄）、P6 的 §3.13（江洋大盜），
+> 和 P7 的 §3.14（贓物熱度：箱子繼承＋兩級洗白）。
 
 ## §3.3 箱子 — 定案表（P2／P4 已實作）
 
@@ -832,8 +833,8 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
   （`NetworkUpgrade.IsHiddenForRun` postfix，§3.11.4）負責把 `CF_SAWYER_*`
   在交換所未解鎖前藏起來；**不要**再加一個前置 id。
 - 三個都在 `CfNetwork.EnsureRegistered()` 裡用既有 `Add(...)` 包裝與 try/catch；
-  註冊 log 改成 `[CF-NET] registered N/7 CardFence upgrades tab=CardFence width=792/1060`，
-  只有 `ok == 7` 才印 hide 那行。
+  註冊 log 改成 `[CF-NET] registered N/9 CardFence upgrades tab=CardFence width=792/1060`
+  （0.7.0–0.8.0 是 `N/7`，0.9.0 起 `N/9`），只有 `ok == 9` 才印 hide 那行。
 - 分頁寬度不變：`CardFence` 仍是第 3 個分頁、佔 792/1060（§3.11.1），
   **沒有第 4 個分頁**。
 - PERMANENT 的 `onUnlock` 用 try/catch 包住
@@ -854,7 +855,8 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - `[CF-SAWYER] paper book granted id=cf_sawyer_card_catalog`
 - `[CF-PAPER] registered runtime paper sprites notebook_manual + 4 chrome buttons`
 - `[CF-LOOT] overflow table=… item=… remaining=…; item destroyed, crate is short one roll`
-- `[CF-NET] registered N/7 CardFence upgrades tab=CardFence width=792/1060`
+- `[CF-NET] registered N/9 CardFence upgrades tab=CardFence width=792/1060`
+  （0.7.0–0.8.0 是 `N/7`）
 
 ### §3.9.9 實機驗證與未核實
 
@@ -929,6 +931,8 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
 - **T1 一律不加**：原版 thief 已經會賣 T1 箱，CF 這條只補 T2／T3。
 - **永不給 CMD 箱**：小偷的家族池只有 SEC／MED／ENG／SER。
 - 不改 thief 的 `acceptRetailMarkup`（上一版曾設 false，本輪移除）。
+- **P7-1（0.9.0）**：被打開的贓物箱會把自身熱度繼承給箱內 loot，箱子外殼則被洗淨；
+  這是刻意的行為變更（§3.14.1）。
 
 ### §3.10.2 箱等級（黑市聲望 → 等級）
 
@@ -971,6 +975,8 @@ P1–P3 只建了 T1／T2。P4 的退休製卡匠庫存要求「1 張 T3 卡 + 1
   不進後台、不進玩家背包。
 - **先 CF 箱、再原版庫存**：若原版 thief 商品因此被擠掉，這是刻意取捨；
   CF 箱需要 6 個連續空欄，原版先鋪會讓箱子幾乎永遠放不下。
+- **P7-1（0.9.0）**：被打開的贓物箱會把自身熱度繼承給箱內 loot（刻意的行為變更，
+  §3.14.1）；未開箱直接轉賣則不繼承。
 
 ### §3.10.5 診斷 log
 
@@ -1007,13 +1013,13 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
 
 - `OnEnable` 呼叫 `ModHelper.SetNetworkTabLabel("CardFence", () => "制卡")`；
   `GetTabLabel` 會先找 `UI` 表的 `network_ui_tab_CardFence`，沒有才用這個 provider。
-- **7 個升級**全部用 `ModHelper.AddNetworkUpgrade(...)`，`tab: "CardFence"`，
-  `subtitle` 只有 `Cardmaker`、`Thief` 與 `索耶` 三種。
+- **9 個升級**全部用 `ModHelper.AddNetworkUpgrade(...)`，`tab: "CardFence"`，
+  `subtitle` 只有 `Cardmaker`、`Thief`、`索耶` 與 `洗白` 四種。
 - title／description 用 `Func<string>` provider 直接回中文（本 MOD 沒有自己的
   在地化檔）；`GetLocalizedTitle` 會先找 `NetworkUpgrade` 表的 `network_<id>_title`
   key，找不到才用 provider，所以之後補在地化不用改代碼。
 
-### §3.11.3 7 個升級（價格定案）
+### §3.11.3 9 個升級（P7 追加兩級洗白）
 
 | id | 價格 | 前置 | subtitle | 效果 |
 |---|---:|---|---|---|
@@ -1024,15 +1030,17 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
 | `CF_SAWYER_PERMANENT` | 400 | — | 索耶 | 索耶常駐：每夜換卡、接管原版三個 crate barter；`onUnlock` 發換卡目錄紙本（§3.9） |
 | `CF_SAWYER_BATCH` | 700 | `CF_SAWYER_PERMANENT` | 索耶 | 取消「每晚 1 箱」上限 |
 | `CF_SAWYER_CHIP` | 900 | `CF_SAWYER_PERMANENT` | 索耶 | 芯片升級：3 個同家族同級核心 → 下一級（T3 不升） |
+| `CF_LAUNDRY_FAST` | 1200 | — | 洗白 | 贓物熱度的每晚自然衰減翻倍（18 → 36，§3.14.3） |
+| `CF_LAUNDRY_CLEAN` | 3000 | `CF_LAUNDRY_FAST` | 洗白 | 今後買進的物品與其開箱子物品熱度清零（§3.14.4） |
 
-- 7 個升級都是**取得管道**的開關；只有 `CF_FENCE_PRO` 與 `CF_SAWYER_PERMANENT`
+- 9 個升級都是**取得管道**的開關；只有 `CF_FENCE_PRO` 與 `CF_SAWYER_PERMANENT`
   會直接發物品（各一次性）。
 - `CF_SAWYER_*` 的三個**沒有**「交換所已解鎖」的 prerequisites id：那條由
   `IsHiddenForRun` postfix（§3.11.4）負責，不要重複加前置。
 - `state = 1`（未買）、不可重複、無 cooldown；`recommended` 不設，避免佔用
   recommended 卡位。
 - 圖示 `iconKey` 不指定：`WildNetworkUI.ResolveIcon` 會 fallback 到 `BUY_REFERAL`，
-  不會出現空圖；7 個升級都還沒有專屬 icon。
+  不會出現空圖；9 個升級都還沒有專屬 icon。
 - **刪除的舊 id**：`CF_FENCE_CONTACT`、`CF_FENCE_BATCH`、`CF_FENCE_SUPPLY`、
   `CF_FENCE_T1`、`CF_FENCE_THIEF`。舊存檔若買過這些 id，`networkUpgrade`
   字典裡會留下孤兒條目，但 `GetDefinitionsInOrder` 只認已註冊的定義，
@@ -1052,8 +1060,9 @@ P5 的索耶升級要嘛放進 `CardFence`，要嘛放進 `Advanced`，不得新
 - `[CF-NET] register start id=… prereq=…`
 - `[CF-NET] register ok id=…`
 - `[CF-NET] register failed id=… stage=ModHelper.AddNetworkUpgrade …`
-- `[CF-NET] registered N/7 CardFence upgrades tab=CardFence width=792/1060`
-- `[CF-NET] hide CF_SAWYER_* until the exchange is unlocked`（只有 `ok == 7` 才印）
+- `[CF-NET] registered N/9 CardFence upgrades tab=CardFence width=792/1060`
+  （歷史：0.7.0–0.8.0 是 `N/7`，0.9.0 起 `N/9`）
+- `[CF-NET] hide CF_SAWYER_* until the exchange is unlocked`（只有 `ok == 9` 才印）
 - `[CF-NET] PRO kit granted printer+chip+cnc+2 electronic+2 plastic+battery`
 - `[CF-INVENTOR] stock desequencer+batch`
 - 索耶本身的 log（`[CF-SAWYER] …`）見 §3.9.8。
@@ -1087,10 +1096,11 @@ Error: NullReferenceException ... at CardCraftAndFenceMod.OnEnable () [0x000a]
 - 升級改在 `ModHook.OnGameLoadedLate`（讀檔）與 `ModHook.OnNewGameStarted`
   （新遊戲）註冊；这时 `PlayerStore.Instance` 已存在且 `networkUpgrade` 可用。
 - 每個 `Add` 各自 `try/catch`，印 `register start/ok/failed id=…`，
-  最後一定印 `registered N/7`（0.5.2 當時是 `N/4`）；任何一個失敗都不會讓後面的消失。
+  最後一定印 `registered N/9`（0.5.2 當時是 `N/4`，0.7.0–0.8.0 是 `N/7`）；
+  任何一個失敗都不會讓後面的消失。
 - 每個讀檔／新遊戲都重跑一次（`RegisterModUpgrade` 對同 id 是 remove+add，
   `PlayerStore.networkUpgrade` 只在缺 id 時補），所以第二輪新遊戲也會有全部定義
-  （0.7.0 起 7 個）。
+  （0.7.0 起 7 個，0.9.0 起 9 個）。
 - 這條也讓 `CF_FENCE_*` 在製卡匠／小偷第一次生成前就存在，gate 不會讀到缺 id。
 
 ## §3.12 CMD 箱貼圖＝執行期染色（0.5.1）
@@ -1272,3 +1282,197 @@ CMD 箱不引入任何美術檔：用 `sec_box`／`sec_box_u` 在執行期把來
 - 前台塞滿：`counter full, skipped cf_cmd_box_*`，沒有例外、沒有重複 Destroy。
 - bm<30：`skip: bm=… < 30` 只印一次；未買 PRO 時
   `skip: CF_FENCE_PRO not unlocked` 只印一次。
+
+## §3.14 P7 贓物熱度（0.9.0）：箱子繼承＋兩級洗白
+
+> 本節只寫「已寫進代碼、且已用離線檢查核對過」的規則；**沒有任何實機結果**。
+> 開箱繼承、夜間衰減、購買洗白、UI、存讀檔都尚未在遊戲內看過（§3.14.6）。
+> 0.9.0 只新增兩個升級與一個 Harmony patch；P5／P6 的類別本體不變。
+
+### §3.14.1 設計與刻意行為變更（P7-1）
+
+P7-1 在既有的 `CfTryOpenLockPatch.Prefix` 裡，位置是 `if (canOpen)` 之內、
+`LockHelper.UnlockContainer(box)` 之前；**沒有新增 patch**。
+
+- 只處理 `box.IsTag("CF_CRATE_TIER")` 的 CF 箱；原版箱子（沒有這個 tag）在
+  prefix 開頭就 `return true`，照原版解鎖規則走。
+- 只有 `box.IsTag("STOLEN_TAG")` 才進入繼承分支：
+  1. `int boxHeat = StolenHelper.GetFoundChance(box)`。
+  2. `boxHeat > 0` 時，對 `GraphUtils.FindAllChildrenType<GameItem>(box)`
+     的每個子物品（遞迴 BFS、不含箱子本身；`null` 跳過）：
+     `childHeat = child.IsTag("STOLEN_TAG") ? StolenHelper.GetFoundChance(child) : 0`，
+     再 `StolenHelper.SetHeat(child, Math.Max(childHeat, boxHeat))`。
+  3. 不論 `boxHeat` 是否為 0，最後都 `StolenHelper.RemoveStolenStatus(box)`，
+     把箱子外殼洗淨。
+  4. log `[CF-LAUNDRY] open box=<id> heat=<n> children=<n>`。
+- 刻意後果（**行為變更**）：
+  - **P4 小偷的 T2／T3 分級箱與 P6 江洋大盜 CMD 箱**（都是 CF 箱、都會標
+    stolen；原版 T1 箱不是 CF 箱、不受影響）：開箱後熱度轉到箱內 loot，
+    箱子本身變乾淨。這是 P7-1 有意為之，不是 bug。
+  - **未開箱的贓物箱直接賣給客戶**：買方拿到的是原本的熱箱；繼承只發生在
+    「開箱」這條路徑，轉賣不繼承、也不洗白。
+  - **索耶換卡產出的箱子**：產出時就是乾淨的（沒有 `STOLEN_TAG`），整個分支
+    不會進入，箱內物件維持乾淨。
+  - **`boxHeat == 0`**：不打 `SetHeat`、箱內子物品原樣不動；但外殼仍會
+    `RemoveStolenStatus`（若它還帶著 `STOLEN_TAG`）。
+  - 只有 CF 箱會走這個 prefix；原版箱子的解鎖行為完全不變。
+- `GraphUtils.FindAllChildrenType<GameItem>` 是遞迴走訪，箱內多層容器也算在內；
+  `children` 計數是實際走到的子物品數，不是「有被改熱」的數量。
+- 開箱仍需要對應的鑰匙卡（`canOpen` 條件不變）；繼承只在使用者真的開箱時發生。
+
+### §3.14.2 兩級升級（`tab="CardFence"`、`subtitle="洗白"`）
+
+| id | 價格 | 前置 | title | 效果 |
+|---|---:|---|---|---|
+| `CF_LAUNDRY_FAST` | 1200 | —（無 prerequisites） | 快速洗白 | 贓物熱度的每晚自然衰減翻倍（18 → 36） |
+| `CF_LAUNDRY_CLEAN` | 3000 | `new[] { CF_LAUNDRY_FAST }` | 彻底洗白 | 今後買進的物品及其開箱子物品熱度清零 |
+
+- 兩個都註冊在 `CfNetwork.EnsureRegistered()`，`tab: "CardFence"`、`subtitle: "洗白"`；
+  既有 7 個升級（Cardmaker／Thief／索耶）與 `CF_SAWYER_*` 的隱藏規則
+  （§3.11.4）都不變。
+- 註冊 log 變成 `[CF-NET] registered N/9 CardFence upgrades tab=CardFence width=792/1060`；
+  hide 那行只在 `ok == 9` 時印。
+- **仍然沒有第 4 個分頁**：`CardFence` 是第 3 個分頁，寬度仍是 792/1060
+  （§3.11.1）；兩個新升級只能放在這個分頁裡。
+- CLEAN 的前置就是 FAST；FAST 未買時 CLEAN 應保持鎖定。兩者都不可重複購買、
+  沒有 cooldown、`recommended` 不設、沒有專屬 icon。
+
+### §3.14.3 FAST 實作（被動，夜間多跑一趟）
+
+- `OnEnable` 對 `ModHook.OnHandlingNightlyServicesLate` 先 `-=` 再 `+=`
+  `CfLaundry.OnHandlingNightlyServicesLate`；`OnDisable` `-=`。
+- hook 點在 `PlayerStore.EndNight` 的 `PlayerStore.cs:1744`，早於原版
+  `StolenHelper.UpdateStolenItem` 的迴圈（1757，呼叫點 1759），所以這裡多跑的
+  一趟會疊在原版那一趟之前。
+- handler 立即返回的條件：`CF_LAUNDRY_FAST` 未解鎖、`PlayerStore.Instance` 或
+  `StoreStation.Instance` 為 null、`dayCounter <= 0`。
+- 通過後：對 `PlayerStore.Instance.FindAllItem()` 裡每個
+  `StolenHelper.IsStolenItem(item)` 的物品，多做一次
+  `StolenHelper.UpdateStolenItem(item)`；原版那一趟之後照常再跑一次。
+- 因此基礎衰減是 **18 × 2 = 36／晚**；熱度 100 的贓物一晚變 64，未買 FAST
+  的對照是 82。帶 `CONTRABAND_LEVEL_LOW/MID/HIGH/CRITICAL` 時，**兩趟各自**
+  少 2／4／6／8，合計一晚 32／28／24／20（比 36 少 4／8／12／16）。
+- `laundry_last_day`（`ModHelper` modData，預設 -1）記錄上次執行的
+  `StoreStation.Instance.dayCounter`；同一天再 `EndNight` 直接返回，避免
+  reload 後同一天扣兩次。寫入發生在衰減迴圈之後。
+- 只處理 `IsStolenItem` 為 true 的物品；乾淨物品不碰。log
+  `[CF-LAUNDRY] night day=<d> items=<n>`，`items` 是實際多跑一趟的件數。
+- **FAST 沒有新增 Harmony patch**，只用既有的 `ModHook`。
+
+### §3.14.4 CLEAN 實作（購買後洗白）
+
+- 這是 P7 唯一的新 patch（總數 8 → 9）：
+  `[HarmonyPatch(typeof(PlayerStore), nameof(PlayerStore.BuyItem))]`，postfix
+  `CfLaundryBuyPatch.Postfix(GameItem item)`。
+- gate：`CfNetwork.Unlocked(CfNetwork.LaundryClean)` 且 `item != null`；
+  其餘直接 return。
+- 先 `StolenHelper.RemoveStolenStatus(item)`，再對
+  `GraphUtils.FindAllChildrenType<GameItem>(item)` 的每個子物品
+  `RemoveStolenStatus`；子物品的 `STOLEN_TAG` 與 `STOLEN_VALUE_INT` 都會清掉。
+- log `[CF-LAUNDRY] bought clean id=<id> children=<n>`，而且只有在
+  「物品本身原本是 stolen」或「至少一個子物品原本是 stolen」時才印；
+  買乾淨物品不會有這行。
+- `PlayerStore.BuyItem(GameItem)` 是共同購買路徑：`BuyItemFromTable()` 與
+  `NegociationUIManager.BuyMultipleItem` 最後都呼叫它，所以一個 postfix 就涵蓋
+  檯面購買與多選購買。postfix 只做事後清理，不改價格、不擋交易。
+- **只影響今後的購買**：已經在背包／店裡的贓物不會回溯洗白，照常每晚衰減。
+- 因為 `STOLEN_TAG` 消失，原版的贓物售價加成與 `GetStolenItemTradingRepBonus`
+  的聲望加成也一併不再適用（`ApplyStolenDiscount`／
+  `GetStolenItemTradingRepBonus` 都以 `STOLEN_TAG` 為條件）。
+- 沒有其他 patch、沒有新物品、沒有改 loot 表。
+
+### §3.14.5 Patch 數 8 → 9 與實際清單
+
+`Probe-Patches.ps1` 對 `CardCraftAndFence.dll` 的實際輸出（節錄）：
+
+```text
+patched 9 method(s)
+  DirectoryMaster.Item
+  LockHelper.CreateLockerContainerTooltip
+  LockHelper.TryOpenLock
+  MachinePrinter.FinishPrinting
+  NetworkUpgrade.IsHiddenForRun
+  PlayerStore.BuyItem
+  StoreClientList.CreateInventor
+  StoreClientList.CreateInventorStorage
+  StoreClientList.CreateThief
+```
+
+- 第 9 個就是 `PlayerStore.BuyItem`（`CfLaundryBuyPatch`）。
+- P7 新增的診斷 log（都帶 `[CardCraftAndFence] ` 前綴）：
+  - `[CF-LAUNDRY] open box=<id> heat=<n> children=<n>`
+  - `[CF-LAUNDRY] night day=<d> items=<n>`
+  - `[CF-LAUNDRY] bought clean id=<id> children=<n>`
+  - `[CF-LAUNDRY] night handler failed: <Type>: <Message>`
+- 其餘舊 log 不變；`[CF-NET] registered` 由 `N/7` 變 `N/9`（§3.11.5）。
+
+### §3.14.6 離線驗收（實際輸出）與實機卡（尚未跑）
+
+**版本與產物**
+
+- `src/CardCraftAndFence/CardCraftAndFence.cs`：`internal const string ModVersion = "0.9.0";`；
+  `manifest.xml`：`<ModVersion>0.9.0</ModVersion>`。
+- `dist/CardCraftAndFence/CardCraftAndFence.dll` = **81,408 bytes**，SHA256
+  `672BB474B90EC59B3A6E92CF834D4D25639D3E972602235F46B24128F9BB20CD`。
+- `AppraisalAssistant.dll` 15,872 bytes／`44BAFD769ACDF9B0BE35C56CF636D2E885102F00403281A06D90C8C6B335EA2E`；
+  `AugSpotter.dll` 9,216 bytes／`CA20B617507A1FC1A9D53F4773F0A7A459BC40D71BCB7C0933E85DAE82332DA7`。
+- `Build-Mods.ps1` exit 0，3 個 DLL。
+
+**Verify-Mods.ps1**：`RESULT: PASS`；CardCraft 9 patches，包含新的
+`DeepSpaceQoL.CfLaundryBuyPatch -> PlayerStore.BuyItem`；無 banned API；
+`HarmonyPatch attributes checked (9)`。
+
+**Probe-Patches.ps1**：`RESULT: PASS`；實際 `patched 8 method(s)`（AppraisalAssistant）、
+`patched 4 method(s)`（AugSpotter）、`patched 9 method(s)`（CardCraftAndFence，
+清單含 `PlayerStore.BuyItem`）。
+**已知差異**：P7 交辦單預期 `9 / 4 / 9`，但 AppraisalAssistant 歷來就只有
+**8** 個 patch attribute，且它的 DLL 與 P7 前建置位元相同；**不要**為了湊 9
+去改 AppraisalAssistant。實際以 **8 / 4 / 9** 為準。
+
+**Probe-Logic.ps1**：`RESULT: PASS`；
+`[Scan] CardCraftAndFence.dll refused=False capabilities=[] findings=0`。
+
+**離線檢查**
+
+- `python .scratch\p7laundry\check.py`：`passed: 107  failed: 0`／
+  `P7 LAUNDRY CHECK: PASS`，exit 0。
+- `python .scratch\p6highwayman\check.py`：`passed: 88  failed: 0`／
+  `P6 HIGHWAYMAN CHECK: PASS`，exit 0。標題行仍印 `P6 HIGHWAYMAN CHECK (0.8.0)`
+  （只允許改 patch 數 8→9 與 h1/h2 版本 0.8.0→0.9.0）；這是美觀上的已知項目，
+  不是失敗。
+
+**實機驗收卡（A–F，全部尚未跑；agent 不啟動遊戲）**
+
+> 安裝：完全退出遊戲 → 備份存檔 → 把 `dist\CardCraftAndFence\*`
+> （81,408／`672BB474…`）覆蓋到 Mods → 重新核可。啟動 log 應有
+> `Init … v0.9.0`、`enabled v0.9.0`、`[CF-NET] registered 9/9`、`Harmony: 9`。
+
+- **A. 開箱繼承／索耶乾淨箱（P7-1）**：買一個上鎖的贓物箱（小偷或江洋大盜），
+  記下開箱前箱子的熱度；用對應鑰匙卡打開，log 應有
+  `[CF-LAUNDRY] open box=<id> heat=<n> children=<n>`。箱子本身應不再帶
+  `STOLEN_TAG`（不再被查），箱內每件 loot 的熱度應為
+  `max(原 childHeat, boxHeat)`。反向：索耶換卡產出的乾淨箱開箱時**不應**出現
+  `[CF-LAUNDRY] open`，箱內物件維持乾淨。
+- **B. FAST 衰減**：已買 FAST，帶一件熱度 100 的贓物睡一晚 → 熱度應為 **64**
+  （18×2）；未買 FAST 的對照存檔應為 **82**（18）。log 應有
+  `[CF-LAUNDRY] night day=<d> items=<n>`；同一天存檔→重載→再睡，不應再扣第二次。
+  帶 `CONTRABAND_LEVEL_*` 的物件，兩趟各減 2／4／6／8（合計 32／28／24／20）。
+- **C. CLEAN 購買**：已買 CLEAN，買一個帶箱內贓物的箱子（或直接買贓物）→
+  log `[CF-LAUNDRY] bought clean id=<id> children=<n>`；買到的箱子熱度 0、
+  `STOLEN_TAG` 消失、箱內 children 也全部乾淨。已存在的舊贓物不受影響，
+  照常每晚衰減；買乾淨物品不應印這行。
+- **D. 未買升級／未開箱轉賣**：未買 FAST／CLEAN 時，贓物照原版 18／晚衰減、
+  買進仍是贓物，不應有 P7 的洗白 log。把未開箱的贓物箱直接賣給客戶：
+  買方拿到的是熱箱，**不繼承、不被洗白**；log 不應有 `[CF-LAUNDRY] open`。
+- **E. UI**：CardFence 分頁應有 **9 個**升級（7 舊 + 快速洗白 + 彻底洗白）；
+  UI 依 subtitle 分成 4 張卡片（Cardmaker、Thief、索耶、洗白），洗白那張
+  有 2 個格子；log 應有
+  `[CF-NET] registered 9/9 CardFence upgrades tab=CardFence width=792/1060`
+  與 hide 那行。仍是 3 個分頁、792/1060、**沒有第 4 個分頁**、沒有卡片重疊／
+  overflow；CLEAN 在 FAST 未買時應鎖定。
+- **F. 存讀檔**：買 FAST／CLEAN 後存檔→重載，升級仍為已買、`9/9` log 重印、
+  效果持續；同一天（`dayCounter` 不變）存檔→重載→再睡，`laundry_last_day`
+  不讓同一天扣第二次。贓物熱度、箱子 `STOLEN_TAG`、箱內 children 狀態都應
+  正確保存。
+
+以上 A–F **全部尚未執行**；在人類回報 `Player.log` 之前，不得寫成已驗收。
