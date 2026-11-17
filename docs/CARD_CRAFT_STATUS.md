@@ -1005,14 +1005,16 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
 
 ## 下一步
 
+> 接下一個對話請先讀 `docs/NEXT_SESSION_HANDOFF.md`。
+
 1. 0.6.2（博士住所 hook／小偷順序）已提交（`75d227f`，本機 commit、未 push）。
 2. **P5 0.7.0 已提交 `66266cf`；0.7.1 已提交 `81c2d08`；0.7.2 已提交
    `801a5b0`；0.7.7 已提交 `3e1c4fa`；0.7.8（P5-02／03／04／05／13／14）
    已提交 `7f10b7c`、未 push**；工作區只剩本輪開始前就存在的
    `ACCEPTANCE_REVIEW.md`／`DEVELOPER_DIAGNOSTIC.md` 修改（非本輪）。
 3. 人類實機重測 **0.7.8**：P5-01 容量三箱（T3 SEC ×5、T3 CMD ×5、
-   T2 CMD ×3，件數 = rolls+1、無 overflow、SEC T2 7 件）、P5-06 芯片、
-   P5-07 促銷 UI；再跑 P4 修訂、CMD 貼圖與其餘驗收卡，收集 `[CF-NET]`／
+   T2 CMD ×3，件數 = rolls+1、無 overflow）、**P5-04 T3 MED／ENG／SER
+   各 3 箱**、P5-06 芯片、P5-07 促銷 UI；再跑 P4 修訂、CMD 貼圖與其餘驗收卡，收集 `[CF-NET]`／
    `[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`／`[CF-SPRITE]`／
    `[CF-SAWYER]`／`[CF-PAPER]`，並補 T3 in-game `[CF-EV]`。
 4. **江洋大盜（P6）**：補 CMD 箱的正常來源（P5 的換卡已先給 CMD T1 一個來源）。
