@@ -1675,3 +1675,65 @@ title／description、icon 都沒有變。
   沒有 `Init failed`、`Harmony: 9`、`registered 9/9`。
 
 以上 A–F **全部尚未執行**；在人類回報 `Player.log` 之前，不得寫成已驗收。
+
+## §3.16 P9 3D 列印塑料穩定來源（0.11.0）
+
+### §3.16.1 目的與定位
+
+`printer_plastic` 原本只靠搜垃圾／拾荒人／退休製卡匠的低機率庫存，對「用印表機
+自產空白卡」的玩家不是穩定輸入。P9 在 Wild Network 的 `CardFence` 分頁加一個
+**可重複購買的回收合約**，讓玩家用 credits 換固定塑料；不走掉寶表、不改原版
+垃圾／拾荒人／匠人機率，也不新增物品。
+
+### §3.16.2 參數
+
+| 項目 | 值 |
+|---|---|
+| 升級 id | `CF_PLASTIC_RECLAIM` |
+| 分頁 | `CardFence`（既有第 3 分頁，第 10 張卡；不加第 4 分頁） |
+| 成本 | 250 credits（normal base；hard 由遊戲自動 ×2 = 500） |
+| 冷卻 | 3 天（`cooldownDays=3`，`isRepeatable=true`） |
+| 每次給付 | 6 × `printer_plastic`（`unitValue=12`、`BASIC_MATERIAL`、`PRINTER_MATERIAL_TAG`） |
+| 前置 | 無 |
+| 取得位置 | 後台優先；後台滿時 `EmporiumTryAdd` 依序 fall through 其他店內 inventory |
+
+### §3.16.3 實作
+
+- `CfNetwork` 新增常數 `PlasticReclaim`／`PlasticReclaimCost=250`／
+  `PlasticReclaimDays=3`／`PlasticReclaimAmount=6`。
+- `CfNetwork.Add(...)` 增加 optional `int cooldownDays = 0`，原 9 個呼叫不變；
+  第 10 個呼叫傳 3。`Add` 把 `cooldownDays` 接到
+  `ModHelper.AddNetworkUpgrade(..., tab, null, prerequisites, cooldownDays)`。
+- `GrantPlastic()`：`Grant(back, "printer_plastic")` ×6；`Grant` 內
+  `GeneralHelper.SetItemOwned(item, true)` + `GraphUtils.EmporiumTryAdd(back, item)`，
+  所以後台滿時不會原地 destroy，會落到其他店內 inventory。
+- `NetworkUpgrade.Unlock()` 每次購買都呼叫 `onUnlock`；`cooldownDuration != 0`
+  時 `state` 回到 1、`cooldownCurrent=3`，3 天後再可買。不是一次性升級。
+- **沒有新 Harmony patch、沒有新物品、沒有改 loot 表**；CardCraft 仍 9 patches。
+
+### §3.16.4 離線驗收
+
+- `Build-Mods.ps1` exit 0；`CardCraftAndFence.dll` = **82,944 bytes**，SHA256
+  `FBEA8729E8DDDA1217295FC2E682CAD60A56D99FF7FE0F2E9D1B89640A8EA80B`。
+- `Verify-Mods.ps1`：`RESULT: PASS`，9 patches（無新增），無 banned API。
+- `Probe-Patches.ps1`：`patched 8 / 4 / 9`，`RESULT: PASS`。
+- `Probe-Logic.ps1`：`[Scan] CardCraftAndFence.dll refused=False capabilities=[] findings=0`，PASS。
+- `Dump.exe strings` 可見 `CF_PLASTIC_RECLAIM`、`回收塑料合约`、
+  `[CF-NET] plastic contract granted`。
+- **實機：使用者回報「有、沒問題」**（2026-11-26）。合約存在且可購買；未提供
+  逐項 `Player.log`，所以下面 3–5 的細節仍屬未逐項核實。
+
+### §3.16.5 實機驗收卡（已跑，使用者回報 OK）
+
+1. 完全退出遊戲，確認 Mods 內是 82,944 bytes／`FBEA8729…`，重新啟動並載入存檔。
+2. 手機 → Wild → Wild Network → `制卡` 分頁，應看到第 10 張卡
+   「回收塑料合约」（subtitle `服务`，250 credits）。
+3. 購買後：後台應多 6 個 `printer_plastic`；log 應有
+   `[CF-NET] plastic contract granted 6 printer_plastic`。
+4. 卡片應顯示 3 天冷卻；3 天後可再買，重複購買每次都是 6 個。
+5. 後台塞滿時再買：物品應落到其他店內 inventory，不應消失；log 不應有
+   `EmporiumTryAdd: every store inventory is full`。
+6. 存讀檔：合約仍在、冷卻天數保持；Wild Network 其他 9 張卡不受影響。
+
+以上 1–6 使用者回報「有、沒問題」；但沒有逐項 log，6 個入後台、3 天冷卻、
+後台滿 fallback 仍列為未逐項核實，不寫成全部已驗收。

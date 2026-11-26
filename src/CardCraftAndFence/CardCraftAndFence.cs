@@ -20,7 +20,7 @@ namespace DeepSpaceQoL
     public sealed class CardCraftAndFenceMod : IMod
     {
         internal const string ModId = "deepspace.card_craft_and_fence";
-        internal const string ModVersion = "0.10.0";
+        internal const string ModVersion = "0.11.0";
 
         public void Init(ModManifest manifest)
         {
@@ -1722,10 +1722,10 @@ namespace DeepSpaceQoL
     }
 
     /// <summary>
-    /// P4/P5 Wild Network "CardFence" tab. All seven upgrades (four CF_FENCE_*
-    /// plus three CF_SAWYER_*) are acquisition/service gates, not stat buffs:
-    /// each one only opens a buy channel or a nightly exchange service. The tab
-    /// arithmetic is fixed by the prefab:
+    /// P4/P5 Wild Network "CardFence" tab. All ten upgrades (four CF_FENCE_*
+    /// plus three CF_SAWYER_*, two CF_LAUNDRY_*, and CF_PLASTIC_RECLAIM) are
+    /// acquisition/service gates, not stat buffs: each one only opens a buy
+    /// channel or a repeatable service. The tab arithmetic is fixed by the prefab:
     /// TABS_W = 1060, TAB_W = 256, step = 268 (TAB_W + TAB_GAP). Three tabs use
     /// 792 px, so CardFence fits with 268 px to spare; a fourth tab would be
     /// exactly 1060 px with no margin, which is why this mod never adds one.
@@ -1750,6 +1750,14 @@ namespace DeepSpaceQoL
         // with no margin.
         internal const string LaundryFast = "CF_LAUNDRY_FAST";
         internal const string LaundryClean = "CF_LAUNDRY_CLEAN";
+
+        // P9 stable source: a repeatable Wild Network contract. It sells
+        // printer_plastic directly, so the player is not dependent on trash,
+        // scavengers or the retired cardmaker for the printer input.
+        internal const string PlasticReclaim = "CF_PLASTIC_RECLAIM";
+        internal const int PlasticReclaimCost = 250;
+        internal const int PlasticReclaimDays = 3;
+        internal const int PlasticReclaimAmount = 6;
 
         // P8 economy: these are normal difficulty bases. The game doubles every
         // NetworkUpgrade cost on hard, so 350 shows as 700 there; do not
@@ -1836,8 +1844,15 @@ namespace DeepSpaceQoL
                 new[] { LaundryFast },
                 null) ? 1 : 0;
 
-            Log.Info("[CF-NET] registered " + ok + "/9 CardFence upgrades tab=CardFence width=792/1060");
-            if (ok == 9)
+            ok += Add(PlasticReclaim, PlasticReclaimCost, "服务", "回收塑料合约",
+                "王尔德的人脉每 " + PlasticReclaimDays + " 天送来 "
+                + PlasticReclaimAmount + " 个 3D 打印塑料。可重复购买；这是列印耗材的稳定来源。",
+                null,
+                GrantPlastic,
+                PlasticReclaimDays) ? 1 : 0;
+
+            Log.Info("[CF-NET] registered " + ok + "/10 CardFence upgrades tab=CardFence width=792/1060");
+            if (ok == 10)
             {
                 Log.Info("[CF-NET] hide CF_SAWYER_* until the exchange is unlocked");
             }
@@ -1922,6 +1937,32 @@ namespace DeepSpaceQoL
             GraphUtils.EmporiumTryAdd(back, item);
         }
 
+        // Repeatable contract: six printer_plastic per purchase. Grant() marks
+        // the item owned and EmporiumTryAdd falls through to the other store
+        // inventories if the back counter is full, instead of destroying it.
+        private static void GrantPlastic()
+        {
+            try
+            {
+                if (PlayerStore.Instance == null || EmporiumEntry.Instance == null)
+                {
+                    return;
+                }
+                GameInventory back = EmporiumEntry.Instance.backInvinvElement;
+                for (int i = 0; i < PlasticReclaimAmount; i++)
+                {
+                    Grant(back, "printer_plastic");
+                }
+                Log.Info("[CF-NET] plastic contract granted "
+                    + PlasticReclaimAmount + " printer_plastic");
+            }
+            catch (Exception e)
+            {
+                Log.Error("[CF-NET] plastic contract grant failed: "
+                    + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
         private static bool Add(
             string id,
             int cost,
@@ -1929,12 +1970,14 @@ namespace DeepSpaceQoL
             string title,
             string description,
             string[] prerequisites,
-            Action onUnlock)
+            Action onUnlock,
+            int cooldownDays = 0)
         {
             try
             {
                 Log.Info("[CF-NET] register start id=" + id
-                    + " prereq=" + (prerequisites == null ? "-" : string.Join(",", prerequisites)));
+                    + " prereq=" + (prerequisites == null ? "-" : string.Join(",", prerequisites))
+                    + " cooldown=" + cooldownDays);
                 ModHelper.AddNetworkUpgrade(
                     CardCraftAndFenceMod.ModId,
                     id,
@@ -1945,7 +1988,8 @@ namespace DeepSpaceQoL
                     onUnlock,
                     Tab,
                     null,
-                    prerequisites);
+                    prerequisites,
+                    cooldownDays);
                 Log.Info("[CF-NET] register ok id=" + id);
                 return true;
             }

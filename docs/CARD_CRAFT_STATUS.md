@@ -1,6 +1,6 @@
 # CardCraftAndFence 開發狀態
 
-更新時間：2026-11-17（0.10.0：P8 經濟平衡；P7 洗白與 P8 A–F 實機尚未跑）
+更新時間：2026-11-26（0.11.0：P9 Wild Network 塑料合約**實機通過**；P8 實機尚未跑）
 
 ## 階段
 
@@ -73,17 +73,22 @@
   「每天 3 顆同家族、最先上架」（`day % 5`、最高已解鎖等級）。Harmony 仍 9、
   無新物品／loot；離線 `p8balance/check.py` 111/0 PASS；Patch 8／4／9。
   **實機尚未跑**（見「P8 0.10.0 經濟平衡」一節）。
+- **P9：0.11.0 完成（離線＋實機）。** Wild Network `CardFence` 分頁追加
+  `CF_PLASTIC_RECLAIM`「回收塑料合約」：250 credits、冷卻 3 天、每次 6 個
+  `printer_plastic`，可重複購買；無新 patch、無新物品。升級數 9→10，
+  Build/Verify 仍 9 patches（8/4/9）。**使用者實機回報「有、沒問題」**（未提供
+  逐項 log；6 個入後台／3 天冷卻／後台滿 fallback 見未決）。
 
 ## 目前 build
 
 | 項目 | 值 |
 |---|---|
-| ModVersion | 0.10.0 |
+| ModVersion | 0.11.0 |
 | DLL | `dist/CardCraftAndFence/CardCraftAndFence.dll` |
-| 大小 | 82,432 bytes |
-| SHA256 | `FCECBE0A5B6FAA85ABFAE54699560FB5BEB5F193D3E3AB287EBE18833C58EB7E` |
-| Mods 安裝 | **0.10.0 待覆蓋**：本輪**未覆蓋** `.../Probably Stolen/Mods/CardCraftAndFence`（沙箱只寫工作區，目前 Mods 仍是 **0.8.0：79,360 bytes／`8E6238AF…`**）；要實機請先複製 `dist/CardCraftAndFence` 過去，並完全退出遊戲再開 |
-| dist / Mods hash | dist 0.10.0 = **82,432 bytes／`FCECBE0A…`**；Mods 仍是 0.8.0 的 **79,360 bytes／`8E6238AF…`**（必須先覆蓋才能測 0.10.0） |
+| 大小 | 82,944 bytes |
+| SHA256 | `FBEA8729E8DDDA1217295FC2E682CAD60A56D99FF7FE0F2E9D1B89640A8EA80B` |
+| Mods 安裝 | **0.11.0 已覆蓋**：`.../Probably Stolen/Mods/CardCraftAndFence` 與 dist 同 hash；完全退出遊戲再開才會載入 |
+| dist / Mods hash | 兩邊都是 **82,944 bytes／`FBEA8729…`** |
 | git | P1–P5 已提交：`9aab571`、`0f62dfc`、`7b1f161`（0.5.1）、`50204fb`（0.5.2）、`3bfd15c`（0.5.3）、`73351ab`（0.5.4）、`7f96242`（0.5.5）、`7d7363a`（0.5.6）、`e83c586`（0.5.7）、`dde90d7`（0.5.8）、`315df85`（0.5.9）、`8094136`（0.6.0）、`6a3387e`（0.6.1）、`75d227f`（0.6.2）、`66266cf`（0.7.0）、`81c2d08`（0.7.1）、`801a5b0`（0.7.2）、`4fe6b3f`（0.7.3）、`d13d49d`（0.7.4）、`c59107c`（0.7.5）、`225f17b`（0.7.6）、`3e1c4fa`（0.7.7）、`7f10b7c`（0.7.8）；0.8.0（P6）實作 `479c270`（含 docs）；0.9.0（P7）實作 `9d4b307`（code；docs 另 commit）；0.10.0（P8）實作 `c29ccce`（code；docs 另 commit）；**未 push**；`dist/` 與 `backup/` 依 `.gitignore` 不進版控 |
 
 > **0.7.7**：HSV 換色參數定案——`BlueHue=0.62`（指揮卡深藍取樣 `39,52,86`
@@ -1249,8 +1254,28 @@ Patch 數：CardCraft 由 7 → **8**（新增 CreateInventorStorage）。
   且方法內不得出現 `"blank_keycard"` 字面值。
 - 實機已證實可用的一條（舊版 log）：`[CF-PRINT] batch=2 extra=1 setsBefore=1 setsAfter=0`。
 
+## P9 0.11.0 Wild Network 塑料合約
+
+- 升級 id：`CF_PLASTIC_RECLAIM`；位置：Wild Network `CardFence` 分頁（第 10 張卡）。
+- 成本 250 credits；`cooldownDays=3`；每次 `onUnlock` 給 6 個
+  `printer_plastic`（`unitValue=12`，`BASIC_MATERIAL` / `PRINTER_MATERIAL_TAG`）。
+- 走 `CfNetwork.Add(..., cooldownDays)` → `ModHelper.AddNetworkUpgrade`；
+  `isRepeatable=true`，3 天後回到可購買狀態，不是一次性。
+- `GrantPlastic` 用 `Grant()`：`SetItemOwned(true)` +
+  `GraphUtils.EmporiumTryAdd(back, item)`；後台滿時會 fall through 到其他店內
+  inventory，不會原地 destroy。
+- 無新 Harmony patch；CardCraft 仍 9 patches（`VerifyMods` 9、`Probe-Patches` 8/4/9）。
+- 離線建置／驗證：`Build-Mods.ps1` 82,944 bytes；`SHA256=FBEA8729…`；
+  `VerifyMods` PASS、`Probe-Logic` PASS、`Dump` 可見
+  `CF_PLASTIC_RECLAIM` / `回收塑料合约` / `[CF-NET] plastic contract granted`。
+- **實機通過（使用者回報）**：合約可買、正常給付；使用者回報「有、沒問題」。
+  未提供逐項 log，所以 6 個入後台、3 天冷卻、後台滿 fallback 仍列在未決。
+
 ## 未決 / 未核實
 
+- **P9 細節未逐項核實**：使用者只回報「有、沒問題」，沒有提供 `Player.log`；
+  6 個 `printer_plastic` 是否全進後台、3 天冷卻是否真的倒數、後台滿時是否
+  fall through 到其他 inventory，都還沒逐項看過。合約存在與可購買已確認。
 - **P4 修訂全部未實機**：PRO 工具包、製卡匠／博士到訪與買賣、小偷 T2/T3 箱、
   Wild Network 4 個升級、T3 箱開鎖，都只有離線驗證；`Player.log` 沒有任何
   `[CF-NET]`／`[CF-MAKER]`／`[CF-INVENTOR]`／`[CF-THIEF]`。
